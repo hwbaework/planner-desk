@@ -2857,9 +2857,31 @@ function openSettings() {
     { k: "fontScale", l: "글자 크기", t: "select", opts: [["1", "보통"], ["1.1", "크게"], ["1.2", "아주 크게"]] },
     { k: "theme", l: "화면 테마", t: "select", opts: [["light", "화이트"], ["dark", "다크"]] },
   ], S.settings, (v) => { ["ackDays", "approvalDays", "quietDays", "verifyDays"].forEach((k) => (v[k] = Number(v[k]) || emptyState().settings[k])); Object.assign(S.settings, v); commit(); },
-  [{ l: "불러오기", cls: "left", fn: () => { closeModal(); $("importFile").click(); } },
+  [{ l: "사용 안내", cls: "left", fn: () => { closeModal(); openHelp(); } },
+   { l: "불러오기", cls: "left", fn: () => { closeModal(); $("importFile").click(); } },
    { l: "다른 이름으로 저장", cls: "left", fn: () => { closeModal(); saveFile(true); } },
    { l: "JSON 내보내기", cls: "left", fn: () => download(`planner-desk_${stamp()}.json`, JSON.stringify(S, null, 1), "application/json") }]);
+}
+function openHelp() {
+  const row = (k, v) => `<div class="mrow"><span class="nm"><b>${k}</b></span><span class="small muted" style="text-align:right">${v}</span></div>`;
+  openModal("사용 안내", `
+    <div class="sec-t">하루 흐름</div>
+    ${row("아침", "대시보드 '오늘 할 일' → 지난 것부터 처리")}
+    ${row("기획 넘길 때", "보드 '기획중' 카드 → 다음 → / 개발 전달 등록 (메일 작성 버튼)")}
+    ${row("회의 끝나고", "메모·회의록 작성 → 액션 → 업무 만들기")}
+    ${row("화면 고칠 때", "화면 목록 '개정' → 변경분 전달")}
+    ${row("주말 전", "상단 주간보고 → 복사")}
+    <div class="sec-t">단축키</div>
+    ${row("Ctrl+K", "통합 검색")}
+    ${row("Ctrl+S", "HTML로 저장")}
+    ${row("Esc", "창 닫기")}
+    <div class="sec-t">데이터</div>
+    ${row("자동 저장", "브라우저에 바로 저장")}
+    ${row("파일 저장", "저장 → 데이터가 든 HTML (다른 PC에서도 그대로)")}
+    ${row("메일 연동", "메일 수신 → 메일 연동 설정 → tools\\sync_mail.bat")}
+    <div class="sec-t">경고가 뜨는 경우</div>
+    <div class="small muted">개발 회신 없음(영업일 ${S.settings.ackDays}일) · 완료 노티 없음 · 승인 회신 없음(${S.settings.approvalDays}일) · 데이터 미수신 · 결함 미전달 · 재테스트 필요 · 화면 변경 후 미전달 · 화면 미반영 요구사항 · 마감 지남. 기준일은 설정에서 바꿀 수 있어.</div>`,
+    [{ l: "닫기", cls: "primary", fn: closeModal }]);
 }
 function toggleTheme() { S.settings.theme = S.settings.theme === "dark" ? "light" : "dark"; persist(); render(); }
 // 주간보고: 금주 실적 → 이슈 → 차주 계획 (개조식). wk=0 이번 주, -1 지난 주
