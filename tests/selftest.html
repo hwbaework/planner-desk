@@ -430,10 +430,17 @@ function tests(w, errors) {
     mk("t_cda"); w.convertTask("t_cda", "data");
     const d = S().datas.find((x) => x.name === "전환 t_cda");
     assert(d && d.dueDate === w.addDays(t, 5) && d.log.some((e) => e.text === "기관 통화"), "데이터: " + JSON.stringify(d));
+    S().tasks.push({ id: "t_cdm", projectId: pid(), title: "전환 메모만", status: "진행중", priority: "mid", start: w.addDays(t, -200), due: "", memo: "5월 19일 기준 자료 요청" });
+    w.convertTask("t_cdm", "data"); w.closeModal();
+    const d2 = S().datas.find((x) => x.name === "전환 메모만");
+    assert(d2.log.some((e) => e.text === "자료 요청") && d2.log.some((e) => e.text === "업무에서 전환" && e.at === t) && d2.memo === "", "메모 날짜 줄: " + JSON.stringify(d2));
+    assert(!w.computeAlerts(pid()).some((a) => a.ref[1] === d2.id), "전환 직후 데이터 경고");
+    S().datas = S().datas.filter((x) => x.id !== d2.id);
     w.closeModal();
     mk("t_cho"); w.convertTask("t_cho", "ho");
     const h = S().handoffs.find((x) => x.title === "전환 t_cho");
-    assert(h && h.status === "plan" && h.code && h.memo.includes("기관 통화"), "개발 전달: " + JSON.stringify(h));
+    assert(h && h.status === "plan" && h.code && !h.memo && h.events.some((e) => e.type === "note" && e.text === "기관 통화"), "개발 전달: " + JSON.stringify(h));
+    assert(S().ui.hoFilter === "open", "전달 목록 필터");
     w.closeModal();
     assert(!S().tasks.some((x) => x.id.startsWith("t_c") && x.title.startsWith("전환")), "업무가 남음");
     S().events = S().events.filter((e) => e.id !== ev.id); S().datas = S().datas.filter((x) => x.id !== d.id); S().handoffs = S().handoffs.filter((x) => x.id !== h.id);
@@ -444,7 +451,7 @@ function tests(w, errors) {
     const d = w.parseD(t), sun = w.addDays(t, (7 - d.getDay()) % 7), mon = w.addDays(sun, -6);
     const rep = w.buildReport([pid()], 0);
     assert(rep.startsWith(`주간 보고 (${mon} ~ ${sun})`), "기간: " + rep.split("\n")[0]);
-    assert(rep.includes(`3. 차주 계획 (${w.shortD(w.addDays(t, 1))} ~ ${w.shortD(w.addDays(sun, 7))})`), "차주 범위");
+    assert(rep.includes(`3. 차주 계획 (${w.shortD(w.addDays(sun, 1))} ~ ${w.shortD(w.addDays(sun, 7))})`), "차주 범위");
     S().settings.reportWeek = prev;
   });
   check("주간보고 금주 실적에 이번 주 업무 진행 기록", () => {

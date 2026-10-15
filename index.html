@@ -1951,23 +1951,30 @@ function convertTaskMenu(id) {
   openModal("다른 항목으로 전환", `<div class="small muted" style="margin-bottom:10px">${esc(x.title)} — 진행 기록과 메모는 그대로 옮겨가고 이 업무는 지워져. (Ctrl+Z로 되돌릴 수 있어)</div>` +
     opt("ms", "마일스톤", `마감일(${x.due ? shortD(x.due) : "없으면 인지일"})로 일정에 표시. 프로젝트 개요·타임라인의 다음 마일스톤에 나와`) +
     opt("data", "데이터 협의", "컨소시엄 기관에서 받을 데이터라면. 수신 예정일 = 마감일, 기록은 협의 기록으로") +
-    opt("ho", "개발 전달", "개발에 넘길 기획 건이라면. 기획중 상태로 만들고 메모에 기록을 붙여"), [{ l: "취소", fn: closeModal }]);
+    opt("ho", "개발 전달", "개발에 넘길 기획 건이라면. 기획중 상태로 만들고, 기록은 내부 메모로만 남겨 (전달 메일에는 안 들어가)"), [{ l: "취소", fn: closeModal }]);
 }
 function convertTask(id, kind) {
   const x = S.tasks.find((t) => t.id === id); if (!x) return;
-  const logs = (x.log || []).filter((e) => e.type === "comment").sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || "")));
-  const memo = [x.memo || "", ...logs.map((e) => `${e.at} ${e.text}`)].filter(Boolean).join("\n");
+  // 진행 기록 + 메모의 날짜 줄을 함께 기록으로 가져간다
+  const dated = memoDated(x.memo);
+  const logs = [...(x.log || []).filter((e) => e.type === "comment"), ...dated.map((r) => ({ at: r.at, ts: "", text: r.text }))]
+    .sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || "")));
+  const restMemo = removeLines(x.memo, dated);
+  const memo = [x.memo || "", ...(x.log || []).filter((e) => e.type === "comment").map((e) => `${e.at} ${e.text}`)].filter(Boolean).join("\n");
   let open;
   if (kind === "ms") {
     const ev = { id: uid("ev"), projectId: x.projectId, title: x.title, type: "마일스톤", start: x.due || x.start || today(), end: "", location: "", memo };
     S.events.push(ev); open = () => editEvent(ev.id);
   } else if (kind === "data") {
-    const d = { id: uid("da"), projectId: x.projectId, org: "", name: x.title, contact: x.owner || "", method: "미정", cycle: "미정", status: x.status === "완료" ? "수신 완료" : "협의 중", requestedAt: x.start || today(), dueDate: x.due || "", memo: x.memo || "",
+    const d = { id: uid("da"), projectId: x.projectId, org: "", name: x.title, contact: x.owner || "", method: "미정", cycle: "미정", status: x.status === "완료" ? "수신 완료" : "협의 중", requestedAt: x.start || today(), dueDate: x.due || "", memo: restMemo,
       log: logs.map((e) => ({ id: uid("l"), at: e.at, ts: e.ts || new Date().toISOString(), type: "기타", text: e.text })) };
-    S.datas.push(d); open = () => openData(d.id);
+    d.log.push({ id: uid("l"), at: today(), ts: new Date().toISOString(), type: "기타", text: "업무에서 전환" });
+    S.datas.push(d); S.ui.dataFilter = "open"; S.ui.dataOrg = ""; open = () => openData(d.id);
   } else {
-    const h = { id: uid("h"), code: nextHOCode(), projectId: x.projectId, title: x.title, status: "plan", events: [], docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due || "", to: "", toEmail: "", cc: "", link: "", memo };
-    S.handoffs.push(h); open = () => openHO(h.id);
+    // 요청사항(memo)은 개발자 메일에 들어가므로 비워 두고, 내부 기록은 메모 이벤트로만 남긴다
+    const h = { id: uid("h"), code: nextHOCode(), projectId: x.projectId, title: x.title, status: "plan", docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due || "", to: "", toEmail: "", cc: "", link: "", memo: "",
+      events: [...logs, ...(restMemo ? [{ at: today(), text: "업무 메모: " + restMemo }] : [])].map((e) => ({ id: uid("e"), at: e.at, ts: e.ts || new Date().toISOString(), type: "note", text: e.text })) };
+    S.handoffs.push(h); S.ui.hoFilter = "open"; open = () => openHO(h.id);
   }
   S.tasks = S.tasks.filter((t) => t.id !== id);
   commit(); closeModal(); open();
@@ -3460,11 +3467,11 @@ function buildReport(pids, wk) {
     decW.forEach((r) => L.push(`  - [결정] ${r.title}`));
     al.slice(0, 8).forEach((a) => L.push(`  - [${a.kind}] ${a.title} — ${a.desc}`));
     // 3. 차주 계획
-    L.push(`3. 차주 계획 (${shortD(addDays(pFrom, 1))} ~ ${shortD(nx)})`);
+    L.push(`3. 차주 계획 (${shortD(addDays(t, 1))} ~ ${shortD(nx)})${pFrom < t ? ` · 이번 주 남은 일정 ${shortD(addDays(pFrom, 1))}~ 포함` : ""}`);
     const plan = calItems(addDays(pFrom, 1), nx, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
     const wbsRun = S.wbs.filter((w) => w.projectId === pid && Number(w.progress) < 100 && w.start && w.end && w.start <= nx && w.end > t);
     if (!plan.length && !wbsRun.length) L.push(`  - (일정이 등록된 항목 없음 — 타임라인에서 날짜를 채워줘)`);
-    plan.forEach((i) => L.push(`  - ${shortD(i.date)} ${CAL_TAG[i.kind] ? "[" + CAL_TAG[i.kind] + "] " : "[" + (i.sub || "일정") + "] "}${i.title}`));
+    plan.forEach((i) => L.push(`  - ${i.date <= t ? "(이번 주) " : ""}${shortD(i.date)} ${CAL_TAG[i.kind] ? "[" + CAL_TAG[i.kind] + "] " : "[" + (i.sub || "일정") + "] "}${i.title}`));
     wbsRun.filter((w) => !plan.some((i) => i.kind === "wbs" && i.title.endsWith(w.title))).forEach((w) => L.push(`  - [WBS 진행] ${w.title} ${w.progress || 0}% (~${shortD(w.end)})`));
     return L.join("\n");
   }).join("\n\n");
