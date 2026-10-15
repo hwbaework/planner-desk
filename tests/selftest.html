@@ -500,6 +500,15 @@ function tests(w, errors) {
     assert(names.includes("업무"), "업무 메뉴가 숨겨짐");
     assert(names.some((n) => /아직 안 쓰는 메뉴|접기/.test(n)) || !names.length === false, "접기 줄 처리");
   });
+  check("파일 저장 알림: 저장한 적 없거나 하루 지나면 배너, '오늘은 그만'이면 숨김", () => {
+    S().fileSavedAt = ""; S().ui.saveNagSnooze = ""; w.persist(); w.render();
+    assert(w.document.getElementById("bannerArea").textContent.includes("파일로 저장한 적이 없어"), "배너 없음");
+    S().ui.saveNagSnooze = t; w.render();
+    assert(!w.document.getElementById("bannerArea").textContent.includes("파일로 저장"), "숨김 안 됨");
+    S().ui.saveNagSnooze = ""; S().fileSavedAt = new Date(Date.now() + 60000).toISOString(); w.render();
+    assert(!w.document.getElementById("bannerArea").textContent.includes("파일로 저장"), "방금 저장했는데 배너");
+    w.openSettings(); assert(w.document.getElementById("modalBody").textContent.includes("마지막 파일 저장"), "설정에 데이터 정보 없음"); w.closeModal();
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
