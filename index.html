@@ -870,7 +870,7 @@ function computeAlerts(pid) {
   });
   S.risks.filter(scope).forEach((r) => {
     if (r.status === "종료" || r.type === "결정" || r.type === "가정") return;
-    if (r.due && r.due < t) out.push({ level: "danger", kind: "이슈·리스크 기한 지남", ref: ["risk", r.id], pid: r.projectId, days: calDays(r.due), title: `${r.code} ${r.title}`, desc: `${r.type} · 대응 기한 ${shortD(r.due)} (${dday(r.due)}) · ${r.owner || "담당 미정"}` });
+    if (r.due && r.due < t) out.push({ level: r.status === "모니터링" ? "warn" : "danger", kind: "이슈·리스크 기한 지남", ref: ["risk", r.id], pid: r.projectId, days: calDays(r.due), title: `${r.code} ${r.title}`, desc: `${r.type} · 대응 기한 ${shortD(r.due)} (${dday(r.due)}) · ${r.owner || "담당 미정"}` });
     else if (riskScore(r) >= 6 && !(r.plan || "").trim()) out.push({ level: "warn", kind: "대응 방안 없음", ref: ["risk", r.id], pid: r.projectId, days: 0, title: `${r.code} ${r.title}`, desc: `${r.type} · 영향 ${r.impact} × 가능성 ${r.prob} · 대응 방안을 적어줘` });
   });
   S.reqs.filter(scope).forEach((r) => {
@@ -950,10 +950,17 @@ function renderTabs() {
     const a = alerts.filter((x) => (NAV_ALERT[k] || []).includes(x.ref[0]));
     return [a.length, a.some((x) => x.level === "danger")];
   };
-  const nav = NAV_GROUPS.map(([g, keys]) => `<h3>${g}</h3>` + keys.map((k) => {
-    const [n, red] = count(k);
-    return `<div class="navi ${S.ui.tab === k ? "active" : ""}" onclick="selTab('${k}')"><span class="nm">${label[k]}</span>${n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`;
-  }).join("")).join("");
+  const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  const has = { tasks: S.tasks, data: S.datas, ho: S.handoffs, risks: S.risks, docs: S.docs, reqs: S.reqs, screens: S.screens, wbs: S.wbs, tc: S.tcs, notes: S.notes };
+  const empty = (k) => has[k] && !has[k].some(sc) && S.ui.tab !== k;
+  const navItem = (k) => { const [n, red] = count(k); return `<div class="navi ${S.ui.tab === k ? "active" : ""}" onclick="selTab('${k}')"><span class="nm">${label[k]}</span>${n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`; };
+  const hidden = [];
+  let nav = NAV_GROUPS.map(([g, keys]) => {
+    const shown = keys.filter((k) => !(g === "관리" && empty(k)));
+    keys.filter((k) => g === "관리" && empty(k)).forEach((k) => hidden.push(k));
+    return `<h3>${g}</h3>` + shown.map(navItem).join("");
+  }).join("");
+  if (hidden.length) nav += `<div class="navi" onclick="S.ui.navMore=!S.ui.navMore;persistUI();render()"><span class="nm muted">${S.ui.navMore ? "접기" : `아직 안 쓰는 메뉴 ${hidden.length}개`}</span></div>` + (S.ui.navMore ? hidden.map(navItem).join("") : "");
   $("sideNav").innerHTML = nav;
   $("tabs").innerHTML = `<span class="crumb" onclick="selProject('all')">프로젝트</span><span class="sep">/</span>${pid ? `<span class="crumb" onclick="selTab('dash')">${esc(projName(pid))}</span><span class="sep">/</span>` : `<span class="crumb" onclick="selTab('dash')">전체 보기</span><span class="sep">/</span>`}<b>${label[S.ui.tab] || ""}</b>`;
 }
@@ -1082,7 +1089,7 @@ function todayCard(pid, alerts) {
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
-  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, req: `editReq('${id}')`, risk: `editRisk('${id}')` }[type];
+  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `selProject('${a.pid}');editScreen('${id}')`, req: `editReq('${id}')`, risk: `editRisk('${id}')` }[type];
     return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
@@ -1114,12 +1121,12 @@ function missingCard(pid) {
 }
 function alertRow(a) {
   const [type, id] = a.ref;
-  const open = { risk: `editRisk('${id}')`, req: `editReq('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
+  const open = { risk: `editRisk('${id}')`, req: `editReq('${id}')`, screen: `selProject('${a.pid}');editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
   let acts = "";
   if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
   if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
   if (type === "task") acts = `<button class="btn sm" onclick="setTask('${id}','status','완료')">완료</button>`;
-  if (type === "screen") acts = `<button class="btn sm" onclick="S.ui.pid='${a.pid}';sendRevision('${id}')">변경분 전달</button>`;
+  if (type === "screen") acts = `<button class="btn sm" onclick="selProject('${a.pid}');sendRevision('${id}')">변경분 전달</button>`;
   if (type === "recur") acts = `<button class="btn sm" onclick="completeRecur('${id}')">완료</button>`;
   if (type === "doc" && a.kind === "승인 회신 없음") acts = `<button class="btn sm" onclick="setDocStatus('${id}','승인')">승인 받음</button>`;
   return `<div class="alert ${a.level}"><span class="ic"></span><div class="body">
@@ -1808,16 +1815,16 @@ function editHO(id, preset) {
   const x = id ? S.handoffs.find((h) => h.id === id) : Object.assign({ docIds: [], screenIds: [] }, preset || {});
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   openForm(id ? `전달 건 편집 · ${x.code}` : "개발 전달 등록", hoFields(x), x, (v) => {
-    if (id) { Object.assign(x, v); }
+    if (id) { Object.assign(x, v); relinkScreens(); }
     else {
       const h = Object.assign({ id: uid("h"), code: nextHOCode(), status: "sent", events: [] }, v);
       h.events.push({ id: uid("e"), at: h.sentAt || today(), ts: new Date().toISOString(), type: "sent", text: "기획 전달" + (h.to ? ` → ${h.to}` : "") });
       S.handoffs.push(h);
-      h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) { s.hoId = h.id; s.lastSentVer = s.version || ""; } });
+      h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) { s.hoId = h.id; s.lastSentVer = s.version || ""; s.lastSentAt = new Date().toISOString(); } });
       setTimeout(() => openHO(h.id), 0);
     }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); relinkScreens(); commit(); closeModal(); } } }] : []);
 }
 function openHO(id, presetType) {
   const x = S.handoffs.find((h) => h.id === id); if (!x) return;
@@ -1874,7 +1881,7 @@ function pushEvent(x, e) {
   if (EV_TO_ST[e.type]) x.status = EV_TO_ST[e.type];
   else if (e.type === "question" && ["plan", "sent"].includes(x.status)) x.status = "ack";
   if (e.type === "sent" && !x.sentAt) x.sentAt = e.at;
-  if (e.type === "sent") (x.screenIds || []).forEach((sid) => { const sc = S.screens.find((z) => z.id === sid); if (sc) { sc.hoId = x.id; sc.lastSentVer = sc.version || ""; } });
+  if (e.type === "sent") (x.screenIds || []).forEach((sid) => { const sc = S.screens.find((z) => z.id === sid); if (sc) { sc.hoId = x.id; sc.lastSentVer = sc.version || ""; sc.lastSentAt = new Date().toISOString(); } });
   if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
 }
 function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
@@ -2112,7 +2119,8 @@ function editRisk(id, preset) {
 }
 
 // ───────────── 요구사항 · 추적표 (요구사항 → 화면 → 테스트) ─────────────
-function nextReqCode() { S.seq.req = (S.seq.req || 0) + 1; return `REQ-${String(S.seq.req).padStart(3, "0")}`; }
+function syncReqSeq() { S.seq.req = Math.max(S.seq.req || 0, ...S.reqs.map((r) => Number((String(r.code).match(/(\d+)\s*$/) || [])[1]) || 0)); }
+function nextReqCode() { syncReqSeq(); S.seq.req += 1; return `REQ-${String(S.seq.req).padStart(3, "0")}`; }
 function reqTrace(r) {
   const screens = (r.screenIds || []).map((id) => S.screens.find((x) => x.id === id)).filter(Boolean);
   const tcs = S.tcs.filter((c) => screens.some((sc) => sc.id === c.screenId));
@@ -2179,14 +2187,16 @@ function bulkReqs() {
     <textarea id="bulkText" style="min-height:220px" class="mono"></textarea>`, [
     { l: "취소", fn: closeModal },
     { l: "추가", cls: "primary", fn: () => {
-      let add = 0, upd = 0;
+      let add = 0, upd = 0; const missing = new Set();
       $("bulkText").value.split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((r) => r[1]).forEach(([code, title, kind, source, scr]) => {
-        const screenIds = String(scr || "").split(/[,\s]+/).filter(Boolean).map((c) => S.screens.find((x) => x.projectId === pid && x.code === c)?.id).filter(Boolean);
+        const codes = String(scr || "").split(/[,\s]+/).filter(Boolean);
+        const screenIds = codes.map((c) => { const f = S.screens.find((x) => x.projectId === pid && x.code === c); if (!f) missing.add(c); return f?.id; }).filter(Boolean);
         const ex = code && S.reqs.find((r) => r.projectId === pid && r.code === code);
-        if (ex) { Object.assign(ex, { title, kind: REQ_KIND.includes(kind) ? kind : ex.kind, source: source || ex.source, screenIds: screenIds.length ? screenIds : ex.screenIds }); upd++; }
+        if (ex) { Object.assign(ex, { title, kind: REQ_KIND.includes(kind) ? kind : ex.kind, source: source || ex.source, screenIds: [...new Set([...(ex.screenIds || []), ...screenIds])] }); upd++; }
         else { S.reqs.push({ id: uid("rq"), projectId: pid, code: code || nextReqCode(), title, kind: REQ_KIND.includes(kind) ? kind : "기능", source: source || "", status: "접수", priority: "mid", receivedAt: today(), screenIds }); add++; }
       });
-      commit(); closeModal(); toast(`추가 ${add} · 갱신 ${upd}`);
+      syncReqSeq(); commit(); closeModal();
+      toast(`추가 ${add} · 갱신 ${upd}${missing.size ? ` · 화면 목록에 없는 화면ID: ${[...missing].slice(0, 5).join(", ")}` : ""}`);
     } },
   ]);
 }
@@ -2228,6 +2238,19 @@ function renderScreens() {
   return h;
 }
 // 화면 개정: 버전업 + 변경 내용 이력. 이미 개발에 넘긴 화면이면 '변경 후 미전달'로 표시된다.
+// 화면마다 '가장 최근에 전달된 전달 건'을 다시 찾는다. 전달 건이 없으면 연결과 전달 버전을 지운다.
+function relinkScreens() {
+  S.screens.forEach((sc) => {
+    let best = null, bestTs = "";
+    S.handoffs.forEach((h) => {
+      if (!(h.screenIds || []).includes(sc.id)) return;
+      const ev = h.events.filter((e) => e.type === "sent").map((e) => e.ts || e.at).sort().pop();
+      if (ev && ev > bestTs) { best = h; bestTs = ev; }
+    });
+    if (!best) { delete sc.hoId; delete sc.lastSentVer; delete sc.lastSentAt; return; }
+    if (sc.hoId !== best.id) { sc.hoId = best.id; if (sc.lastSentVer === undefined) { sc.lastSentVer = sc.version || ""; sc.lastSentAt = bestTs; } }
+  });
+}
 function reviseScreen(id) {
   const sc = S.screens.find((x) => x.id === id);
   const why = prompt(`「${sc.code} ${sc.name}」 변경 내용 (예: 약관 항목 추가, 버튼 문구 변경)`, "");
@@ -2241,7 +2264,7 @@ function reviseScreen(id) {
 // 변경분 전달: 이전 전달 이후 이력을 요약해서 새 전달 건으로
 function sendRevision(id) {
   const sc = S.screens.find((x) => x.id === id);
-  const changes = (sc.history || []).filter((hh) => !sc.lastSentVer || hh.from >= sc.lastSentVer || hh.to > sc.lastSentVer).map((hh) => `- ${hh.to}: ${hh.text}`).join("\n");
+  const changes = (sc.history || []).filter((hh) => !sc.lastSentAt || (hh.ts || hh.at) > sc.lastSentAt).map((hh) => `- ${hh.to}: ${hh.text}`).join("\n");
   const prev = S.handoffs.find((x) => x.id === sc.hoId);
   editHO(null, { projectId: sc.projectId, screenIds: [sc.id], to: prev?.to || sc.dev || "", toEmail: prev?.toEmail || "", title: `${sc.code} ${sc.name} 변경분(${sc.version}) 전달`,
     memo: `[변경 내용] ${sc.lastSentVer || ""} → ${sc.version}\n${changes}` });
