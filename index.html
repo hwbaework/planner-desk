@@ -493,6 +493,11 @@
     .cal .day .pill, .cal .day .more { display: none; }
     .cal .day .dn { display: inline-block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accentw); border-radius: 8px; padding: 0 6px; }
     .cal-agenda { display: block; margin-top: 14px; }
+    .proj-list { display: flex; flex-wrap: nowrap; gap: 4px; overflow-x: auto; width: 100%; min-width: 0; padding-bottom: 2px; }
+    .proj-list > * { flex: none; }
+    .proj-list .proj .nm { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .savenag .why { display: none; }
+    .tcards td.tc-title + td select.inline { padding: 2px 4px; height: 28px; }
     /* 업무 표 → 카드: 제목 한 줄, 아래에 상태·마감·담당 */
     .tcards thead, .tcards .tc-opt { display: none; }
     .tcards tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
@@ -1025,9 +1030,9 @@ function renderBanner() {
   const saved = S.fileSavedAt || "", changed = (S.updatedAt || "") > saved;
   const days = saved ? calDays(saved.slice(0, 10)) : null;
   if (changed && (days === null || days >= 1) && S.ui.saveNagSnooze !== today() && S.projects.length) {
-    h += `<div class="banner" style="background:var(--accentw);color:var(--text);border-color:var(--accent)">
+    h += `<div class="banner savenag" style="background:var(--accentw);color:var(--text);border-color:var(--accent)">
       <b>${days === null ? "아직 파일로 저장한 적이 없어." : `파일로 저장한 지 ${days}일 지났어.`}</b>
-      <span class="small">지금 데이터는 이 브라우저에만 있어서, 브라우저 기록을 지우면 사라질 수 있어.</span>
+      <span class="small why">지금 데이터는 이 브라우저에만 있어서, 브라우저 기록을 지우면 사라질 수 있어.</span>
       <button class="btn sm primary" onclick="saveFile(false)">지금 저장</button><button class="btn sm ghost" style="margin-left:0" onclick="S.ui.saveNagSnooze=today();persistUI();render()">오늘은 그만</button></div>`;
   }
   $("bannerArea").innerHTML = h;
@@ -1038,11 +1043,11 @@ function renderSide() {
   const cntOf = (pid) => all.filter((a) => a.pid === pid && a.level === "danger").length;
   const item = (id, name, color, n) => `<div class="proj ${S.ui.pid === id ? "active" : ""}" onclick="selProject('${id}')">
       <span class="dot" style="${color ? "background:" + color : ""}"></span><span class="nm">${esc(name)}</span>${n ? `<span class="cnt">${n}</span>` : ""}</div>`;
-  let h = `<h3>프로젝트</h3>` + item("all", "전체 보기 (PMO)", "", all.filter((a) => a.level === "danger").length);
+  let h = `<h3>프로젝트</h3><div class="proj-list">` + item("all", "전체 보기 (PMO)", "", all.filter((a) => a.level === "danger").length);
   activeProjects().forEach((p) => {
     h += item(p.id, p.name, p.color, cntOf(p.id));
   });
-  h += `<button class="btn sm add" onclick="editProject()">＋ 프로젝트 추가</button>`;
+  h += `<button class="btn sm add" onclick="editProject()">＋ 프로젝트 추가</button></div>`;
   const arch = S.projects.filter((p) => p.archived);
   if (arch.length) {
     h += `<div class="archived"><h3>보관됨</h3>` + arch.map((p) => `<div class="proj" onclick="editProject('${p.id}')"><span class="dot"></span><span class="nm">${esc(p.name)}</span></div>`).join("") + `</div>`;
@@ -1825,12 +1830,12 @@ function renderTasks() {
     }).join("") || `<tr><td colspan="7" class="empty">해당하는 업무가 없어</td></tr>`) + `</tbody></table></div></div>`;
   const recs = S.recurring.filter(inScope).sort((a, b) => (a.nextDue || "9").localeCompare(b.nextDue || "9"));
   h += `<div class="card"><div class="card-h"><h3>정기 업무</h3><span class="sub">${recs.length}건 · 완료를 누르면 다음 회차로 넘어가</span><div class="actions"><button class="btn sm" onclick="editRecur()">+ 정기 업무</button></div></div>
-    <div class="tbl-wrap"><table class="t"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>정기 업무</th><th>주기</th><th>다음 예정</th><th>최근 완료</th><th>수신</th><th></th></tr></thead><tbody>` +
+    <div class="tbl-wrap"><table class="t tcards"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>정기 업무</th><th>주기</th><th>다음 예정</th><th>최근 완료</th><th>수신</th><th></th></tr></thead><tbody>` +
     (recs.map((r) => `<tr>${pid ? "" : `<td class="nowrap">${projTag(r.projectId)}</td>`}
-      <td><span class="link" onclick="editRecur('${r.id}')">${esc(r.title)}</span>${r.path ? ` <button class="btn sm ghost" title="${esc(r.path)}" onclick="copyText(${esc(JSON.stringify(r.path))},'경로 복사됨')">경로</button>` : ""}</td>
+      <td class="tc-title"><span class="link" onclick="editRecur('${r.id}')">${esc(r.title)}</span>${r.path ? ` <button class="btn sm ghost" title="${esc(r.path)}" onclick="copyText(${esc(JSON.stringify(r.path))},'경로 복사됨')">경로</button>` : ""}</td>
       <td class="nowrap">${recurLabel(r)}</td>
       <td class="nowrap" style="${r.nextDue && r.nextDue < t ? "color:var(--danger);font-weight:700" : ""}">${r.nextDue ? `${shortD(r.nextDue)} <span class="small muted">${dday(r.nextDue)}</span>` : "-"}</td>
-      <td class="nowrap">${r.lastDone ? shortD(r.lastDone) : "-"}</td>
+      <td class="nowrap tc-opt">${r.lastDone ? shortD(r.lastDone) : "-"}</td>
       <td class="small">${esc(r.recipient || "")}</td>
       <td class="nowrap"><button class="btn sm" onclick="completeRecur('${r.id}')">완료</button></td></tr>`).join("") || `<tr><td colspan="7" class="empty">정기 업무 없음 (주간보고 등)</td></tr>`) + `</tbody></table></div></div>`;
   return h;
