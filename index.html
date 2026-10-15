@@ -61,6 +61,19 @@
   .gres .gi .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gres .gi .sub { font-size: 12px; color: var(--faint); white-space: nowrap; }
   .gres mark { background: var(--warnw); color: inherit; border-radius: 2px; }
+  @media print {
+    :root, [data-theme="dark"] { --bg: #fff; --panel: #fff; --sub: #f4f5f7; --hover: #fff; --line: #c9ced6; --text: #000; --dim: #333; --faint: #555; }
+    body { background: #fff; zoom: 1 !important; font-size: 12px; }
+    .top, .side, #bannerArea, .tabs .crumb, .tabs .sep, .page-head .actions, .card-h .actions, .filters, .seg, .cal-bar button, .cal-kinds,
+    .btn, .next, .add, #toast, .modal-bg, .tl-fill input, select.inline::after { display: none !important; }
+    .shell { display: block; }
+    main { padding: 0; }
+    .card, .kpi, .wk, .mx { box-shadow: none; break-inside: avoid; }
+    table.t th { position: static; }
+    a { color: #000; text-decoration: none; }
+    select.inline { border: none; appearance: none; -webkit-appearance: none; padding: 0; }
+    .tbl-wrap, .tl-right, .board { overflow: visible !important; }
+  }
   @media (max-width: 900px) { .gsearch { order: 5; flex: 1 1 100%; } }
   .save-ind { font-size: 12.5px; color: var(--faint); }
   .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; flex: none; }
@@ -3077,12 +3090,34 @@ function buildReport(pids, wk) {
   }).join("\n\n");
   return `주간 보고 (${ws} ~ ${t})${S.settings.me ? " · " + S.settings.me : ""}\n\n` + body;
 }
+// 주간보고 텍스트를 보고서 모양으로 인쇄 (브라우저 인쇄 창에서 PDF로 저장 가능)
+function printReport(text) {
+  const lines = text.split("\n");
+  const body = lines.map((l) => {
+    if (/^주간 보고/.test(l)) return `<h1>${esc(l)}</h1>`;
+    if (/^■ /.test(l)) return `<h2>${esc(l.slice(2))}</h2>`;
+    if (/^\d\. /.test(l)) return `<h3>${esc(l)}</h3>`;
+    if (/^\s{4}· /.test(l)) return `<div class="l3">${esc(l.trim().slice(2))}</div>`;
+    if (/^\s{2}- /.test(l)) return `<div class="l2">${esc(l.trim().slice(2))}</div>`;
+    return l.trim() ? `<div>${esc(l)}</div>` : "";
+  }).join("");
+  const w = window.open("", "_blank");
+  if (!w) { toast("팝업이 막혀 있어 — 이 사이트의 팝업을 허용해줘"); return; }
+  w.document.write(`<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>주간보고 ${today()}</title>
+    <style>body{font-family:"Pretendard Variable",Pretendard,"Malgun Gothic",sans-serif;color:#172b4d;margin:28px 36px;font-size:13px;line-height:1.6}
+    h1{font-size:19px;border-bottom:2px solid #0c66e4;padding-bottom:6px;margin:0 0 14px}h2{font-size:15px;margin:18px 0 6px;color:#0c66e4}
+    h3{font-size:13.5px;margin:10px 0 4px}.l2{padding-left:14px;position:relative}.l2:before{content:"-";position:absolute;left:4px}
+    .l3{padding-left:30px;color:#44546f}@page{margin:16mm}</style></head><body>${body}
+    <div style="margin-top:24px;font-size:11px;color:#626f86">Planner Desk · ${new Date().toLocaleString("ko-KR")}</div></body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
+}
 function openReport(wk = 0) {
   const pids = S.ui.pid === "all" ? activeProjects().map((p) => p.id) : [S.ui.pid];
   const txt = buildReport(pids, wk);
   openModal("주간보고 초안", `<div class="seg" style="margin-bottom:10px">${[[0, "이번 주"], [-1, "지난 주"]].map(([k, l]) => `<button class="${k === wk ? "on" : ""}" onclick="openReport(${k})">${l}</button>`).join("")}</div>
     <div class="small muted" style="margin-bottom:6px">${S.ui.pid === "all" ? "전체 프로젝트" : esc(projName(S.ui.pid))} 기준 · 금주 실적 → 이슈 → 차주 계획. 고쳐서 복사하면 돼.</div>
     <textarea id="rep" class="mono" style="min-height:420px">${esc(txt)}</textarea>`, [
+    { l: "인쇄·PDF", cls: "left", fn: () => printReport($("rep").value) },
     { l: ".txt 저장", cls: "left", fn: () => download(`주간보고_${stamp()}.txt`, $("rep").value, "text/plain") },
     { l: "복사", cls: "primary", fn: () => copyText($("rep").value) },
   ], true);

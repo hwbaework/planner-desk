@@ -509,6 +509,19 @@ function tests(w, errors) {
     assert(!w.document.getElementById("bannerArea").textContent.includes("파일로 저장"), "방금 저장했는데 배너");
     w.openSettings(); assert(w.document.getElementById("modalBody").textContent.includes("마지막 파일 저장"), "설정에 데이터 정보 없음"); w.closeModal();
   });
+  check("주간보고 인쇄용 문서: 제목·프로젝트·단계 구조로 변환", () => {
+    let html = "", printed = false;
+    const keep = w.open;
+    w.open = () => ({ document: { write: (h) => (html += h), close() {} }, focus() {}, print() { printed = true; } });
+    w.printReport(w.buildReport([pid()], 0));
+    w.open = keep;
+    assert(html.includes("<h1>주간 보고") && html.includes("<h2>") && html.includes("<h3>1. 금주 실적"), "구조 변환 실패");
+    assert(!/<script/i.test(html), "스크립트가 섞임");
+  });
+  check("인쇄할 때 메뉴·버튼은 숨김 규칙이 있음", () => {
+    const css = [...w.document.styleSheets].flatMap((s) => { try { return [...s.cssRules]; } catch (e) { return []; } }).filter((r) => r.media && /print/.test(r.media.mediaText)).map((r) => r.cssText).join(" ");
+    assert(/\.side/.test(css) && /\.top/.test(css) && /\.btn/.test(css), "인쇄용 규칙 없음");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
