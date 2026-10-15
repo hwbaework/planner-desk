@@ -227,6 +227,23 @@
   .gantt .todayline { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--danger); }
   input.progress { width: 58px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; text-align: right; background: var(--panel); color: var(--text); font-family: inherit; font-size: 12px; }
 
+  /* 요약 (Jira 요약 화면 구조) */
+  .week { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+  .wk { display: flex; align-items: center; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; box-shadow: var(--shadow); }
+  .wk-i { width: 34px; height: 34px; border-radius: 50%; background: var(--sub); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .ov { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+  .donut { display: flex; align-items: center; gap: 14px; }
+  .dn-v { font-size: 26px; font-weight: 700; fill: var(--text); }
+  .dn-l { font-size: 11px; fill: var(--faint); }
+  .dn-legend div { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 3px 0; color: var(--dim); }
+  .dn-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+  .dn-legend b { color: var(--text); margin-left: 2px; }
+  .ov-types { flex: 1; min-width: 200px; }
+  .ov-row { display: flex; align-items: center; gap: 6px; margin: 5px 0; font-size: 13px; }
+  .ov-bar { flex: 1; height: 8px; background: var(--sub); border-radius: 4px; overflow: hidden; }
+  .ov-bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  @media (max-width: 900px) { .week { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
   /* Project tag */
   .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
   .ti + .tlabel { margin-left: 6px; }
@@ -557,6 +574,7 @@ function normalize(d) {
   s.seq = Object.assign({ ho: 0, tc: 0 }, d?.seq || {});
   ["projects", "tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
+  ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
   s.projects.forEach((p, i) => { if (!p.color) p.color = PROJ_COLORS[i % PROJ_COLORS.length]; });
   s.handoffs.forEach((h) => { h.events = h.events || []; h.docIds = h.docIds || []; h.screenIds = h.screenIds || []; });
@@ -582,6 +600,7 @@ function writeLocal() {
 }
 function persist() {
   S.updatedAt = new Date().toISOString();
+  ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
   writeLocal(); dirty = true; updateSaveInd();
   if (fileHandle) { clearTimeout(fileTimer); fileTimer = setTimeout(() => writeToHandle(true), 1500); }
 }
@@ -869,6 +888,12 @@ function renderDash() {
     <div class="kpi ok" onclick="S.ui.hoFilter='done';selTab('ho')"><div class="l">내 검수 대기</div><div class="v">${mine}</div><div class="h">완료 노티 받은 건</div></div>
     <div class="kpi" onclick="S.ui.taskFilter='open';selTab('tasks')"><div class="l">진행 중 업무</div><div class="v">${openTasks}</div><div class="h">완료 전 업무</div></div>
   </div>`;
+  const wk = weekSummary(pid);
+  h += `<div class="week">
+    <div class="wk"><span class="wk-i">${typeIcon("task")}</span><div><b>${wk.done}개 완료함</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk"><span class="wk-i">${typeIcon("wbs")}</span><div><b>${wk.upd}개 업데이트함</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk"><span class="wk-i">${typeIcon("doc")}</span><div><b>${wk.made}개 만듦</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk" style="cursor:pointer" onclick="selTab('cal')"><span class="wk-i">${typeIcon("event")}</span><div><b>${wk.due}개 마감 예정</b><div class="small muted">다음 7일 이내</div></div></div></div>`;
 
   if (pid) {
     const cur = currentPhase(pid);
@@ -900,9 +925,43 @@ function renderDash() {
     <div class="card"><div class="card-h"><h3>확인 필요</h3><span class="sub">${alerts.length}건 · 노티가 안 온 건 / 내가 처리할 건</span></div>
       ${alerts.length ? alerts.slice(0, 30).map(alertRow).join("") : `<div class="empty">지금은 확인할 게 없어</div>`}</div>
     <div><div class="card"><div class="card-h"><h3>다가오는 일정</h3><span class="sub">오늘부터 14일</span><div class="actions"><button class="btn sm" onclick="selTab('cal')">캘린더</button></div></div>${upcomingList(pid, 14)}</div>
+    <div class="card"><div class="card-h"><h3>상태 개요</h3><span class="sub">업무 상태 · 항목 유형</span><div class="actions"><button class="btn sm" onclick="selTab('tasks')">모든 업무 보기</button></div></div><div class="card-b">${statusOverview(pid)}</div></div>
     <div class="card"><div class="card-h"><h3>최근 활동</h3></div><div class="card-b">${recentActivity(pid)}</div></div></div>
   </div>`;
   return h;
+}
+function weekSummary(pid) {
+  const t = today(), from = addDays(t, -6), to7 = addDays(t, 7);
+  const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  const inW = (d) => d && d.slice(0, 10) >= from && d.slice(0, 10) <= t;
+  let done = 0, upd = 0, made = 0;
+  S.tasks.filter(sc).forEach((x) => { if (x.status === "완료" && inW(x.updatedAt)) done++; if (inW(x.updatedAt)) upd++; });
+  S.handoffs.filter(sc).forEach((h) => { if (h.events.some((e) => e.type === "verified" && inW(e.at))) done++; if (h.events.some((e) => inW(e.at))) upd++; });
+  S.docs.filter(sc).forEach((d) => { if (d.history.some((e) => inW(e.at) && /→ 승인/.test(e.text))) done++; if (d.history.some((e) => inW(e.at))) upd++; });
+  S.datas.filter(sc).forEach((d) => { if (d.status === "수신 완료" && d.log.some((e) => inW(e.at))) done++; if (d.log.some((e) => inW(e.at))) upd++; });
+  S.tcs.filter(sc).forEach((c) => { if (c.result === "Pass" && inW(c.testedAt)) done++; if (inW(c.testedAt)) upd++; });
+  ["tasks", "events", "datas", "tcs", "docs", "handoffs", "screens", "notes"].forEach((k) => S[k].filter(sc).forEach((x) => { if (inW(x.createdAt)) made++; }));
+  const due = calItems(addDays(t, 1), to7, pid, { event: 0, task: 1, data: 1, ho: 1, doc: 1, recur: 0, wbs: 0 }).filter((i) => !i.done).length;
+  return { done, upd, made, due };
+}
+// 상태 개요 도넛 (업무 상태 분포)
+function donut(parts, center, sub) {
+  const total = parts.reduce((a, p) => a + p[1], 0), R = 52, C = 2 * Math.PI * R;
+  let off = 0;
+  const arcs = total ? parts.filter((p) => p[1]).map(([, v, color]) => { const len = (v / total) * C; const a = `<circle r="${R}" cx="70" cy="70" fill="none" stroke="${color}" stroke-width="18" stroke-dasharray="${len} ${C - len}" stroke-dashoffset="${-off}" transform="rotate(-90 70 70)"/>`; off += len; return a; }).join("") : `<circle r="${R}" cx="70" cy="70" fill="none" stroke="var(--line)" stroke-width="18"/>`;
+  return `<div class="donut"><svg viewBox="0 0 140 140" width="140" height="140">${arcs}<text x="70" y="68" text-anchor="middle" class="dn-v">${center}</text><text x="70" y="88" text-anchor="middle" class="dn-l">${sub}</text></svg>
+    <div class="dn-legend">${parts.map(([l, v, c]) => `<div><i style="background:${c}"></i>${esc(l)} <b>${v}</b></div>`).join("")}</div></div>`;
+}
+function statusOverview(pid) {
+  const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  const ts = S.tasks.filter(sc);
+  const parts = [["진행중", ts.filter((x) => x.status === "진행중").length, "#1d7afc"], ["대기", ts.filter((x) => x.status === "대기").length, "#f18d13"],
+    ["예정", ts.filter((x) => x.status === "예정").length, "#8590a2"], ["완료", ts.filter((x) => x.status === "완료").length, "#22a06b"]];
+  const types = [["task", "업무", ts.length], ["ho", "개발 전달", S.handoffs.filter(sc).length], ["doc", "산출물", S.docs.filter((d) => sc(d) && d.status !== "해당없음").length],
+    ["data", "데이터 협의", S.datas.filter(sc).length], ["tc", "테스트", S.tcs.filter(sc).length]];
+  const max = Math.max(1, ...types.map((x) => x[2]));
+  return `<div class="ov">${donut(parts, ts.length, "전체 업무")}
+    <div class="ov-types"><div class="small muted" style="margin-bottom:6px">항목 유형</div>${types.map(([k, l, n]) => `<div class="ov-row">${typeIcon(k)}<span class="tlabel" style="width:78px">${l}</span><span class="ov-bar"><i style="width:${(n / max) * 100}%"></i></span><b>${n}</b></div>`).join("")}</div></div>`;
 }
 function alertRow(a) {
   const [type, id] = a.ref;
