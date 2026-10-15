@@ -1585,7 +1585,7 @@ function calItems(from, to, pid, kinds = S.ui.calKinds) {
   if (kinds.task) S.tasks.filter(sc).forEach((t) => { if (inR(t.due)) add(t.due, "task", t.title, t, `editTask('${t.id}')`, { done: t.status === "완료" }); });
   if (kinds.ho) S.handoffs.filter(sc).forEach((h) => { if (inR(h.dueDate) && h.status !== "hold") add(h.dueDate, "ho", `[${h.code}] ${h.title}`, h, `openHO('${h.id}')`, { done: ["done", "verified"].includes(h.status), icon: hoKind(h) }); });
   if (kinds.doc) S.docs.filter(sc).forEach((d) => { if (inR(d.plan) && d.status !== "해당없음") add(d.plan, "doc", d.name, d, `editDoc('${d.id}')`, { done: d.status === "승인" }); });
-  if (kinds.recur) S.recurring.filter(sc).forEach((r) => recurDates(r, from, to).forEach((d) => add(d, "recur", r.title, r, `editRecur('${r.id}')`)));
+  if (kinds.recur) S.recurring.filter(sc).forEach((r) => recurDates(r, from, to).forEach((d) => add(d, "recur", r.title + (d < today() ? " (밀림)" : ""), r, `editRecur('${r.id}')`)));
   if (kinds.wbs) S.wbs.filter(sc).forEach((w) => {
     if (inR(w.start)) add(w.start, "wbs", "시작 " + w.title, w, `editWBS('${w.id}')`);
     if (inR(w.end) && w.end !== w.start) add(w.end, "wbs", "종료 " + w.title, w, `editWBS('${w.id}')`, { done: Number(w.progress) >= 100 });
@@ -2050,8 +2050,12 @@ function recurFirst(r) {
   return addDays(t, ((Number(r.day) || 0) - parseD(t).getDay() + 7) % 7);
 }
 function recurDates(r, from, to) {
-  if (r.nextDue && r.nextDue < today()) return r.nextDue >= from && r.nextDue <= to ? [r.nextDue] : [];
+  // 밀린 회차는 밀린 날 하나만 두고(사이 회차는 생략), 오늘 이후 회차는 그대로 보여준다
   const out = []; let d = r.nextDue, guard = 0;
+  if (d && d < today()) {
+    if (d >= from && d <= to) out.push(d);
+    while (d && d <= today() && guard++ < 500) d = recurStep(r, d);
+  }
   while (d && d <= to && guard++ < 500) { if (d >= from) out.push(d); d = recurStep(r, d); }
   return out;
 }
@@ -3394,7 +3398,11 @@ function buildReport(pids, wk) {
     const tOpen = tasks.filter((x) => x.status !== "완료");
     L.push(`  - 업무: 완료 ${tDone.length}건 · 현재 진행 ${tOpen.length}건`);
     tDone.forEach((x) => L.push(`    · 완료: ${x.title}`));
-    tOpen.filter((x) => x.priority === "high" || (x.due && x.due <= nx)).slice(0, 6).forEach((x) => L.push(`    · 진행: ${x.title}${x.due ? ` (마감 ${shortD(x.due)})` : ""}${x.owner ? ` / ${x.owner}` : ""}`));
+    // 이번 주 진행 기록이 있는 업무를 먼저, 최근 기록 한 줄과 함께
+    const wkLog = (x) => (x.log || []).filter((e) => e.type === "comment" && inW(e.at)).sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || "")));
+    const logged = tasks.filter((x) => wkLog(x).length);
+    logged.forEach((x) => { const lg = wkLog(x), e = lg[lg.length - 1]; L.push(`    · 진행: ${x.title} — ${shortD(e.at)} ${e.text.split("\n")[0].slice(0, 60)}${lg.length > 1 ? ` (이번 주 기록 ${lg.length}건)` : ""}`); });
+    tOpen.filter((x) => !logged.includes(x) && (x.priority === "high" || (x.due && x.due <= nx))).slice(0, Math.max(0, 6 - logged.length)).forEach((x) => L.push(`    · 진행: ${x.title}${x.due ? ` (마감 ${shortD(x.due)})` : ""}${x.owner ? ` / ${x.owner}` : ""}`));
     S.recurring.filter((r) => r.projectId === pid && (r.history || []).some(inW)).forEach((r) => L.push(`    · 정기: ${r.title} 완료`));
     const apprW = S.docs.filter((d) => d.projectId === pid && inW(d.approvedAt)), reqW = S.docs.filter((d) => d.projectId === pid && inW(d.requestedAt));
     L.push(`  - 산출물(현재): 승인 ${ds.ok}/${ds.total}${apprW.length ? ` (금주 승인 ${apprW.length})` : ""} · 검토요청 ${ds.req} · 작성중 ${ds.wip}`);

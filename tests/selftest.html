@@ -410,12 +410,22 @@ function tests(w, errors) {
     assert(sg.length === 3, "제안: " + JSON.stringify(sg));
     assert(sg.every((x) => x.due), "날짜를 못 읽음: " + JSON.stringify(sg));
   });
-  check("밀린 정기 업무는 다음 회차를 중복 표시하지 않음 (4차 5번)", () => {
-    const r = { id: "r_dup", projectId: pid(), title: "밀린 정기", freq: "weekly", day: w.parseD(w.addDays(t, -6)).getDay(), nextDue: w.addDays(t, -6), history: [] };
+  check("밀린 정기 업무: 밀린 날 하나 + 오늘 이후 회차는 표시 (4차 5번, 13차 1번)", () => {
+    const r = { id: "r_dup", projectId: pid(), title: "밀린 정기", freq: "weekly", day: w.parseD(w.addDays(t, -13)).getDay(), nextDue: w.addDays(t, -13), history: [] };
     S().recurring.push(r);
-    const items = w.calItems(w.addDays(t, -10), w.addDays(t, 14), pid()).filter((i) => i.kind === "recur" && i.title === "밀린 정기");
-    assert(items.length === 1 && items[0].date === r.nextDue, "회차: " + items.map((i) => i.date).join(","));
+    const items = w.calItems(w.addDays(t, -20), w.addDays(t, 14), pid()).filter((i) => i.kind === "recur" && i.title.startsWith("밀린 정기"));
+    const dates = items.map((i) => i.date);
+    assert(dates[0] === r.nextDue && items[0].title.endsWith("(밀림)"), "밀린 날: " + dates.join(","));
+    assert(!dates.includes(w.addDays(t, -6)) && !dates.includes(t), "사이 회차 중복: " + dates.join(","));
+    assert(dates.includes(w.addDays(t, 1)) && dates.includes(w.addDays(t, 8)), "앞으로 회차 없음: " + dates.join(","));
+    assert(w.buildReport([pid()], 0).includes(w.shortD(w.addDays(t, 1)) + " [정기] 밀린 정기"), "차주 계획에 없음");
     S().recurring = S().recurring.filter((x) => x.id !== "r_dup");
+  });
+  check("주간보고 금주 실적에 이번 주 업무 진행 기록", () => {
+    S().tasks.push({ id: "t_wlog", projectId: pid(), title: "주간 기록 점검", status: "진행중", priority: "low", start: t, due: "", log: [{ type: "comment", at: w.addDays(t, -2), text: "기관 회신 받음\n세부 내용" }] });
+    const rep = w.buildReport([pid()], 0);
+    assert(rep.includes("· 진행: 주간 기록 점검 — " + w.shortD(w.addDays(t, -2)) + " 기관 회신 받음"), "기록 없음");
+    S().tasks = S().tasks.filter((x) => x.id !== "t_wlog");
   });
   check("검색에서 다른 프로젝트 테스트 케이스를 열면 그 프로젝트로 전환 (4차 3번)", () => {
     const other = S().projects.find((p) => p.id !== pid() && !p.archived);
