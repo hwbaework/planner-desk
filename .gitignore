@@ -14,3 +14,4 @@ Thumbs.db
 tools/mail_config.json
 tools/.mail_state.json
 mail_inbox.json
+__pycache__/

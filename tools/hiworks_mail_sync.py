@@ -147,6 +147,7 @@ def main():
     ap = argparse.ArgumentParser(description="하이웍스 메일 → Planner Desk mail_inbox.json")
     ap.add_argument("--test", action="store_true", help="로그인만 확인")
     ap.add_argument("--days", type=int, help="최근 며칠치 (기본: 설정 days)")
+    ap.add_argument("--quiet", action="store_true", help="작업 스케줄러용 (창 멈춤 없음)")
     a = ap.parse_args()
     cfg = load_config()
     try:
