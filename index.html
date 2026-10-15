@@ -419,7 +419,7 @@ const RESP_EV = ["ack", "question", "progress", "done"];   // 개발자 쪽에�
 const MINE_EV = ["sent", "answer", "nudge", "verified", "reject"];
 const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
 const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
-const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
 const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e8a9a", "#b5487a", "#5b6474"];
 const TASK_ST = ["진행중", "대기", "예정", "완료"];
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "예정": "gray", "완료": "green" };
@@ -430,6 +430,15 @@ const DATA_CLS = { "협의 전": "gray", "협의 중": "violet", "합의": "blue
 const DATA_METHOD = ["API", "파일(엑셀/CSV)", "DB 연계", "RTU/계측기", "수기 입력", "미정"];
 const DATA_CYCLE = ["실시간", "15분", "1시간", "일", "주", "월", "1회", "미정"];
 const DATA_LOG = ["회의", "메일", "전화", "공문", "수신", "기타"];
+const TC_RES = ["미수행", "Pass", "Fail", "Block"];
+const TC_CLS = { "미수행": "gray", "Pass": "green", "Fail": "red", "Block": "amber" };
+// 화면 목록에서 기본 TC를 만들 때 쓰는 기획자용 표준 시나리오
+const TC_TEMPLATES = [
+  ["화면 진입 및 기본 표시", "메뉴 경로로 화면 진입 → 초기 데이터·레이아웃 확인", "화면설계서와 같은 항목·문구·버튼이 표시된다"],
+  ["필수값·입력 검증", "필수 항목을 비우거나 잘못된 형식으로 입력 후 처리", "안내 문구가 표시되고 처리되지 않는다"],
+  ["정상 처리", "올바른 값 입력 후 저장/조회/처리 실행", "처리 완료 안내 후 결과가 목록·상세에 반영된다"],
+  ["권한·예외 상황", "권한 없는 사용자 접근, 데이터 없음, 네트워크 오류 상황 확인", "권한 안내 또는 빈 상태·오류 안내가 표시된다"],
+];
 const CAL_KINDS = [["event", "일정"], ["task", "업무 마감"], ["data", "데이터 수신 예정"], ["ho", "개발 완료예정"], ["doc", "산출물 계획"], ["recur", "정기 업무"], ["wbs", "WBS 시작·종료"]];
 const CAL_TAG = { event: "", task: "업무", data: "데이터", ho: "완료예정", doc: "산출물", recur: "정기", wbs: "WBS" };
 
@@ -484,8 +493,8 @@ function emptyState() {
     settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1",
       mail: { provider: "hiworks", protocol: "pop3", host: "pop3s.hiworks.com", port: 995, user: "", folder: "INBOX", days: 14, devSenders: "", last: null } },
     ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "" },
-    seq: { ho: 0 },
-    projects: [], tasks: [], events: [], recurring: [], datas: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
+    seq: { ho: 0, tc: 0 },
+    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
   };
 }
 function normalize(d) {
@@ -494,8 +503,8 @@ function normalize(d) {
   s.settings = Object.assign(emptyState().settings, d?.settings || {});
   s.settings.mail = Object.assign(emptyState().settings.mail, d?.settings?.mail || {});
   s.ui = Object.assign(emptyState().ui, d?.ui || {});
-  s.seq = Object.assign({ ho: 0 }, d?.seq || {});
-  ["projects", "tasks", "events", "recurring", "datas", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+  s.seq = Object.assign({ ho: 0, tc: 0 }, d?.seq || {});
+  ["projects", "tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
   s.projects.forEach((p, i) => { if (!p.color) p.color = PROJ_COLORS[i % PROJ_COLORS.length]; });
@@ -687,6 +696,11 @@ function computeAlerts(pid) {
       if (bd > Number(st.quietDays)) out.push({ level: "warn", kind: "데이터 협의 지연", ref: ["data", x.id], pid: x.projectId, days: bd, title: x.name, desc: `${x.org || "제공 기관"} · 마지막 협의 ${shortD(last)} 이후 영업일 ${bd}일` });
     }
   });
+  S.tcs.filter(scope).forEach((c) => {
+    const ho = c.hoId && S.handoffs.find((h) => h.id === c.hoId);
+    if (c.result === "Fail" && !ho) out.push({ level: "mine", kind: "결함 미전달", ref: ["tc", c.id], pid: c.projectId, days: c.testedAt ? calDays(c.testedAt) : 0, title: `${c.code} ${c.scenario}`, desc: `Fail ${c.testedAt ? shortD(c.testedAt) : ""} · 개발에 결함을 전달하지 않음` });
+    if (["Fail", "Block"].includes(c.result) && ho && ["done", "verified"].includes(ho.status)) out.push({ level: "mine", kind: "재테스트 필요", ref: ["tc", c.id], pid: c.projectId, days: 0, title: `${c.code} ${c.scenario}`, desc: `결함 [${ho.code}] ${hoStLabel(ho.status)} → 다시 테스트해서 결과 갱신` });
+  });
   S.recurring.filter(scope).forEach((r) => {
     if (r.nextDue && r.nextDue < t) out.push({ level: "warn", kind: "정기 업무 지남", ref: ["recur", r.id], pid: r.projectId, days: calDays(r.nextDue), title: r.title, desc: `예정 ${shortD(r.nextDue)} (${dday(r.nextDue)}) · 완료 처리 안 됨` });
   });
@@ -719,7 +733,7 @@ function render() {
     : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
   renderBanner(); renderSide(); renderTabs();
-  const v = { dash: renderDash, board: renderBoard, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  const v = { dash: renderDash, board: renderBoard, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
   $("view").innerHTML = v();
   if (S.ui.tab === "mail") bindDrop();
   if (S.ui.tab === "notes") bindNoteEditor();
@@ -832,7 +846,7 @@ function renderDash() {
 }
 function alertRow(a) {
   const [type, id] = a.ref;
-  const open = { data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
+  const open = { tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
   let acts = "";
   if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
   if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
@@ -861,10 +875,12 @@ const BOARDS = {
     st: (x) => x.status, key: () => "업무", who: (x) => x.owner, due: (x) => x.due, done: ["완료"], open: (x) => `editTask('${x.id}')` },
   docs: { l: "산출물", cols: DOC_ST.map((k) => [k, k]), list: () => S.docs,
     st: (x) => x.status, key: (x) => `${x.phase} · ${x.version || ""}`, who: (x) => x.owner, due: (x) => x.plan, done: ["승인", "해당없음"], open: (x) => `editDoc('${x.id}')` },
+  tc: { l: "테스트", cols: TC_RES.map((k) => [k, k]), list: () => S.tcs,
+    st: (x) => x.result, key: (x) => x.code, who: (x) => x.tester, due: (x) => x.testedAt, done: ["Pass"], open: (x) => `editTC('${x.id}')` },
   data: { l: "데이터 협의", cols: DATA_ST.map((k) => [k, k]), list: () => S.datas,
     st: (x) => x.status, key: (x) => x.org || "기관 미정", who: (x) => x.contact, due: (x) => x.dueDate, done: ["수신 완료"], open: (x) => `openData('${x.id}')` },
 };
-function boardTitle(b, x) { return b === "docs" ? x.name : x.title || x.name; }
+function boardTitle(b, x) { return b === "docs" ? x.name : b === "tc" ? x.scenario : x.title || x.name; }
 function avatar(name) {
   const n = String(name || "").replace(/\(.*?\)|<.*?>/g, "").trim();
   if (!n) return "";
@@ -925,6 +941,7 @@ function boardMove(id, col) {
   } else if (bk === "tasks") setTask(id, "status", col);
   else if (bk === "docs") setDocStatus(id, col);
   else if (bk === "data") setData(id, "status", col);
+  else if (bk === "tc") setTC(id, "result", col);
 }
 function boardAdd(col) {
   const bk = S.ui.board in BOARDS ? S.ui.board : "ho";
@@ -939,6 +956,7 @@ function boardAdd(col) {
   } else if (bk === "tasks") editTask(null, { status: col, projectId: pid });
   else if (bk === "docs") editDoc(null, "P1");
   else if (bk === "data") editData(null, { status: col, projectId: pid });
+  else if (bk === "tc") editTC(null, { projectId: pid });
 }
 
 // ───────────── 캘린더 ─────────────
@@ -1474,7 +1492,7 @@ function renderDocs() {
         const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
         const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
         return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
-          <td><span class="link" onclick="editDoc('${d.id}')">${esc(d.name)}</span>${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
+          <td><span class="link" onclick="editDoc('${d.id}')">${esc(d.name)}</span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap">${esc(d.owner || "")}</td>
@@ -1701,6 +1719,122 @@ function exportWbsCsv() {
   const rows = [["단계", "작업", "담당", "시작", "종료", "진척률", "메모"]];
   S.wbs.filter((w) => w.projectId === S.ui.pid).forEach((w) => rows.push([w.phase, w.title, w.owner, w.start, w.end, w.progress, w.memo]));
   download(`WBS_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+}
+
+// ───────────── 테스트 케이스 (통합 테스트) ─────────────
+function tcStats(pid) {
+  const l = S.tcs.filter((c) => c.projectId === pid), n = (r) => l.filter((c) => c.result === r).length;
+  return { total: l.length, pass: n("Pass"), fail: n("Fail"), block: n("Block"), todo: n("미수행") };
+}
+function tcChip(pid) {
+  const t = tcStats(pid); if (!t.total) return "";
+  return ` <span class="chip-ref" title="테스트 케이스 결과" style="cursor:pointer" onclick="selTab('tc')">TC Pass ${t.pass}/${t.total}${t.fail ? ` · Fail ${t.fail}` : ""}</span>`;
+}
+function nextTCCode() { S.seq.tc = (S.seq.tc || 0) + 1; return `TC-${String(S.seq.tc).padStart(3, "0")}`; }
+function renderTC() {
+  if (S.ui.pid === "all") {
+    let h = pageHead("테스트 케이스", "프로젝트별 통합 테스트 현황");
+    h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>프로젝트</th><th>전체</th><th>Pass</th><th>Fail</th><th>Block</th><th>미수행</th><th>진척</th></tr></thead><tbody>` +
+      (activeProjects().map((p) => { const t = tcStats(p.id); const pct = t.total ? Math.round(((t.total - t.todo) / t.total) * 100) : 0;
+        return `<tr><td class="link" onclick="selProject('${p.id}')">${projTag(p.id)}</td><td class="num">${t.total}</td><td class="num">${t.pass}</td><td class="num">${t.fail ? badge(t.fail, "red") : 0}</td><td class="num">${t.block}</td><td class="num">${t.todo}</td><td class="nowrap">${pct}% 수행</td></tr>`; }).join("") || `<tr><td colspan="7" class="empty">프로젝트 없음</td></tr>`) +
+      `</tbody></table></div></div>`;
+    return h;
+  }
+  const pid = S.ui.pid, t = tcStats(pid), f = S.ui.tcFilter || "all", q = (S.ui.tcQ || "").toLowerCase();
+  const screens = S.screens.filter((x) => x.projectId === pid);
+  let list = S.tcs.filter((c) => c.projectId === pid);
+  if (f !== "all") list = list.filter((c) => c.result === f);
+  if (S.ui.tcScreen) list = list.filter((c) => c.screenId === S.ui.tcScreen);
+  if (q) list = list.filter((c) => (c.code + c.scenario + (c.steps || "") + (c.expected || "")).toLowerCase().includes(q));
+  list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
+  const done = t.total - t.todo, pct = t.total ? Math.round((done / t.total) * 100) : 0, passPct = done ? Math.round((t.pass / done) * 100) : 0;
+  let h = pageHead("테스트 케이스", `${esc(projName(pid))} · 전체 ${t.total} · 수행 ${pct}% · Pass율 ${passPct}% · Fail ${t.fail} · Block ${t.block}`,
+    `<button class="btn" onclick="genTCs()">화면 목록에서 기본 TC 생성</button><button class="btn" onclick="bulkTC()">엑셀 붙여넣기</button><button class="btn" onclick="exportTCCsv()">결과서 CSV</button><button class="btn primary" onclick="editTC()">+ 테스트 케이스</button>`);
+  const chip = (k, l, n) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.tcFilter='${k}';render()">${l} ${n}</button>`;
+  h += `<div class="filters">${chip("all", "전체", t.total)}${chip("미수행", "미수행", t.todo)}${chip("Pass", "Pass", t.pass)}${chip("Fail", "Fail", t.fail)}${chip("Block", "Block", t.block)}
+    <select class="inline" style="padding:4px 6px" onchange="S.ui.tcScreen=this.value;render()"><option value="">전체 화면</option>${screens.map((x) => `<option value="${x.id}" ${S.ui.tcScreen === x.id ? "selected" : ""}>${esc(x.code)} ${esc(x.name)}</option>`).join("")}</select>
+    <input class="search" placeholder="TC·시나리오 검색" value="${esc(S.ui.tcQ || "")}" oninput="S.ui.tcQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>TC ID</th><th>화면</th><th>시나리오</th><th>예상 결과</th><th>결과</th><th>수행일</th><th>결함 전달</th></tr></thead><tbody>` +
+    (list.map((c) => {
+      const sc = S.screens.find((x) => x.id === c.screenId), ho = c.hoId && S.handoffs.find((x) => x.id === c.hoId);
+      return `<tr><td class="mono nowrap">${esc(c.code)}</td>
+        <td class="nowrap small">${sc ? `${esc(sc.code)}<div class="muted">${esc(sc.name)}</div>` : '<span class="muted">-</span>'}</td>
+        <td><span class="link" onclick="editTC('${c.id}')">${esc(c.scenario)}</span>${c.steps ? `<div class="small muted clamp1">${esc(c.steps)}</div>` : ""}</td>
+        <td class="small">${esc(c.expected || "")}</td>
+        <td><select class="inline" onchange="setTC('${c.id}','result',this.value)">${TC_RES.map((r) => `<option ${r === c.result ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+        <td class="nowrap">${c.testedAt ? shortD(c.testedAt) : '<span class="muted">-</span>'}</td>
+        <td class="nowrap">${ho ? `<span class="link mono small" onclick="openHO('${ho.id}')">${esc(ho.code)}</span> ${badge(hoStLabel(ho.status), HO_CLS[ho.status])}` : ["Fail", "Block"].includes(c.result) ? `<button class="btn sm" onclick="tcDefect('${c.id}')">결함 전달</button>` : ""}</td></tr>`;
+    }).join("") || `<tr><td colspan="7" class="empty">테스트 케이스가 없어. 화면 목록이 있으면 [화면 목록에서 기본 TC 생성]으로 바로 만들 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
+function setTC(id, k, v) {
+  const c = S.tcs.find((x) => x.id === id); c[k] = v;
+  if (k === "result") { c.testedAt = v === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || ""; }
+  commit();
+  if (k === "result" && v === "Fail" && !c.hoId) toast("Fail — [결함 전달]로 개발에 넘길 수 있어");
+}
+function editTC(id, preset) {
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const c = id ? S.tcs.find((x) => x.id === id) : Object.assign({ result: "미수행", projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
+  openForm(id ? `테스트 케이스 · ${c.code}` : "테스트 케이스 추가", [
+    { k: "scenario", l: "시나리오", t: "text", full: true, req: true, ph: "예: 회원가입 필수값 미입력 시 안내" },
+    { k: "screenId", l: "화면", t: "select", opts: [["", "(화면 없음)"], ...S.screens.filter((x) => x.projectId === c.projectId).map((x) => [x.id, `${x.code} ${x.name}`])] },
+    { k: "result", l: "결과", t: "select", opts: TC_RES },
+    { k: "pre", l: "사전 조건", t: "text", full: true, ph: "예: 일반 회원으로 로그인" },
+    { k: "steps", l: "테스트 절차", t: "textarea", full: true, ph: "1. 메뉴 진입\n2. 이름 비우고 저장" },
+    { k: "expected", l: "예상 결과", t: "textarea", full: true },
+    { k: "actual", l: "실제 결과 (Fail·Block일 때)", t: "textarea", full: true },
+    { k: "tester", l: "수행자", t: "text" },
+    { k: "testedAt", l: "수행일", t: "date" },
+  ], c, (v) => {
+    if (id) Object.assign(c, v); else S.tcs.push(Object.assign({ id: uid("tc"), code: nextTCCode() }, c, v));
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("테스트 케이스를 삭제할까?")) { S.tcs = S.tcs.filter((x) => x.id !== id); commit(); closeModal(); } } },
+          ...(["Fail", "Block"].includes(c.result) && !c.hoId ? [{ l: "결함 전달", cls: "left", fn: () => { closeModal(); tcDefect(c.id); } }] : [])] : []);
+}
+// Fail TC → 개발 전달(결함) 생성. 수신자는 화면의 개발 담당자.
+function tcDefect(id) {
+  const c = S.tcs.find((x) => x.id === id), sc = S.screens.find((x) => x.id === c.screenId);
+  const h = { id: uid("h"), code: nextHOCode(), projectId: c.projectId, title: `[결함] ${c.code} ${c.scenario}`, status: "sent", sentAt: today(), dueDate: addDays(today(), 3),
+    to: sc?.dev || "", toEmail: "", cc: "", link: "", priority: "high", docIds: [], screenIds: sc ? [sc.id] : [], events: [],
+    memo: `[테스트 케이스] ${c.code}\n[사전 조건] ${c.pre || "-"}\n[절차]\n${c.steps || "-"}\n[예상 결과] ${c.expected || "-"}\n[실제 결과] ${c.actual || "-"}` };
+  pushEvent(h, { type: "sent", at: today(), text: `결함 전달 (${c.code})` });
+  S.handoffs.push(h); c.hoId = h.id; commit(); openHO(h.id);
+  toast(`${h.code} 결함 전달 등록 — 수신자·완료 예정일 확인해줘`);
+}
+function genTCs() {
+  const pid = S.ui.pid, screens = S.screens.filter((x) => x.projectId === pid);
+  if (!screens.length) { toast("화면 목록에 화면이 없어. 화면 목록부터 만들어줘"); return; }
+  const target = screens.filter((x) => !S.tcs.some((c) => c.screenId === x.id));
+  if (!target.length) { toast("모든 화면에 TC가 이미 있어"); return; }
+  if (!confirm(`TC가 없는 화면 ${target.length}개에 기본 시나리오 ${TC_TEMPLATES.length}개씩, 총 ${target.length * TC_TEMPLATES.length}개를 만들까?`)) return;
+  target.forEach((x) => TC_TEMPLATES.forEach(([scn, steps, exp]) => S.tcs.push({
+    id: uid("tc"), code: nextTCCode(), projectId: pid, screenId: x.id, scenario: `${x.name} - ${scn}`, pre: "", steps: `${x.menu ? x.menu + " 진입\n" : ""}${steps}`, expected: exp, result: "미수행" })));
+  commit(); toast(`${target.length * TC_TEMPLATES.length}개 생성 — 화면에 맞게 다듬어줘`);
+}
+function bulkTC() {
+  const pid = S.ui.pid;
+  openModal("테스트 케이스 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사 (탭 구분): <b>화면ID · 시나리오 · 사전 조건 · 절차 · 예상 결과</b>. 화면ID가 화면 목록에 있으면 자동 연결.</p>
+    <textarea id="bulkText" style="min-height:220px" class="mono"></textarea>`, [
+    { l: "취소", fn: closeModal },
+    { l: "추가", cls: "primary", fn: () => {
+      let n = 0;
+      $("bulkText").value.split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((r) => r[1]).forEach(([sc, scenario, pre, steps, expected]) => {
+        const scr = S.screens.find((x) => x.projectId === pid && x.code === sc);
+        S.tcs.push({ id: uid("tc"), code: nextTCCode(), projectId: pid, screenId: scr?.id || "", scenario, pre: pre || "", steps: steps || "", expected: expected || "", result: "미수행" });
+        n++;
+      });
+      commit(); closeModal(); toast(`${n}개 추가`);
+    } },
+  ]);
+}
+function exportTCCsv() {
+  const rows = [["TC ID", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "결과", "실제 결과", "수행일", "수행자", "결함 전달"]];
+  S.tcs.filter((c) => c.projectId === S.ui.pid).forEach((c) => {
+    const sc = S.screens.find((x) => x.id === c.screenId), ho = S.handoffs.find((x) => x.id === c.hoId);
+    rows.push([c.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, c.result, c.actual, c.testedAt, c.tester, ho?.code]);
+  });
+  download(`통합테스트결과_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
 
 // ───────────── 메일 수신 (붙여넣기 / .eml) ─────────────
@@ -2048,7 +2182,7 @@ function editProject(id) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => {
     if (!confirm(`「${p.name}」와 관련 데이터(업무·일정·산출물·전달·화면·WBS·메모)를 모두 삭제할까? 되돌릴 수 없어. (보관 처리를 추천)`)) return;
-    ["tasks", "events", "recurring", "datas", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
+    ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
     S.projects = S.projects.filter((x) => x.id !== id); commit(); closeModal();
   } }] : []);
 }
