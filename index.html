@@ -2499,7 +2499,7 @@ function syncReqSeq() { S.seq.req = Math.max(S.seq.req || 0, ...S.reqs.map((r) =
 function nextReqCode() { syncReqSeq(); S.seq.req += 1; return `REQ-${String(S.seq.req).padStart(3, "0")}`; }
 function reqTrace(r) {
   const screens = (r.screenIds || []).map((id) => S.screens.find((x) => x.id === id)).filter(Boolean);
-  const tcs = S.tcs.filter((c) => screens.some((sc) => sc.id === c.screenId));
+  const tcs = S.tcs.filter((c) => c.reqId === r.id || (!c.reqId && screens.some((sc) => sc.id === c.screenId)));
   return { screens, tcs, pass: tcs.filter((c) => c.result === "Pass").length, fail: tcs.filter((c) => c.result === "Fail").length };
 }
 function reqChip(pid) {
@@ -2799,7 +2799,7 @@ function renderTC() {
   list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
   const done = t.total - t.todo, pct = t.total ? Math.round((done / t.total) * 100) : 0, passPct = done ? Math.round((t.pass / done) * 100) : 0;
   let h = pageHead("테스트 케이스", `${esc(projName(pid))} · 전체 ${t.total} · 수행 ${pct}% · Pass율 ${passPct}% · Fail ${t.fail} · Block ${t.block}`,
-    `<button class="btn" onclick="genTCs()">화면 목록에서 기본 TC 생성</button><button class="btn" onclick="bulkTC()">엑셀 붙여넣기</button><button class="btn" onclick="exportTCCsv()">결과서 CSV</button><button class="btn primary" onclick="editTC()">+ 테스트 케이스</button>`);
+    `<button class="btn" onclick="genTCs()">화면 목록에서 기본 TC 생성</button><button class="btn" onclick="genReqTCs()">요구사항에서 TC 생성</button><button class="btn" onclick="bulkTC()">엑셀 붙여넣기</button><button class="btn" onclick="exportTCCsv()">결과서 CSV</button><button class="btn primary" onclick="editTC()">+ 테스트 케이스</button>`);
   const chip = (k, l, n) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.tcFilter='${k}';render()">${l} ${n}</button>`;
   h += `<div class="filters">${chip("all", "전체", t.total)}${chip("미수행", "미수행", t.todo)}${chip("Pass", "Pass", t.pass)}${chip("Fail", "Fail", t.fail)}${chip("Block", "Block", t.block)}
     <select class="inline" style="padding:4px 6px" onchange="S.ui.tcScreen=this.value;render()"><option value="">전체 화면</option>${screens.map((x) => `<option value="${x.id}" ${S.ui.tcScreen === x.id ? "selected" : ""}>${esc(x.code)} ${esc(x.name)}</option>`).join("")}</select>
@@ -2851,6 +2851,7 @@ function editTC(id, preset) {
     { k: "scenario", l: "시나리오", t: "text", full: true, req: true, ph: "예: 회원가입 필수값 미입력 시 안내" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "screenId", l: "화면", t: "select", opts: [["", "(화면 없음)"], ...S.screens.filter((x) => x.projectId === c.projectId).map((x) => [x.id, `${x.code} ${x.name}`])] },
+    { k: "reqId", l: "요구사항", t: "select", opts: [["", "(연결 안 함)"], ...S.reqs.filter((x) => x.projectId === c.projectId && x.status !== "제외").map((x) => [x.id, `${x.code} ${x.title.slice(0, 30)}`])] },
     { k: "result", l: "결과", t: "select", opts: TC_RES },
     { k: "pre", l: "사전 조건", t: "text", full: true, ph: "예: 일반 회원으로 로그인" },
     { k: "steps", l: "테스트 절차", t: "textarea", full: true, ph: "1. 메뉴 진입\n2. 이름 비우고 저장" },
@@ -2900,6 +2901,16 @@ function genTCs() {
     id: uid("tc"), code: nextTCCode(), projectId: pid, screenId: x.id, scenario: `${x.name} - ${scn}`, pre: "", steps: `${x.menu ? x.menu + " 진입\n" : ""}${steps}`, expected: exp, result: "미수행" })));
   commit(); toast(`${target.length * TC_TEMPLATES.length}개 생성 — 화면에 맞게 다듬어줘`);
 }
+// 요구사항마다 수용 기준 TC 1개 (reqId로 연결). 이미 TC가 있는 요구사항은 건너뜀
+function genReqTCs() {
+  const pid = S.ui.pid;
+  const target = S.reqs.filter((r) => r.projectId === pid && !["제외", "보류"].includes(r.status) && r.kind !== "비기능" && !S.tcs.some((c) => c.reqId === r.id));
+  if (!target.length) { toast(S.reqs.some((r) => r.projectId === pid) ? "모든 기능 요구사항에 TC가 이미 있어" : "요구사항이 없어. 요구사항 메뉴에서 먼저 넣어줘"); return; }
+  if (!confirm(`TC가 없는 기능 요구사항 ${target.length}건에 수용 기준 TC를 1개씩 만들까?`)) return;
+  target.forEach((r) => S.tcs.push({ id: uid("tc"), code: nextTCCode(), projectId: pid, reqId: r.id, screenId: (r.screenIds || [])[0] || "", scenario: `${r.code} ${r.title}`,
+    pre: "", steps: "", expected: r.desc || `${r.title} — 요구사항대로 동작`, result: "미수행" }));
+  commit(); toast(`${target.length}개 생성 — 절차를 채워줘`);
+}
 function bulkTC() {
   const pid = S.ui.pid;
   openModal("테스트 케이스 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사 (탭 구분): <b>화면ID · 시나리오 · 사전 조건 · 절차 · 예상 결과</b>. 화면ID가 화면 목록에 있으면 자동 연결.</p>
@@ -2917,11 +2928,11 @@ function bulkTC() {
   ]);
 }
 function exportTCCsv() {
-  const rows = [["TC ID", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "최초 결과", "최종 결과", "재테스트", "실제 결과", "수행일", "수행자", "결함 전달", "결과 이력"]];
+  const rows = [["TC ID", "REQ", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "최초 결과", "최종 결과", "재테스트", "실제 결과", "수행일", "수행자", "결함 전달", "결과 이력"]];
   S.tcs.filter((c) => c.projectId === S.ui.pid).forEach((c) => {
     const sc = S.screens.find((x) => x.id === c.screenId), ho = S.handoffs.find((x) => x.id === c.hoId);
     const hs = c.history || [], defects = [...new Set([...(c.prevHoIds || []), c.hoId].map((i) => S.handoffs.find((x) => x.id === i)?.code).filter(Boolean))];
-    rows.push([c.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, hs[0]?.result || c.result, c.result, Math.max(0, hs.length - 1), c.actual, c.testedAt, c.tester, defects.join(" "),
+    rows.push([c.code, S.reqs.find((r) => r.id === c.reqId)?.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, hs[0]?.result || c.result, c.result, Math.max(0, hs.length - 1), c.actual, c.testedAt, c.tester, defects.join(" "),
       hs.map((x) => `${x.at} ${x.result}${x.ho ? " " + x.ho : ""}`).join(" > ")]);
   });
   download(`통합테스트결과_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");

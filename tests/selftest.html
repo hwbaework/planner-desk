@@ -238,6 +238,21 @@ function tests(w, errors) {
     h.events = h.events.filter((e) => e !== ev); w.recomputeHOStatus(h);
     assert(h.status === "ack", "상태: " + h.status);
   });
+  check("요구사항에서 TC 생성 (reqId 연결, 추적표 반영)", () => {
+    window.confirm = () => true;
+    S().ui.pid = pid();
+    const r = { id: "rq_tc", projectId: pid(), code: "REQ-990", title: "점검 요구사항", kind: "기능", status: "확정", desc: "조건을 만족하면 완료", screenIds: [] };
+    S().reqs.push(r);
+    w.genReqTCs();
+    const c = S().tcs.find((x) => x.reqId === "rq_tc");
+    assert(c && c.expected === "조건을 만족하면 완료" && c.scenario.startsWith("REQ-990"), "생성: " + JSON.stringify(c));
+    w.setTC(c.id, "result", "Pass");
+    const tr = w.reqTrace(r);
+    assert(tr.tcs.length === 1 && tr.pass === 1, "추적표: " + tr.tcs.length);
+    const n = S().tcs.length; w.genReqTCs();
+    assert(S().tcs.length === n, "중복 생성");
+    S().tcs = S().tcs.filter((x) => x.reqId !== "rq_tc"); S().reqs = S().reqs.filter((x) => x.id !== "rq_tc");
+  });
   check("완료노티 단계 결함은 재테스트 Fail 시 같은 건 반려, 검수완료 뒤 Fail은 재발", () => {
     const c = S().tcs.find((x) => !x.hoId && x.projectId === pid());
     assert(c, "TC가 없음");
