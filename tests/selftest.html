@@ -647,8 +647,8 @@ function tests(w, errors) {
     assert(rows[0].text === "회의함\n- 참석: 3개 기관\n· 다음 회의 미정" && rows[0].at.endsWith("-06-09"), "목록 줄/조사: " + JSON.stringify(rows[0]));
     assert(rows[1].at.endsWith("-05-19") && rows[1].text === "오전 통화", "M/D: " + JSON.stringify(rows[1]));
     assert(!rows.some((r) => r.text.includes("자료 제출") || r.text.includes("확정 예정")), "마감 줄이 옮겨짐");
-    const rest = w.removeLines("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝", w.memoDated("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝"));
-    assert(rest === "7월 9일까지 자료 제출\n메모 끝", "남은 메모: " + JSON.stringify(rest));
+    const rest = w.removeLines("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n\n메모 끝", w.memoDated("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n\n메모 끝"));
+    assert(rest === "7월 9일까지 자료 제출\n\n메모 끝", "남은 메모: " + JSON.stringify(rest));
   });
   check("메모 날짜 줄: 날짜만 있는 머리줄 · 번호 목록 · 요일·조사 · 같은 줄 두 번", () => {
     const memo = "6월 4일\n1. 요구사항 회의\n2. 화면 검토\n\n7월 15일(수) 확정\n9월 11기준으로 메일로 보고완료\n9월 12일 회의 예정\n같은 줄\n6월 1일 기준 A\n6월 1일 기준 A";
@@ -659,6 +659,11 @@ function tests(w, errors) {
     assert(rows[3].plan === true && rows[1].plan === false, "계획 표시");
     const rest = w.removeLines(memo, [rows[5]]);
     assert(rest.endsWith("같은 줄\n6월 1일 기준 A"), "같은 줄 하나만 지워야 함: " + JSON.stringify(rest));
+  });
+  check("메모 날짜 줄: 내용 있는 날짜 줄도 아래 문단을 함께, 머리줄 계획 표시", () => {
+    const rows = w.memoDated("7월 15일 기준 본부 회신\n주 논리는\n1) 일정\n\n남는 줄\n6월 5일 기준\n현장 방문예정(2명)");
+    assert(rows.length === 2 && rows[0].text === "본부 회신\n주 논리는\n1) 일정", "문단: " + JSON.stringify(rows[0]));
+    assert(rows[1].plan === true, "머리줄 계획 표시 없음");
   });
   check("메모 일괄 변환: 미리보기에서 체크 해제한 줄은 남김", () => {
     const tk = { id: "t_bulk", projectId: pid(), title: "일괄 변환 점검", status: "진행중", priority: "mid", start: t, due: "", memo: "8월 1일 기준 A 요청\n8월 2일 기준 B 회신" };

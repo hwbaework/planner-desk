@@ -1922,11 +1922,15 @@ function addTaskLog(id) {
 function delTaskLog(id, lid) { const x = S.tasks.find((t) => t.id === id); x.log = (x.log || []).filter((e) => e.id !== lid); persist(); $("taskLog").innerHTML = taskLogHtml(x); }
 // 예전 메모의 "9월 18일 기준 …" 줄을 날짜가 있는 진행 기록으로
 // 예전 메모의 날짜 줄 → 진행 기록. "6월 9일 기준 …", "6월 9일에 …", "5/19 …" 로 시작하는 줄,
-// 바로 아래 목록 줄('-·*', '1.')은 그 기록에 붙인다. 날짜만 있는 줄은 머리줄로 보고 빈 줄 전까지를 본문으로 한다.
+// 그 아래 줄은 빈 줄이나 다음 날짜 줄 전까지 같은 기록으로 붙인다(날짜만 있는 줄은 머리줄).
 // "7월 9일까지/~/부터/중/경 …"은 마감·기간이라 옮기지 않고 skipped 로 돌려준다.
 function memoScan(memo) {
   const rows = [], skipped = []; let cur = null;
-  const close = () => { if (cur && cur.header && !cur.text) rows.pop(); cur = null; };
+  const close = () => {
+    if (cur && cur.header && !cur.text) rows.pop();
+    else if (cur) cur.plan = /(예정|필요|요청)(\([^)]*\))?\s*\.?$/m.test(cur.text);
+    cur = null;
+  };
   String(memo || "").split(/\r?\n/).forEach((raw, i) => {
     const l = raw.trim();
     if (!l) { close(); return; }
@@ -1939,9 +1943,8 @@ function memoScan(memo) {
       const y = new Date().getFullYear(), mo = Number(m[1]), d = Number(m[2]);
       if (mo < 1 || mo > 12 || d < 1 || d > 31) return;
       cur = { idx: [i], lines: [raw], at: `${mo > new Date().getMonth() + 2 ? y - 1 : y}-${pad(mo)}-${pad(d)}`, text: rest, header: !rest };
-      cur.plan = /(예정|필요|요청)\s*\.?$/.test(rest);
       rows.push(cur);
-    } else if (cur && (cur.header || /^([-*•·]|\d{1,2}[.)]\s)/.test(l))) {
+    } else if (cur) {
       cur.idx.push(i); cur.lines.push(raw); cur.text += (cur.text ? "\n" : "") + l;
     } else cur = null;
   });
