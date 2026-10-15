@@ -628,6 +628,19 @@ function tests(w, errors) {
     w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "1" }));
     assert(!w.document.getElementById("modalBg").classList.contains("open"), "만들기 창 밖에서 숫자키가 동작함");
   });
+  check("업무 진행 기록: 상태 변경 자동 기록, 수동 기록, 메모 날짜 줄 옮기기", () => {
+    window.confirm = () => true;
+    const tk = { id: "t_log", projectId: pid(), title: "진행 기록 점검", status: "예정", priority: "mid", start: t, due: "", memo: "배경 설명\n9월 18일 기준 자료 요청함\n10월 2일 기준 회신 대기" };
+    S().tasks.push(tk);
+    w.setTask("t_log", "status", "진행중");
+    assert((tk.log || []).some((e) => e.type === "status" && e.text === "예정 → 진행중"), "상태 기록 없음");
+    w.editTask("t_log");
+    w.document.getElementById("tlText").value = "담당자 통화"; w.addTaskLog("t_log");
+    assert(tk.log.some((e) => e.type === "comment" && e.text === "담당자 통화"), "수동 기록 없음");
+    w.splitMemoToLog("t_log"); w.closeModal();
+    assert(tk.memo === "배경 설명" && tk.log.filter((e) => e.type === "comment").length === 3, "메모 옮기기: " + JSON.stringify(tk.memo));
+    assert(tk.log.some((e) => e.at.endsWith("-09-18") && e.text === "자료 요청함"), "날짜 인식 실패");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);

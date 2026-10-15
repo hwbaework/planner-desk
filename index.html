@@ -1222,6 +1222,7 @@ function recentActivity(pid) {
   const items = [];
   S.handoffs.filter((h) => !pid || h.projectId === pid).forEach((h) => h.events.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>[${esc(h.code)}]</b> ${evLabel(e.type)}${e.text ? " — " + esc(e.text.split("\n")[0].slice(0, 60)) : ""}`, cls: RESP_EV.includes(e.type) ? "resp" : MINE_EV.includes(e.type) ? "mine" : "", click: `openHO('${h.id}')` })));
   S.docs.filter((d) => !pid || d.projectId === pid).forEach((d) => d.history.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>${esc(d.name)}</b> ${esc(e.text)}`, cls: e.text.includes("승인") ? "resp" : "", click: `editDoc('${d.id}')` })));
+  S.tasks.filter((t) => !pid || t.projectId === pid).forEach((t) => (t.log || []).forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>${esc(t.title)}</b> ${e.type === "status" ? esc(e.text) : "— " + esc(e.text.split("\n")[0].slice(0, 60))}`, cls: e.type === "status" ? "mine" : "resp", click: `editTask('${t.id}')` })));
   items.sort((a, b) => (b.at + b.ts).localeCompare(a.at + a.ts));
   if (!items.length) return `<div class="empty">아직 기록이 없어</div>`;
   return `<ul class="tl">` + items.slice(0, 14).map((i) => `<li class="${i.cls}"><div class="h">${shortD(i.at)}${pid ? "" : ""}</div><div class="x" style="cursor:pointer" onclick="${i.click}">${i.html}</div></li>`).join("") + `</ul>`;
@@ -1775,7 +1776,7 @@ function renderTasks() {
   const pr = { high: 0, mid: 1, low: 2 };
   list.sort((a, b) => (a.status === "완료") - (b.status === "완료") || (a.due || "9999").localeCompare(b.due || "9999") || (pr[a.priority] ?? 1) - (pr[b.priority] ?? 1));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.taskFilter='${k}';render()">${l} ${cnt[k]}</button>`;
-  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `<button class="btn" onclick="pickTaskCsv()" title="Jira 등에서 내보낸 CSV">CSV 가져오기</button><button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
+  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `${(() => { const n = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length).length; return n ? `<button class="btn" onclick="splitAllMemos()" title="메모의 '6월 9일 기준 …' 줄을 날짜별 진행 기록으로">메모 → 진행 기록 (${n}건)</button>` : ""; })()}<button class="btn" onclick="pickTaskCsv()" title="Jira 등에서 내보낸 CSV">CSV 가져오기</button><button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
   h += `<div class="filters">${chip("open", "진행 전체")}${chip("진행중", "진행중")}${chip("대기", "대기")}${chip("예정", "예정")}${chip("완료", "완료")}${chip("all", "전체")}
     <input class="search" placeholder="업무·담당·메모 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   const eps = epicsOf(pid);
@@ -1783,7 +1784,8 @@ function renderTasks() {
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>업무</th><th>상태</th><th>우선</th><th>인지일</th><th>마감</th><th>담당 / 관계자</th></tr></thead><tbody>` +
     (list.map((x) => {
       const late = x.status !== "완료" && x.due && x.due < t;
-      const memo = (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
+      const lastLog = [...(x.log || [])].filter((e) => e.type === "comment").sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).pop();
+      const memo = lastLog ? `${shortD(lastLog.at)} ${lastLog.text}` : (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
       return `<tr style="${x.status === "완료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
         <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
         <td><select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
@@ -1880,7 +1882,8 @@ function importTaskCsv(text) {
     } },
   ], true);
 }
-function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const prev = x.status; x[k] = v; x.updatedAt = new Date().toISOString(); if (k === "status") markDone(x, prev); commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
+function logTask(x, type, text, at) { x.log = x.log || []; x.log.push({ id: uid("l"), at: at || today(), ts: new Date().toISOString(), type, text }); }
+function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const prev = x.status; x[k] = v; x.updatedAt = new Date().toISOString(); if (k === "status") { markDone(x, prev); if (prev !== v) logTask(x, "status", `${prev} → ${v}`); } commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
 function editTask(id, preset) {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const x = id ? S.tasks.find((t) => t.id === id) : Object.assign({ status: "진행중", priority: "mid", start: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
@@ -1897,10 +1900,50 @@ function editTask(id, preset) {
     { k: "memo", l: "메모 / 진행사항", t: "textarea", full: true },
   ], x, (v) => {
     v.updatedAt = new Date().toISOString();
-    if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
+    if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); if (prev !== x.status) logTask(x, "status", `${prev} → ${x.status}`); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
-  fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "");
+  (fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "") +
+  (id ? `<div class="sec-t">진행 기록</div>
+    <div class="evform" style="grid-template-columns:140px 1fr auto"><input type="date" id="tlAt" value="${today()}"><textarea id="tlText" placeholder="예: 담당자에게 자료 요청, 금요일 회신 예정"></textarea><button class="btn primary" onclick="addTaskLog('${x.id}')">기록</button></div>
+    ${memoDated(x.memo).length ? `<div class="small muted" style="margin:-6px 0 8px">메모에 날짜별 진행사항이 ${memoDated(x.memo).length}줄 있어. <a href="#" onclick="splitMemoToLog('${x.id}');return false">진행 기록으로 옮기기</a></div>` : ""}
+    <ul class="tl" id="taskLog">${taskLogHtml(x)}</ul>` : ""));
+}
+function taskLogHtml(x) {
+  const l = [...(x.log || [])].sort((a, b) => (b.at + (b.ts || "")).localeCompare(a.at + (a.ts || "")));
+  return l.map((e) => `<li class="${e.type === "status" ? "mine" : "resp"}"><div class="h"><b>${e.type === "status" ? "상태" : "기록"}</b> · ${e.at} (${wd(e.at)})
+    <button class="btn sm ghost" style="padding:0 4px" onclick="delTaskLog('${x.id}','${e.id}')" title="삭제">삭제</button></div><div class="x">${esc(e.text)}</div></li>`).join("") || `<li><div class="x muted">아직 기록이 없어</div></li>`;
+}
+function addTaskLog(id) {
+  const x = S.tasks.find((t) => t.id === id), text = $("tlText").value.trim(); if (!text) { toast("내용을 적어줘"); return; }
+  logTask(x, "comment", text, $("tlAt").value || today()); x.updatedAt = new Date().toISOString(); persist();
+  $("tlText").value = ""; $("taskLog").innerHTML = taskLogHtml(x); toast("기록했어");
+}
+function delTaskLog(id, lid) { const x = S.tasks.find((t) => t.id === id); x.log = (x.log || []).filter((e) => e.id !== lid); persist(); $("taskLog").innerHTML = taskLogHtml(x); }
+// 예전 메모의 "9월 18일 기준 …" 줄을 날짜가 있는 진행 기록으로
+function memoDated(memo) {
+  return String(memo || "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean).map((l) => {
+    const m = l.match(/^(\d{1,2})\s*월\s*(\d{1,2})\s*일\s*(?:기준)?\s*[,:]?\s*(.+)$/);
+    if (!m) return null;
+    const y = new Date().getFullYear(), mo = Number(m[1]);
+    const at = `${mo > new Date().getMonth() + 1 + 1 ? y - 1 : y}-${pad(mo)}-${pad(m[2])}`;
+    return { line: l, at, text: m[3].trim() };
+  }).filter(Boolean);
+}
+function splitAllMemos() {
+  const list = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length);
+  const lines = list.reduce((a, t) => a + memoDated(t.memo).length, 0);
+  if (!confirm(`업무 ${list.length}건 메모의 날짜 줄 ${lines}개를 진행 기록으로 옮길까? (Ctrl+Z로 되돌릴 수 있어)`)) return;
+  list.forEach((x) => { const rows = memoDated(x.memo); rows.forEach((r) => logTask(x, "comment", r.text, r.at)); const moved = new Set(rows.map((r) => r.line)); x.memo = String(x.memo).split(/\r?\n/).filter((l) => !moved.has(l.trim())).join("\n").trim(); });
+  commit(); toast(`${lines}줄을 진행 기록으로 옮겼어`, true);
+}
+function splitMemoToLog(id) {
+  const x = S.tasks.find((t) => t.id === id), rows = memoDated(x.memo);
+  if (!rows.length) return;
+  rows.forEach((r) => logTask(x, "comment", r.text, r.at));
+  const moved = new Set(rows.map((r) => r.line));
+  x.memo = String(x.memo).split(/\r?\n/).filter((l) => !moved.has(l.trim())).join("\n").trim();
+  commit(); closeModal(); editTask(id); toast(`${rows.length}줄을 진행 기록으로 옮겼어`, true);
 }
 function recurLabel(r) { return r.freq === "monthly" ? `매월 ${r.day}일` : `매주 ${"일월화수목금토"[Number(r.day) || 0]}요일`; }
 function recurStep(r, d) {
