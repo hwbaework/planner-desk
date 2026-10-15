@@ -229,9 +229,13 @@ function tests(w, errors) {
     h.events = h.events.filter((e) => e !== ev); w.recomputeHOStatus(h);
     assert(h.status === "ack", "상태: " + h.status);
   });
-  check("결함 처리 후 재테스트 Fail이면 재발로 다시 결함 전달 가능", () => {
+  check("완료노티 단계 결함은 재테스트 Fail 시 같은 건 반려, 검수완료 뒤 Fail은 재발", () => {
     const c = S().tcs.find((x) => x.hoId && S().handoffs.find((h) => h.id === x.hoId)?.status === "done");
     assert(c, "앞 단계의 결함 TC가 없음");
+    const ho = S().handoffs.find((h) => h.id === c.hoId);
+    w.setTC(c.id, "result", "Fail");
+    assert(c.hoId === ho.id && ho.status === "dev" && ho.events.some((e) => e.type === "reject"), "반려가 안 됨: " + ho.status);
+    w.pushEvent(ho, { type: "done", at: t, text: "" }); w.pushEvent(ho, { type: "verified", at: t, text: "" });
     w.setTC(c.id, "result", "Fail");
     assert(!c.hoId && (c.prevHoIds || []).length === 1, "연결이 안 풀림");
     assert(w.computeAlerts(null).some((a) => a.ref[1] === c.id && a.kind === "결함 미전달"), "결함 미전달 경고 없음");
@@ -296,6 +300,24 @@ function tests(w, errors) {
     const lanes = [...w.document.querySelectorAll(".lane-h")].map((e) => e.textContent);
     assert(lanes.some((l) => l.includes("점검 분류")) && lanes.some((l) => l.includes("분류 없음")), "분류 묶음: " + lanes.join("/"));
     S().ui.boardGroup = "none";
+  });
+  check("직접 바꾼 상태는 관계없는 기록을 지워도 유지 (재검토 1번)", () => {
+    const h = { id: "hm", code: "HO-902", projectId: pid(), title: "상태 유지 점검", status: "plan", sentAt: "", events: [], docIds: [], screenIds: [] };
+    S().handoffs.push(h);
+    w.pushEvent(h, { type: "sent", at: t, text: "" });
+    w.noteStatus(h, "dev", "상태 직접 변경");
+    w.pushEvent(h, { type: "nudge", at: t, text: "독촉" });
+    h.events = h.events.filter((e) => e.type !== "nudge"); w.recomputeHOStatus(h);
+    assert(h.status === "dev", "상태: " + h.status);
+  });
+  check("대시보드 '날짜 없는 항목'에서 바로 날짜 입력", () => {
+    S().ui.pid = pid(); S().ui.tab = "dash";
+    const tk = { id: "t_md", projectId: pid(), title: "마감 없는 점검 업무", status: "진행중", priority: "mid", start: t, due: "" };
+    S().tasks.push(tk); w.render();
+    assert(w.missingDates(pid()).task.some((x) => x.id === "t_md"), "목록에 없음");
+    assert(w.document.getElementById("view").innerHTML.includes("날짜 없는 항목"), "카드 없음");
+    w.tlSet("task", "t_md", "due", w.addDays(t, 5));
+    assert(!w.missingDates(pid()).task.some((x) => x.id === "t_md"), "입력 후에도 남음");
   });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;

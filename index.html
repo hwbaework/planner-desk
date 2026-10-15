@@ -20,6 +20,7 @@
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
   }
   [data-theme="dark"] .btn.primary { color: #1d2125; font-weight: 700; }
+  [data-theme="dark"] .cal .day.today .num { color: #1d2125; }
   [data-theme="dark"] {
     color-scheme: dark;
     --bg: #1d2125; --panel: #22272b; --sub: #2c333a; --hover: #282e33;
@@ -244,6 +245,11 @@
   .ov-bar { flex: 1; height: 8px; background: var(--sub); border-radius: 4px; overflow: hidden; }
   .ov-bar i { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
   @media (max-width: 900px) { .week { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+
+  .mrow { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; }
+  .mrow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mrow label { display: inline-flex; align-items: center; gap: 4px; }
+  .mrow input[type=date] { width: 128px; height: 26px; padding: 0 4px; font-size: 12px; }
 
   /* Project tag */
   .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
@@ -968,6 +974,7 @@ function renderDash() {
     <div class="card"><div class="card-h"><h3>상태 개요</h3><span class="sub">업무 상태 · 항목 유형</span><div class="actions"><button class="btn sm" onclick="selTab('tasks')">모든 업무 보기</button></div></div><div class="card-b">${statusOverview(pid)}</div></div>
     <div class="card"><div class="card-h"><h3>최근 활동</h3></div><div class="card-b">${recentActivity(pid)}</div></div></div>
   </div>`;
+  h += `<div style="margin-top:14px">${missingCard(pid)}</div>`;
   return h;
 }
 function weekSummary(pid) {
@@ -1002,6 +1009,26 @@ function statusOverview(pid) {
   const max = Math.max(1, ...types.map((x) => x[2]));
   return `<div class="ov">${donut(parts, ts.length, "전체 업무")}
     <div class="ov-types"><div class="small muted" style="margin-bottom:6px">항목 유형</div>${types.map(([k, l, n]) => `<div class="ov-row">${typeIcon(k)}<span class="tlabel" style="width:78px">${l}</span><span class="ov-bar"><i style="width:${(n / max) * 100}%"></i></span><b>${n}</b></div>`).join("")}</div></div>`;
+}
+function missingDates(pid) {
+  const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  return {
+    task: S.tasks.filter((x) => sc(x) && x.status !== "완료" && !x.due),
+    wbs: S.wbs.filter((x) => sc(x) && Number(x.progress) < 100 && (!x.start || !x.end)),
+    doc: S.docs.filter((x) => sc(x) && !["승인", "해당없음"].includes(x.status) && !x.plan),
+  };
+}
+function missingCard(pid) {
+  const m = missingDates(pid), total = m.task.length + m.wbs.length + m.doc.length;
+  if (!total) return "";
+  const row = (kind, x, title, inputs) => `<div class="mrow">${typeIcon(kind)}<span class="nm" title="${esc(title)}">${esc(title)}</span>${pid ? "" : `<span class="small muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projTag(x.projectId)}</span>`}${inputs}</div>`;
+  const inp = (kind, id, f, ph) => `<label class="small muted">${ph}<input type="date" onchange="tlSet('${kind}','${id}','${f}',this.value)"></label>`;
+  const sec = (l, list, f) => list.length ? `<div class="sec-t">${l} ${list.length}</div>${list.slice(0, 5).map(f).join("")}${list.length > 5 ? `<div class="small muted" style="padding:2px 0 6px">외 ${list.length - 5}건 — 타임라인에서 계속</div>` : ""}` : "";
+  return `<div class="card"><div class="card-h"><h3>날짜 없는 항목</h3><span class="sub">${total}건 · 날짜가 있어야 지연 경고·현재 단계·차주 계획이 정확해져</span><div class="actions"><button class="btn sm" onclick="S.ui.tlMissing=1;selTab('timeline')">타임라인에서 채우기</button></div></div><div class="card-b">` +
+    sec("마감일 없는 업무", m.task, (x) => row("task", x, x.title, inp("task", x.id, "due", "마감"))) +
+    sec("일정 없는 WBS", m.wbs, (x) => row("wbs", x, `${x.phase ? x.phase + " " : ""}${x.title}`, (x.start ? "" : inp("wbs", x.id, "start", "시작")) + (x.end ? "" : inp("wbs", x.id, "end", "종료")))) +
+    sec("계획일 없는 산출물", m.doc, (x) => row("doc", x, `${x.phase} ${x.name}`, inp("doc", x.id, "plan", "계획"))) +
+    `</div></div>`;
 }
 function alertRow(a) {
   const [type, id] = a.ref;
@@ -1098,8 +1125,8 @@ function boardMove(id, col) {
   const bk = S.ui.board in BOARDS ? S.ui.board : "ho";
   if (bk === "ho") {
     const h = S.handoffs.find((x) => x.id === id); if (!h || h.status === col) return;
-    if (col === "sent") { h.sentAt = h.sentAt || today(); pushEvent(h, { type: "sent", at: today(), text: "기획 전달" + (h.to ? ` → ${h.to}` : "") }); h.status = "sent"; }
-    else if (col === "plan" || col === "hold") { h.events.push({ id: uid("e"), at: today(), ts: new Date().toISOString(), type: "note", text: `상태 → ${hoStLabel(col)}` }); h.status = col; }
+    if (col === "sent") { h.sentAt = h.sentAt || today(); pushEvent(h, { type: "sent", at: today(), text: (h.events.some((e) => e.type === "sent") ? "재전달" : "기획 전달") + (h.to ? ` → ${h.to}` : "") }); h.status = "sent"; }
+    else if (col === "plan" || col === "hold") noteStatus(h, col, "보드에서 이동");
     else pushEvent(h, { type: { ack: "ack", dev: "progress", done: "done", verified: "verified" }[col], at: today(), text: "보드에서 이동" });
     commit(); toast(`[${h.code}] ${hoStLabel(col)}`);
   } else if (bk === "tasks") setTask(id, "status", col);
@@ -1710,23 +1737,27 @@ function pushEvent(x, e) {
   if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
 }
 function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
-// 남은 기록으로 상태를 다시 계산 (보류는 그대로 둔다)
+// 남은 기록으로 상태를 다시 계산. 직접 바꾼 상태(toStatus 기록)도 순서대로 반영한다.
 function recomputeHOStatus(x) {
-  if (x.status === "hold") return;
+  if (x.status === "hold" && !x.events.some((e) => e.toStatus)) return;
   let st = "plan";
   [...x.events].sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).forEach((e) => {
-    if (e.type === "sent") st = st === "plan" ? "sent" : st;
+    if (e.toStatus) st = e.toStatus;
+    else if (e.type === "sent") st = "sent";
     else if (EV_TO_ST[e.type]) st = EV_TO_ST[e.type];
     else if (e.type === "question" && ["plan", "sent"].includes(st)) st = "ack";
   });
+  x.status = st;
+}
+function noteStatus(x, st, why) {
+  x.events.push({ id: uid("e"), at: today(), ts: new Date().toISOString(), type: "note", toStatus: st, text: `${why} → ${hoStLabel(st)}` });
   x.status = st;
 }
 function delEvent(hid, eid) { const x = S.handoffs.find((h) => h.id === hid); if (!confirm("이 기록을 지울까?")) return; x.events = x.events.filter((e) => e.id !== eid); recomputeHOStatus(x); commit(); openHO(hid); }
 function setHOStatus(hid, st) {
   const x = S.handoffs.find((h) => h.id === hid);
   if (st === "sent" && !x.sentAt) x.sentAt = today();
-  x.events.push({ id: uid("e"), at: today(), ts: new Date().toISOString(), type: "note", text: `상태 직접 변경 → ${hoStLabel(st)}` });
-  x.status = st; commit(); openHO(hid);
+  noteStatus(x, st, "상태 직접 변경"); commit(); openHO(hid);
 }
 function me() { return S.settings.me || "기획 담당"; }
 function nudgeText(x) {
@@ -1862,6 +1893,7 @@ function editDoc(id, phaseId, status) {
   openForm(id ? `산출물 · ${d.name}` : "산출물 추가", fields, d, (v) => {
     if (v.status === "검토요청" && !v.requestedAt) v.requestedAt = today();
     if (v.status === "승인" && !v.approvedAt) v.approvedAt = today();
+    if (id && d.status === "승인" && ["작성중", "미착수"].includes(v.status) && v.approvedAt === d.approvedAt) { v.approvedAt = ""; v.requestedAt = ""; }
     if (id) { if (v.status !== d.status) d.history.push({ at: today(), ts: new Date().toISOString(), text: `${d.status} → ${v.status}` }); Object.assign(d, v); }
     else S.docs.push(Object.assign({ id: uid("d"), history: [{ at: today(), ts: new Date().toISOString(), text: `추가 (${v.status})` }], order: 99 }, v));
     commit();
@@ -2074,9 +2106,14 @@ function renderTC() {
 function tcResultChanged(c) {
   c.testedAt = c.result === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || "";
   const ho = c.hoId && S.handoffs.find((h) => h.id === c.hoId);
-  if (ho && ["done", "verified"].includes(ho.status) && ["Fail", "Block"].includes(c.result)) {
-    c.prevHoIds = [...(c.prevHoIds || []), c.hoId]; c.hoId = "";   // 재발: 이전 결함은 이력으로
-    toast(`이전 결함 ${ho.code}이 처리됐는데 다시 ${c.result} — 결함을 다시 전달해줘`);
+  if (!ho || !["Fail", "Block"].includes(c.result)) return;
+  if (ho.status === "done") {
+    // 완료 노티를 받았지만 재테스트 실패 → 같은 결함 건을 반려/재작업
+    pushEvent(ho, { type: "reject", at: today(), text: `재테스트 ${c.result} (${c.code})${c.actual ? "\n" + c.actual : ""}` });
+    toast(`[${ho.code}] 반려/재작업으로 기록 — 개발에 다시 알려줘`);
+  } else if (ho.status === "verified") {
+    c.prevHoIds = [...(c.prevHoIds || []), c.hoId]; c.hoId = "";   // 검수까지 끝난 뒤 다시 실패 = 재발
+    toast(`검수 완료된 결함 ${ho.code}이 다시 ${c.result} — 결함을 다시 전달해줘`);
   }
 }
 function setTC(id, k, v) {
