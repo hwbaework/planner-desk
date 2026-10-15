@@ -148,11 +148,20 @@ function tests(w, errors) {
     const c = S().tcs.find((x) => x.screenId === sc.id);
     w.setTC(c.id, "result", "Fail");
     assert(w.computeAlerts(null).some((a) => a.kind === "결함 미전달" && a.ref[1] === c.id), "결함 미전달 없음");
-    w.tcDefect(c.id); w.closeModal();
+    w.tcDefect(c.id);
+    assert(w.document.getElementById("modalTitle").textContent.startsWith("결함 전달"), "전달 전 확인 창 없음");
+    const fv = (k, v) => (w.document.querySelector(`#fForm [data-k="${k}"]`).value = v);
+    const save = () => [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "저장").click();
+    fv("actual", ""); fv("to", "개발 담당"); save();
+    assert(!c.hoId, "실제 결과 없이 전달됨");
+    fv("actual", "오류 안내 없이 저장됨"); save(); w.closeModal();
     const h = S().handoffs.find((x) => x.id === c.hoId);
-    assert(h && /^\[결함\]/.test(h.title) && h.screenIds.includes(sc.id), "결함 전달 생성 실패");
+    assert(h && /^\[결함\]/.test(h.title) && h.screenIds.includes(sc.id) && h.to === "개발 담당" && h.memo.includes("오류 안내 없이 저장됨"), "결함 전달 생성 실패");
     w.pushEvent(h, { type: "done", at: t, text: "" });
     assert(w.computeAlerts(null).some((a) => a.kind === "재테스트 필요" && a.ref[1] === c.id), "재테스트 필요 없음");
+    w.setTC(c.id, "result", "Pass");
+    assert(h.status === "verified", "재테스트 Pass 후 검수 완료 안 됨: " + h.status);
+    assert(c.history.map((x) => x.result).join(">") === "Fail>Pass" && c.history[0].ho === h.code, "결과 이력: " + JSON.stringify(c.history));
     return `TC ${made}개 · 결함 ${h.code}`;
   });
   check("메일 붙여넣기: 코드로 전달 건 매칭 · 회신 종류 판별", () => {
@@ -230,9 +239,11 @@ function tests(w, errors) {
     assert(h.status === "ack", "상태: " + h.status);
   });
   check("완료노티 단계 결함은 재테스트 Fail 시 같은 건 반려, 검수완료 뒤 Fail은 재발", () => {
-    const c = S().tcs.find((x) => x.hoId && S().handoffs.find((h) => h.id === x.hoId)?.status === "done");
-    assert(c, "앞 단계의 결함 TC가 없음");
+    const c = S().tcs.find((x) => !x.hoId && x.projectId === pid());
+    assert(c, "TC가 없음");
+    w.setTC(c.id, "result", "Fail"); w.tcDefectSend(c.id, { to: "개발 담당", toEmail: "", dueDate: "" }); w.closeModal();
     const ho = S().handoffs.find((h) => h.id === c.hoId);
+    w.pushEvent(ho, { type: "done", at: t, text: "" });
     w.setTC(c.id, "result", "Fail");
     assert(c.hoId === ho.id && ho.status === "dev" && ho.events.some((e) => e.type === "reject"), "반려가 안 됨: " + ho.status);
     w.pushEvent(ho, { type: "done", at: t, text: "" }); w.pushEvent(ho, { type: "verified", at: t, text: "" });

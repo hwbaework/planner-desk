@@ -1972,7 +1972,7 @@ function convertTask(id, kind) {
     S.datas.push(d); S.ui.dataFilter = "open"; S.ui.dataOrg = ""; open = () => openData(d.id);
   } else {
     // 요청사항(memo)은 개발자 메일에 들어가므로 비워 두고, 내부 기록은 메모 이벤트로만 남긴다
-    const h = { id: uid("h"), code: nextHOCode(), projectId: x.projectId, title: x.title, status: "plan", docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due || "", to: "", toEmail: "", cc: "", link: "", memo: "",
+    const h = { id: uid("h"), code: nextHOCode(), projectId: x.projectId, title: x.title, status: "plan", docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due && x.due >= today() ? x.due : "", to: "", toEmail: "", cc: "", link: "", memo: "",
       events: [...logs, ...(restMemo ? [{ at: today(), text: "업무 메모: " + restMemo }] : [])].map((e) => ({ id: uid("e"), at: e.at, ts: e.ts || new Date().toISOString(), type: "note", text: e.text })) };
     S.handoffs.push(h); S.ui.hoFilter = "open"; open = () => openHO(h.id);
   }
@@ -2820,6 +2820,14 @@ function renderTC() {
 function tcResultChanged(c) {
   c.testedAt = c.result === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || "";
   const ho = c.hoId && S.handoffs.find((h) => h.id === c.hoId);
+  if (c.result !== "미수행") c.history = [...(c.history || []), { at: today(), result: c.result, tester: c.tester || "", ho: ho?.code || "" }];
+  if (ho && c.result === "Pass" && ho.status === "done") {
+    // 완료 노티 받은 결함을 재테스트해서 Pass → 이 결함에 걸린 TC가 모두 Pass면 검수 완료
+    const linked = S.tcs.filter((x) => x.hoId === ho.id);
+    if (linked.every((x) => x.result === "Pass")) { pushEvent(ho, { type: "verified", at: today(), text: `재테스트 Pass (${linked.map((x) => x.code).join(", ")})` }); toast(`[${ho.code}] 재테스트 Pass — 검수 완료로 기록했어`); }
+    return;
+  }
+  if (ho && c.result === "Pass" && isOpenHO(ho)) { toast(`[${ho.code}] 아직 완료 노티 전이야 — 완료 노티를 받으면 검수 완료로 넘어가`); return; }
   if (!ho || !["Fail", "Block"].includes(c.result)) return;
   if (ho.status === "done") {
     // 완료 노티를 받았지만 재테스트 실패 → 같은 결함 건을 반려/재작업
@@ -2861,12 +2869,26 @@ function editTC(id, preset) {
 // Fail TC → 개발 전달(결함) 생성. 수신자는 화면의 개발 담당자.
 function tcDefect(id) {
   const c = S.tcs.find((x) => x.id === id), sc = S.screens.find((x) => x.id === c.screenId);
-  const h = { id: uid("h"), code: nextHOCode(), projectId: c.projectId, title: `[결함] ${c.code} ${c.scenario}`, status: "sent", sentAt: today(), dueDate: addDays(today(), 3),
-    to: sc?.dev || "", toEmail: "", cc: "", link: "", priority: "high", docIds: [], screenIds: sc ? [sc.id] : [], events: [],
+  const last = S.handoffs.filter((h) => h.projectId === c.projectId && h.to && (h.screenIds || []).includes(sc?.id)).pop();
+  openForm(`결함 전달 · ${c.code}`, [
+    { k: "actual", l: "실제 결과", t: "textarea", full: true, req: true, ph: "예: 이름을 비우고 저장해도 오류 안내 없이 저장됨" },
+    { k: "to", l: "받는 사람 (개발 담당)", t: "text", req: true },
+    { k: "toEmail", l: "메일 주소", t: "text" },
+    { k: "dueDate", l: "수정 완료 예정일", t: "date" },
+  ], { actual: c.actual || "", to: sc?.dev || last?.to || "", toEmail: last?.toEmail || "", dueDate: addDays(today(), 3) }, (v) => {
+    c.actual = v.actual; tcDefectSend(id, v);
+  });
+}
+function tcDefectSend(id, v) {
+  const c = S.tcs.find((x) => x.id === id), sc = S.screens.find((x) => x.id === c.screenId);
+  const h = { id: uid("h"), code: nextHOCode(), projectId: c.projectId, title: `[결함] ${c.code} ${c.scenario}`, status: "sent", sentAt: today(), dueDate: v.dueDate || addDays(today(), 3),
+    to: v.to || "", toEmail: v.toEmail || "", cc: "", link: "", priority: "high", docIds: [], screenIds: sc ? [sc.id] : [], events: [],
     memo: `[테스트 케이스] ${c.code}\n[사전 조건] ${c.pre || "-"}\n[절차]\n${c.steps || "-"}\n[예상 결과] ${c.expected || "-"}\n[실제 결과] ${c.actual || "-"}` };
   pushEvent(h, { type: "sent", at: today(), text: `결함 전달 (${c.code})` });
-  S.handoffs.push(h); c.hoId = h.id; commit(); openHO(h.id);
-  toast(`${h.code} 결함 전달 등록 — 수신자·완료 예정일 확인해줘`);
+  S.handoffs.push(h); c.hoId = h.id;
+  if (c.history?.length) c.history[c.history.length - 1].ho = h.code;
+  commit(); openHO(h.id);
+  toast(`${h.code} 결함 전달 등록 — [전달 메일 작성]으로 보내줘`);
 }
 function genTCs() {
   const pid = S.ui.pid, screens = S.screens.filter((x) => x.projectId === pid);
@@ -2895,10 +2917,12 @@ function bulkTC() {
   ]);
 }
 function exportTCCsv() {
-  const rows = [["TC ID", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "결과", "실제 결과", "수행일", "수행자", "결함 전달"]];
+  const rows = [["TC ID", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "최초 결과", "최종 결과", "재테스트", "실제 결과", "수행일", "수행자", "결함 전달", "결과 이력"]];
   S.tcs.filter((c) => c.projectId === S.ui.pid).forEach((c) => {
     const sc = S.screens.find((x) => x.id === c.screenId), ho = S.handoffs.find((x) => x.id === c.hoId);
-    rows.push([c.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, c.result, c.actual, c.testedAt, c.tester, ho?.code]);
+    const hs = c.history || [], defects = [...new Set([...(c.prevHoIds || []), c.hoId].map((i) => S.handoffs.find((x) => x.id === i)?.code).filter(Boolean))];
+    rows.push([c.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, hs[0]?.result || c.result, c.result, Math.max(0, hs.length - 1), c.actual, c.testedAt, c.tester, defects.join(" "),
+      hs.map((x) => `${x.at} ${x.result}${x.ho ? " " + x.ho : ""}`).join(" > ")]);
   });
   download(`통합테스트결과_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
