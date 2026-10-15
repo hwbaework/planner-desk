@@ -3011,10 +3011,27 @@ function bindNoteEditor() {
   }));
 }
 let noteTimer = null, noteFlush = null;
-function newNote() {
+// 회의록 양식: [결정]·[액션]·[리스크] 칸이 들어 있어서 다 쓰고 바로 업무·결정·리스크로 등록할 수 있다
+const NOTE_TEMPLATES = {
+  blank: ["빈 메모", ""],
+  meeting: ["일반 회의", "일시: {date} \n장소: \n참석: \n\n[안건]\n- \n\n[논의 내용]\n- \n\n[결정]\n- \n\n[액션]\n- 담당: 내용 (~MM/DD)\n\n[리스크]\n- "],
+  client: ["고객 미팅", "일시: {date} \n고객사 참석: \n당사 참석: \n\n[고객 요청]\n- \n\n[답변·협의]\n- \n\n[결정]\n- \n\n[액션]\n- 기획: \n- 개발: \n\n[이슈]\n- "],
+  data: ["데이터 협의 회의", "일시: {date} \n기관: \n참석: \n\n[협의 데이터]\n- 데이터명 / 제공 방식 / 주기 / 시작일\n\n[결정]\n- \n\n[액션]\n- 기관: 샘플 데이터 제공 (~MM/DD)\n- 기획: 데이터 명세 정리\n\n[리스크]\n- "],
+  consortium: ["컨소시엄 회의", "일시: {date} \n주관: \n참석 기관: \n\n[기관별 진행 현황]\n- \n\n[결정]\n- \n\n[액션]\n- \n\n[리스크]\n- \n\n[다음 회의]\n- "],
+  review: ["기획 리뷰(화면설계)", "일시: {date} \n대상 화면: \n참석: \n\n[피드백]\n- \n\n[결정]\n- \n\n[액션]\n- 기획: 화면설계서 수정 (~MM/DD)\n- 개발: 영향도 회신\n\n[이슈]\n- "],
+};
+function newNote(tpl) {
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id;
   if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
-  const n = { id: uid("n"), projectId: pid, title: "", date: today(), content: "", updatedAt: new Date().toISOString() };
+  if (!tpl) {
+    openModal("새 메모", `<div class="small muted" style="margin-bottom:8px">양식을 고르면 [결정]·[액션]·[리스크] 칸이 들어가. 다 쓰고 '업무·결정·리스크 등록'을 누르면 돼.</div>` +
+      Object.entries(NOTE_TEMPLATES).map(([k, [l, body]]) => `<div class="mrow" style="cursor:pointer" onclick="closeModal();newNote('${k}')">${typeIcon(k === "blank" ? "doc" : "event")}<span class="nm"><b>${l}</b></span><span class="small muted clamp1" style="max-width:320px">${esc(body.split("\n").filter((x) => /^\[/.test(x)).join(" "))}</span></div>`).join(""),
+      [{ l: "취소", fn: closeModal }]);
+    return;
+  }
+  const [label, body] = NOTE_TEMPLATES[tpl] || NOTE_TEMPLATES.blank;
+  const d = today();
+  const n = { id: uid("n"), projectId: pid, title: tpl === "blank" ? "" : `${d.slice(2).replace(/-/g, "")} ${label}`, date: d, content: body.replace("{date}", `${d} (${wd(d)})`), updatedAt: new Date().toISOString() };
   S.notes.push(n); S.ui.noteId = n.id; commit(); setTimeout(() => $("noteTitle")?.focus(), 0);
 }
 // 회의록 → 업무: [액션]/[Action]/할 일 아래 줄, 또는 "- [ ]"·"TODO" 줄을 후보로 뽑는다.
@@ -3042,6 +3059,7 @@ function noteActions(text) {
     if (/^\[?(액션|액션\s*아이템|action\s*items?|todo|할\s*일|후속\s*조치)\]?\s*:?$/i.test(l)) { inAct = true; return; }
     if (/^\[.+\]$/.test(l) || /^#+\s/.test(l)) { inAct = false; return; }
     if (inAct && l && !/^(?:[-*•·]|\d+[.)]|\[\s?\])/.test(l) && l.length <= 20) { inAct = false; return; }   // '결정사항' 같은 짧은 소제목에서 끝
+    if (/MM\/DD/.test(l)) return;   // 양식 자리표시 줄은 건너뜀
     const m = l.match(/^(?:[-*•·]|\d+[.)])\s*(?:\[\s?\]\s*)?(.+)$/);
     const isTodo = /^(?:[-*]\s*)?\[\s?\]\s+/.test(l) || /^todo\s*[:：]/i.test(l);
     if (!(inAct && m) && !isTodo) return;
@@ -3072,7 +3090,7 @@ function noteSections(text) {
     if (hm) { kind = /결정|합의/.test(hm[1]) ? "결정" : /이슈|문제/.test(hm[1]) ? "이슈" : "리스크"; return; }
     if (/^\[.+\]$/.test(l) || /^#+\s/.test(l)) { kind = ""; return; }
     const m = l.match(/^(?:[-*•·]|\d+[.)])\s*(.+)$/);
-    if (kind && m && m[1].trim().length >= 3) out.push({ title: m[1].trim(), owner: "", due: "", type: kind });
+    if (kind && m && m[1].trim().length >= 3 && !/MM\/DD/.test(l)) out.push({ title: m[1].trim(), owner: "", due: "", type: kind });
   });
   return out;
 }
