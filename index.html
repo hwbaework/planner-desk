@@ -50,6 +50,18 @@
   .brand small { font-weight: 500; color: var(--faint); margin-left: 6px; font-size: 12px; }
   .today { color: var(--dim); font-size: 12px; }
   .top .spacer { flex: 1; }
+  .gsearch { position: relative; flex: 0 1 460px; display: flex; align-items: center; gap: 6px; border: 1px solid var(--line2); border-radius: 6px; padding: 0 10px; background: var(--panel); color: var(--faint); }
+  .gsearch:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accentw); }
+  .gsearch input { border: none !important; outline: none !important; box-shadow: none !important; padding: 7px 0; background: transparent; width: 100%; }
+  .gres { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(9,30,66,.18); max-height: 60vh; overflow-y: auto; display: none; z-index: 50; color: var(--text); }
+  .gres.open { display: block; }
+  .gres .gh { font-size: 11.5px; font-weight: 700; color: var(--faint); padding: 8px 12px 4px; }
+  .gres .gi { display: flex; align-items: center; gap: 8px; padding: 7px 12px; cursor: pointer; font-size: 13.5px; }
+  .gres .gi.on, .gres .gi:hover { background: var(--accentw); }
+  .gres .gi .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gres .gi .sub { font-size: 12px; color: var(--faint); white-space: nowrap; }
+  .gres mark { background: var(--warnw); color: inherit; border-radius: 2px; }
+  @media (max-width: 900px) { .gsearch { order: 5; flex: 1 1 100%; } }
   .save-ind { font-size: 12.5px; color: var(--faint); }
   .ico { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -4px; flex: none; }
   .btn .ico + span { margin-left: 6px; }
@@ -442,6 +454,11 @@
   <div>
     <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232684FF'/%3E%3Cstop offset='1' stop-color='%230C66E4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23g%29'/%3E%3Cpath d='M32 12 L48 28 L32 44 L16 28 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M32 36 L40 44 L32 52 L24 44 Z' fill='white'/%3E%3C/svg%3E" alt="">Planner Desk <small>기획 · PMO 데스크</small></div>
     <div class="today" id="todayLabel"></div>
+  </div>
+  <div class="gsearch">
+    <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="gq" type="text" placeholder="검색 (Ctrl+K) — 업무·전달·산출물·데이터·화면·테스트·메모" autocomplete="off" oninput="gSearch(this.value)" onkeydown="gKey(event)" onfocus="gSearch(this.value)">
+    <div id="gres" class="gres"></div>
   </div>
   <div class="spacer"></div>
   <span class="save-ind" id="saveInd"></span>
@@ -1184,6 +1201,55 @@ function boardAdd(col) {
   else if (bk === "docs") editDoc(null, "P1", col);
   else if (bk === "data") editData(null, { status: col, projectId: pid });
   else if (bk === "tc") editTC(null, { projectId: pid });
+}
+
+// ───────────── 통합 검색 (Ctrl+K) ─────────────
+// 보관된 프로젝트는 빼고, 제목·코드·담당·메모를 대상으로 찾는다.
+function gSearchItems(q) {
+  q = q.trim().toLowerCase(); if (!q) return [];
+  const live = (x) => !proj(x.projectId)?.archived;
+  const hit = (...f) => f.some((v) => String(v || "").toLowerCase().includes(q));
+  const out = [];
+  const add = (group, kind, x, title, sub, open) => out.push({ group, kind, title, sub, open, pid: x.projectId });
+  S.tasks.filter(live).forEach((x) => hit(x.title, x.owner, x.memo, x.epic) && add("업무", "task", x, x.title, `${x.status}${x.due ? " · 마감 " + shortD(x.due) : ""}`, `editTask('${x.id}')`));
+  S.handoffs.filter(live).forEach((x) => hit(x.code, x.title, x.to, x.memo) && add("개발 전달", hoKind(x), x, `[${x.code}] ${x.title}`, hoStLabel(x.status), `openHO('${x.id}')`));
+  S.datas.filter(live).forEach((x) => hit(x.name, x.org, x.contact, x.memo, x.spec) && add("데이터 협의", "data", x, `${x.org ? x.org + " · " : ""}${x.name}`, x.status, `openData('${x.id}')`));
+  S.docs.filter(live).forEach((x) => hit(x.name, x.owner, x.memo, x.path) && add("산출물", "doc", x, `${x.phase} ${x.name}`, `${x.status} ${x.version || ""}`, `editDoc('${x.id}')`));
+  S.screens.filter(live).forEach((x) => hit(x.code, x.name, x.menu, x.memo) && add("화면", "doc", x, `${x.code} ${x.name}`, x.status, `S.ui.pid='${x.projectId}';selTab('screens');editScreen('${x.id}')`));
+  S.tcs.filter(live).forEach((x) => hit(x.code, x.scenario, x.steps, x.expected) && add("테스트 케이스", x.result === "Fail" ? "bug" : "tc", x, `${x.code} ${x.scenario}`, x.result, `S.ui.pid='${x.projectId}';editTC('${x.id}')`));
+  S.events.filter(live).forEach((x) => hit(x.title, x.location, x.memo) && add("일정", "event", x, x.title, `${x.type} · ${shortD(x.start)}`, `editEvent('${x.id}')`));
+  S.notes.filter(live).forEach((x) => hit(x.title, x.content) && add("메모·회의록", "doc", x, x.title || "(제목 없음)", x.date || "", `S.ui.pid='${x.projectId}';S.ui.noteId='${x.id}';selTab('notes')`));
+  // 같은 그룹 안에서는 끝난 항목(완료·검수완료·승인·수신 완료·Pass)을 뒤로
+  const order = [...new Set(out.map((r) => r.group))];
+  const isDone = (r) => /^(완료|검수완료|승인|수신 완료|Pass)/.test(r.sub || "");
+  return out.map((r, i) => [r, i]).sort((a, b) => order.indexOf(a[0].group) - order.indexOf(b[0].group) || isDone(a[0]) - isDone(b[0]) || a[1] - b[1]).map(([r]) => r);
+}
+let gSel = 0, gList = [];
+function gSearch(q) {
+  const box = $("gres"); gList = gSearchItems(q).slice(0, 40); gSel = 0;
+  if (!q.trim()) { box.classList.remove("open"); return; }
+  const mark = (t) => { const i = t.toLowerCase().indexOf(q.trim().toLowerCase()); return i < 0 ? esc(t) : esc(t.slice(0, i)) + "<mark>" + esc(t.slice(i, i + q.trim().length)) + "</mark>" + esc(t.slice(i + q.trim().length)); };
+  let html = "", last = "";
+  gList.forEach((r, i) => {
+    if (r.group !== last) { html += `<div class="gh">${r.group}</div>`; last = r.group; }
+    html += `<div class="gi ${i === gSel ? "on" : ""}" data-i="${i}" onmousedown="gOpen(${i})">${typeIcon(r.kind)}<span class="nm">${mark(r.title)}</span><span class="sub">${esc(r.sub || "")}</span><span class="sub">${projTag(r.pid)}</span></div>`;
+  });
+  box.innerHTML = html || `<div class="empty">"${esc(q)}" 결과 없음</div>`;
+  box.classList.add("open");
+}
+function gKey(e) {
+  const items = [...document.querySelectorAll("#gres .gi")];
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault(); if (!items.length) return;
+    gSel = (gSel + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+    items.forEach((el, i) => el.classList.toggle("on", i === gSel)); items[gSel].scrollIntoView({ block: "nearest" });
+  } else if (e.key === "Enter" && gList[gSel]) { e.preventDefault(); gOpen(gSel); }
+  else if (e.key === "Escape") { $("gres").classList.remove("open"); e.target.blur(); }
+}
+function gOpen(i) {
+  const r = gList[i]; if (!r) return;
+  $("gres").classList.remove("open"); $("gq").blur();
+  new Function(r.open)();
 }
 
 // ───────────── 타임라인 (Jira 타임라인 구조) ─────────────
@@ -2737,8 +2803,10 @@ function seedDemo() {
 }
 
 // ───────────── boot ─────────────
+document.addEventListener("mousedown", (e) => { if (!e.target.closest(".gsearch")) $("gres").classList.remove("open"); });
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveFile(false); }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("gq").focus(); $("gq").select(); }
   if (e.key === "Escape" && $("modalBg").classList.contains("open")) closeModal();
 });
 window.addEventListener("beforeunload", (e) => { if (fileHandle && dirty) { e.preventDefault(); e.returnValue = ""; } });
