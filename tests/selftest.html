@@ -533,6 +533,15 @@ function tests(w, errors) {
     assert(S().tasks.length === before && S().tasks.some((x) => x.id === victim.id), "복구 안 됨");
     assert(S().ui.tab === "tasks", "화면이 바뀜");
   });
+  check("마일스톤: 다음 마일스톤 D-day 표시, 타임라인 마름모, 지난 것은 제외", () => {
+    S().events.push({ id: "ms_old", projectId: pid(), title: "착수보고", type: "마일스톤", start: w.addDays(t, -30) },
+                    { id: "ms_next", projectId: pid(), title: "중간점검 보고", type: "마일스톤", start: w.addDays(t, 12) });
+    assert(w.nextMilestone(pid()).id === "ms_next", "다음 마일스톤 틀림");
+    S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
+    assert(w.document.querySelector(".page-head .ms-tag")?.textContent.includes("D-12"), "대시보드에 D-day 없음");
+    S().ui.tab = "timeline"; S().ui.tlZoom = "month"; w.render();
+    assert([...w.document.querySelectorAll(".tl-r.grp .tl-ms")].some((e) => (e.getAttribute("title") || "").includes("중간점검 보고")), "타임라인 마름모 없음");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);

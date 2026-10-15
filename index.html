@@ -302,6 +302,8 @@
   .pill .ti { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
   .epic-lz { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 6px; border-radius: 3px; border: 1px solid; white-space: nowrap; margin-right: 4px; }
   [data-theme="dark"] .epic-lz { filter: brightness(1.6) saturate(.8); background: transparent !important; }
+  .ms-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 3px; color: var(--accent); white-space: nowrap; }
+  .ms-tag i { width: 8px; height: 8px; background: var(--accent); transform: rotate(45deg); display: inline-block; }
   .ptag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
   .ptag i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
@@ -559,7 +561,7 @@ const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e
 const TASK_ST = ["진행중", "대기", "예정", "완료"];
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "예정": "gray", "완료": "green" };
 const PRI = [["high", "높음"], ["mid", "보통"], ["low", "낮음"]];
-const EVENT_TYPES = ["회의", "출장", "시연", "보고", "교육", "휴가", "기타"];
+const EVENT_TYPES = ["마일스톤", "회의", "출장", "시연", "보고", "교육", "휴가", "기타"];
 const DATA_ST = ["협의 전", "협의 중", "합의", "수신 중", "수신 완료", "보류"];
 const DATA_CLS = { "협의 전": "gray", "협의 중": "violet", "합의": "blue", "수신 중": "amber", "수신 완료": "green", "보류": "muted" };
 const DATA_METHOD = ["API", "파일(엑셀/CSV)", "DB 연계", "RTU/계측기", "수기 입력", "미정"];
@@ -916,6 +918,10 @@ function computeAlerts(pid) {
   return out.sort((a, b) => rank[a.level] - rank[b.level] || b.days - a.days);
 }
 
+// 다음 마일스톤 (오늘 포함, 가장 가까운 것)
+function milestones(pid) { return S.events.filter((e) => e.projectId === pid && e.type === "마일스톤" && e.start).sort((a, b) => a.start.localeCompare(b.start)); }
+function nextMilestone(pid) { return milestones(pid).find((e) => e.start >= today()); }
+function msTag(pid) { const m = nextMilestone(pid); return m ? `<span class="ms-tag" title="${esc(m.title)} ${m.start}"><i></i>${esc(m.title)} <b>${dday(m.start)}</b></span>` : ""; }
 function currentPhase(pid) {
   const t = today();
   const ws = S.wbs.filter((w) => w.projectId === pid && w.phase && w.start && w.end && w.start <= t && t <= w.end);
@@ -1030,8 +1036,8 @@ function renderDash() {
   if (pid) {
     const p = proj(pid);
     const span = p.start || p.end ? `${p.start || "?"} ~ ${p.end || "?"}${p.end ? ` · 종료 ${dday(p.end)}` : ""}` : "기간 미입력";
-    h += pageHead(esc(p.name), `${esc(p.client || "고객사 미입력")} · ${span}${p.pm ? " · PM " + esc(p.pm) : ""}${p.devLead ? " · 개발 PL " + esc(p.devLead) : ""}`,
-      `<button class="btn" onclick="editProject('${pid}')">프로젝트 정보</button><button class="btn primary" onclick="editHO()">＋ 개발 전달 등록</button>`);
+    h += pageHead(esc(p.name), `${esc(p.client || "고객사 미입력")} · ${span}${p.pm ? " · PM " + esc(p.pm) : ""}${p.devLead ? " · 개발 PL " + esc(p.devLead) : ""} ${msTag(pid)}`,
+      `<button class="btn" onclick="editEvent(null, today());setTimeout(()=>{const t=document.querySelector('#fForm [data-k=type]');if(t)t.value='마일스톤'},0)">+ 마일스톤</button><button class="btn" onclick="editProject('${pid}')">프로젝트 정보</button><button class="btn primary" onclick="editHO()">＋ 개발 전달 등록</button>`);
   } else {
     h += pageHead("전체 프로젝트 현황", `진행 프로젝트 ${activeProjects().length}개`, `<button class="btn primary" onclick="editProject()">＋ 프로젝트</button>`);
   }
@@ -1063,7 +1069,7 @@ function renderDash() {
       }).join("") + `</div></div></div>`;
   } else {
     h += `<div class="card"><div class="card-h"><h3>프로젝트별 현황</h3></div><div class="tbl-wrap"><table class="t"><thead><tr>
-      <th>프로젝트</th><th>현재 단계</th><th>산출물 승인</th><th class="nowrap">진행 업무</th><th class="nowrap">데이터 협의</th><th class="nowrap">진행 전달</th><th class="nowrap">노티 미수신</th><th>지연</th><th>종료</th></tr></thead><tbody>` +
+      <th>프로젝트</th><th>현재 단계</th><th>산출물 승인</th><th class="nowrap">진행 업무</th><th class="nowrap">데이터 협의</th><th class="nowrap">진행 전달</th><th class="nowrap">노티 미수신</th><th>지연</th><th>다음 마일스톤</th><th>종료</th></tr></thead><tbody>` +
       (activeProjects().map((p) => {
         const a = computeAlerts(p.id); const s = docStats(p.id); const ph = currentPhase(p.id);
         const pct = s.total ? Math.round((s.ok / s.total) * 100) : 0;
@@ -1075,8 +1081,9 @@ function renderDash() {
           <td class="num">${S.handoffs.filter((x) => x.projectId === p.id && isOpenHO(x)).length}</td>
           <td class="num">${(() => { const n = a.filter((x) => x.level === "danger").length; return n ? badge(n, "red") : "0"; })()}</td>
           <td class="num">${a.filter((x) => x.level === "warn").length}</td>
+          <td class="nowrap">${msTag(p.id) || '<span class="muted">-</span>'}</td>
           <td class="nowrap">${p.end ? `${p.end} <span class="muted">${dday(p.end)}</span>` : "-"}</td></tr>`;
-      }).join("") || `<tr><td colspan="9" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
+      }).join("") || `<tr><td colspan="10" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
   }
 
   h += `<div class="grid2" style="margin-top:14px">
@@ -1406,7 +1413,7 @@ function renderTimeline() {
   rows.forEach((r) => {
     if (r.grp) {
       L += `<div class="tl-r grp">${projTag(r.p.id)} <span class="muted small">${r.n}</span></div>`;
-      R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}</div>`;
+      R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}${milestones(r.p.id).map((m) => tlMilestone(m.start, x, r0, r1, "#0c66e4", `editEvent('${m.id}')`, "마일스톤 " + m.title, m.start < today())).join("")}${todayLine}</div>`;
       return;
     }
     if (r.epic) {
@@ -1499,7 +1506,7 @@ function renderCal() {
   return h;
 }
 function calPill(i) {
-  const tag = CAL_TAG[i.kind];
+  const tag = i.sub === "마일스톤" ? "마일스톤" : CAL_TAG[i.kind];
   return `<div class="pill ${i.done ? "done" : ""}" style="border-left-color:${projColor(i.pid)}" title="${esc(projName(i.pid))} · ${esc((tag ? tag + " · " : "") + i.title)}" onclick="event.stopPropagation();${i.click}">${typeIcon(i.icon || i.kind)}${esc(i.title)}</div>`;
 }
 function itemList(items, showDate) {
