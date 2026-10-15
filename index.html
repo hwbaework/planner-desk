@@ -251,6 +251,18 @@
   .mrow label { display: inline-flex; align-items: center; gap: 4px; }
   .mrow input[type=date] { width: 128px; height: 26px; padding: 0 4px; font-size: 12px; }
 
+  .td { margin-bottom: 14px; }
+  .td-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .td-col { padding: 10px 14px; min-width: 0; }
+  .td-col + .td-col { border-left: 1px solid var(--line); }
+  .td-h { font-weight: 700; font-size: 13.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .td-i { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 13.5px; cursor: pointer; border-bottom: 1px dashed var(--line); min-width: 0; }
+  .td-i:hover .nm { color: var(--accent); }
+  .td-i .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-k { font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+  .td-k.danger { color: var(--danger); } .td-k.warn { color: var(--warn); } .td-k.mine { color: var(--accent); }
+  @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } .td-col + .td-col { border-left: none; border-top: 1px solid var(--line); } }
+
   /* Project tag */
   .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
   .ti + .tlabel { margin-left: 6px; }
@@ -927,13 +939,17 @@ function renderDash() {
   } else {
     h += pageHead("전체 프로젝트 현황", `진행 프로젝트 ${activeProjects().length}개`, `<button class="btn primary" onclick="editProject()">＋ 프로젝트</button>`);
   }
-  h += `<div class="kpis">
-    <div class="kpi danger" onclick="S.ui.hoFilter='alert';selTab('ho')"><div class="l">노티 미수신</div><div class="v">${noNoti}</div><div class="h">접수/완료 회신 기준 초과</div></div>
-    <div class="kpi" onclick="S.ui.hoFilter='open';selTab('ho')"><div class="l">진행 중 개발 전달</div><div class="v">${openHo}</div><div class="h">검수완료 전 건</div></div>
-    <div class="kpi warn" onclick="selTab('docs')"><div class="l">승인 대기 산출물</div><div class="v">${reqDocs}</div><div class="h">검토요청 상태</div></div>
-    <div class="kpi ok" onclick="S.ui.hoFilter='done';selTab('ho')"><div class="l">내 검수 대기</div><div class="v">${mine}</div><div class="h">완료 노티 받은 건</div></div>
-    <div class="kpi" onclick="S.ui.taskFilter='open';selTab('tasks')"><div class="l">진행 중 업무</div><div class="v">${openTasks}</div><div class="h">완료 전 업무</div></div>
-  </div>`;
+  h += todayCard(pid, alerts);
+  const kpis = [
+    [noNoti, "danger", "S.ui.hoFilter='alert';selTab('ho')", "노티 미수신", "접수/완료 회신 기준 초과"],
+    [openHo, "", "S.ui.hoFilter='open';selTab('ho')", "진행 중 개발 전달", "검수완료 전 건"],
+    [reqDocs, "warn", "selTab('docs')", "승인 대기 산출물", "검토요청 상태"],
+    [mine, "ok", "S.ui.hoFilter='done';selTab('ho')", "내 검수 대기", "완료 노티 받은 건"],
+    [openTasks, "", "S.ui.taskFilter='open';selTab('tasks')", "진행 중 업무", "완료 전 업무"],
+  ];
+  const shown = kpis.filter((k) => k[0]), zero = kpis.filter((k) => !k[0]);
+  if (shown.length) h += `<div class="kpis" style="grid-template-columns:repeat(${Math.max(shown.length, 2)},minmax(0,1fr))">` + shown.map(([v, c, on, l, hh]) => `<div class="kpi ${c}" onclick="${on}"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${hh}</div></div>`).join("") + `</div>`;
+  if (zero.length) h += `<div class="small muted" style="margin:-6px 0 12px">없음: ${zero.map((k) => k[3]).join(" · ")}</div>`;
   const wk = weekSummary(pid);
   h += `<div class="week">
     <div class="wk"><span class="wk-i">${typeIcon("task")}</span><div><b>${wk.done}개 완료함</b><div class="small muted">지난 7일간</div></div></div>
@@ -1010,6 +1026,23 @@ function statusOverview(pid) {
   return `<div class="ov">${donut(parts, ts.length, "전체 업무")}
     <div class="ov-types"><div class="small muted" style="margin-bottom:6px">항목 유형</div>${types.map(([k, l, n]) => `<div class="ov-row">${typeIcon(k)}<span class="tlabel" style="width:78px">${l}</span><span class="ov-bar"><i style="width:${(n / max) * 100}%"></i></span><b>${n}</b></div>`).join("")}</div></div>`;
 }
+// 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
+function todayCard(pid, alerts) {
+  const t = today();
+  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "완료 노티 없음", "접수 노티 없음", "승인 회신 없음", "내 검수 대기", "결함 미전달", "재테스트 필요"].includes(a.kind));
+  const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
+  const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
+  const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
+  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')` }[type];
+    return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
+  const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
+  const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
+  return `<div class="card td"><div class="card-h"><h3>오늘 할 일</h3><span class="sub">${t} (${wd(t)})</span>
+      ${miss ? `<div class="actions"><button class="btn sm" onclick="document.getElementById('missingCard')?.scrollIntoView({behavior:'smooth'})">날짜 없는 항목 ${miss}건</button></div>` : ""}</div>
+    <div class="td-grid">${col("지난 것 · 확인 필요", overdue.length, overdue.slice(0, 8).map(al).join("") + (overdue.length > 8 ? `<div class="small muted">외 ${overdue.length - 8}건</div>` : ""), "밀린 일 없음")}
+      ${col("오늘", todays.length, todays.map((i) => it(i, false)).join(""), "오늘 잡힌 일정 없음")}
+      ${col("이번 주", week.length, week.slice(0, 8).map((i) => it(i, true)).join("") + (week.length > 8 ? `<div class="small muted">외 ${week.length - 8}건</div>` : ""), "다음 7일 일정 없음")}</div></div>`;
+}
 function missingDates(pid) {
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   return {
@@ -1024,7 +1057,7 @@ function missingCard(pid) {
   const row = (kind, x, title, inputs) => `<div class="mrow">${typeIcon(kind)}<span class="nm" title="${esc(title)}">${esc(title)}</span>${pid ? "" : `<span class="small muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projTag(x.projectId)}</span>`}${inputs}</div>`;
   const inp = (kind, id, f, ph) => `<label class="small muted">${ph}<input type="date" onchange="tlSet('${kind}','${id}','${f}',this.value)"></label>`;
   const sec = (l, list, f) => list.length ? `<div class="sec-t">${l} ${list.length}</div>${list.slice(0, 5).map(f).join("")}${list.length > 5 ? `<div class="small muted" style="padding:2px 0 6px">외 ${list.length - 5}건 — 타임라인에서 계속</div>` : ""}` : "";
-  return `<div class="card"><div class="card-h"><h3>날짜 없는 항목</h3><span class="sub">${total}건 · 날짜가 있어야 지연 경고·현재 단계·차주 계획이 정확해져</span><div class="actions"><button class="btn sm" onclick="S.ui.tlMissing=1;selTab('timeline')">타임라인에서 채우기</button></div></div><div class="card-b">` +
+  return `<div class="card" id="missingCard"><div class="card-h"><h3>날짜 없는 항목</h3><span class="sub">${total}건 · 날짜가 있어야 지연 경고·현재 단계·차주 계획이 정확해져</span><div class="actions"><button class="btn sm" onclick="S.ui.tlMissing=1;selTab('timeline')">타임라인에서 채우기</button></div></div><div class="card-b">` +
     sec("마감일 없는 업무", m.task, (x) => row("task", x, x.title, inp("task", x.id, "due", "마감"))) +
     sec("일정 없는 WBS", m.wbs, (x) => row("wbs", x, `${x.phase ? x.phase + " " : ""}${x.title}`, (x.start ? "" : inp("wbs", x.id, "start", "시작")) + (x.end ? "" : inp("wbs", x.id, "end", "종료")))) +
     sec("계획일 없는 산출물", m.doc, (x) => row("doc", x, `${x.phase} ${x.name}`, inp("doc", x.id, "plan", "계획"))) +
@@ -1155,7 +1188,7 @@ function boardAdd(col) {
 const TL_KIND = {
   wbs: { l: "WBS", list: () => S.wbs, title: (x) => x.title, s: "start", e: "end", who: (x) => x.owner, st: (x) => `${Number(x.progress) || 0}%`, done: (x) => Number(x.progress) >= 100, open: (x) => `editWBS('${x.id}')` },
   task: { l: "업무", list: () => S.tasks, title: (x) => x.title, s: "start", e: "due", who: (x) => x.owner, st: (x) => x.status, done: (x) => x.status === "완료", open: (x) => `editTask('${x.id}')` },
-  ho: { l: "개발 전달", list: () => S.handoffs, title: (x) => `[${x.code}] ${x.title}`, s: "sentAt", e: "dueDate", who: (x) => x.to, st: (x) => hoStLabel(x.status), done: (x) => ["verified"].includes(x.status), open: (x) => `openHO('${x.id}')`, icon: hoKind },
+  ho: { noStartFill: true, l: "개발 전달", list: () => S.handoffs, title: (x) => `[${x.code}] ${x.title}`, s: "sentAt", e: "dueDate", who: (x) => x.to, st: (x) => hoStLabel(x.status), done: (x) => ["verified"].includes(x.status), open: (x) => `openHO('${x.id}')`, icon: hoKind },
   data: { l: "데이터 협의", list: () => S.datas, title: (x) => `${x.org ? x.org + " · " : ""}${x.name}`, s: "requestedAt", e: "dueDate", who: (x) => x.contact, st: (x) => x.status, done: (x) => x.status === "수신 완료", open: (x) => `openData('${x.id}')` },
   doc: { l: "산출물 계획", list: () => S.docs, title: (x) => x.name, s: null, e: "plan", who: (x) => x.owner, st: (x) => x.status, done: (x) => ["승인", "해당없음"].includes(x.status), open: (x) => `editDoc('${x.id}')` },
 };
@@ -1235,8 +1268,8 @@ function renderTimeline() {
     const icon = typeIcon(K.icon ? K.icon(it) : kind), color = TYPE_ICON[K.icon ? K.icon(it) : kind][0];
     L += `<div class="tl-r" style="padding-left:${r.indent ? 30 : 10}px">${icon}<span class="nm" onclick="${K.open(it)}" title="${esc(K.title(it))}">${esc(K.title(it))}</span><span class="who">${esc(K.st(it))}${K.who(it) ? " · " + esc(K.who(it)) : ""}</span></div>`;
     let bar = "";
-    if (!e0 && !s0) bar = `<div class="tl-fill"><span>날짜 없음</span>${K.s ? `<input type="date" title="시작" onchange="tlSet('${kind}','${it.id}','${K.s}',this.value)">` : ""}<input type="date" title="${K.s ? "종료" : "계획일"}" onchange="tlSet('${kind}','${it.id}','${K.e}',this.value)"></div>`;
-    else if (!K.s || !s0 || !e0) bar = tlMilestone(e0 || s0, x, r0, r1, color, K.open(it), K.title(it), done);
+    if (!e0) bar = `<div class="tl-fill"><span>${s0 ? "마감 없음" : "날짜 없음"}</span>${K.s && !s0 && !K.noStartFill ? `<input type="date" title="시작" onchange="tlSet('${kind}','${it.id}','${K.s}',this.value)">` : ""}<input type="date" title="${K.s ? (kind === "ho" ? "완료 예정" : "종료·마감") : "계획일"}" onchange="tlSet('${kind}','${it.id}','${K.e}',this.value)"></div>`;
+    else if (!K.s || !s0) bar = tlMilestone(e0, x, r0, r1, color, K.open(it), K.title(it), done);
     else bar = tlSpan(s0, e0, x, z, r0, r1, color, K.open(it), done ? "done" : !done && e0 < t ? "late" : "", K.title(it));
     R += `<div class="tl-r" style="width:${W}px">${gridBody}${bar}${todayLine}</div>`;
   });
@@ -1528,7 +1561,8 @@ function renderTasks() {
       <td class="nowrap"><button class="btn sm" onclick="completeRecur('${r.id}')">완료</button></td></tr>`).join("") || `<tr><td colspan="7" class="empty">정기 업무 없음 (주간보고 등)</td></tr>`) + `</tbody></table></div></div>`;
   return h;
 }
-function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); x[k] = v; x.updatedAt = new Date().toISOString(); commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
+function markDone(x, prevStatus) { if (x.status === "완료" && prevStatus !== "완료") x.completedAt = today(); if (x.status !== "완료") x.completedAt = ""; }
+function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const prev = x.status; x[k] = v; x.updatedAt = new Date().toISOString(); if (k === "status") markDone(x, prev); commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
 function editTask(id, preset) {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const x = id ? S.tasks.find((t) => t.id === id) : Object.assign({ status: "진행중", priority: "mid", start: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
@@ -1544,7 +1578,7 @@ function editTask(id, preset) {
     { k: "memo", l: "메모 / 진행사항", t: "textarea", full: true },
   ], x, (v) => {
     v.updatedAt = new Date().toISOString();
-    if (id) Object.assign(x, v); else S.tasks.push(Object.assign({ id: uid("t") }, v));
+    if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); } } }] : []);
 }
@@ -1741,7 +1775,8 @@ function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid);
 function recomputeHOStatus(x) {
   if (x.status === "hold" && !x.events.some((e) => e.toStatus)) return;
   let st = "plan";
-  [...x.events].sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).forEach((e) => {
+  const key = (e) => e.ts || e.at + "T00:00";   // 화면 상태와 같은 '입력 순서'로 다시 계산
+  [...x.events].sort((a, b) => key(a).localeCompare(key(b))).forEach((e) => {
     if (e.toStatus) st = e.toStatus;
     else if (e.type === "sent") st = "sent";
     else if (EV_TO_ST[e.type]) st = EV_TO_ST[e.type];
@@ -2572,18 +2607,18 @@ function buildReport(pids, wk) {
     L.push(`■ ${p.name}${ph ? ` (현재 ${ph} ${phase(ph).name})` : ""}`);
     // 1. 금주 실적
     L.push(`1. 금주 실적`);
-    const tDone = tasks.filter((x) => x.status === "완료" && inW(x.updatedAt));
+    const tDone = tasks.filter((x) => x.status === "완료" && inW(x.completedAt || x.updatedAt));
     const tOpen = tasks.filter((x) => x.status !== "완료");
-    L.push(`  - 업무: 완료 ${tDone.length}건 · 진행 ${tOpen.length}건`);
+    L.push(`  - 업무: 완료 ${tDone.length}건 · 현재 진행 ${tOpen.length}건`);
     tDone.forEach((x) => L.push(`    · 완료: ${x.title}`));
     tOpen.filter((x) => x.priority === "high" || (x.due && x.due <= nx)).slice(0, 6).forEach((x) => L.push(`    · 진행: ${x.title}${x.due ? ` (마감 ${shortD(x.due)})` : ""}${x.owner ? ` / ${x.owner}` : ""}`));
     S.recurring.filter((r) => r.projectId === pid && (r.history || []).some(inW)).forEach((r) => L.push(`    · 정기: ${r.title} 완료`));
     const apprW = S.docs.filter((d) => d.projectId === pid && inW(d.approvedAt)), reqW = S.docs.filter((d) => d.projectId === pid && inW(d.requestedAt));
-    L.push(`  - 산출물: 승인 ${ds.ok}/${ds.total}${apprW.length ? ` (금주 승인 ${apprW.length})` : ""} · 검토요청 ${ds.req} · 작성중 ${ds.wip}`);
+    L.push(`  - 산출물(현재): 승인 ${ds.ok}/${ds.total}${apprW.length ? ` (금주 승인 ${apprW.length})` : ""} · 검토요청 ${ds.req} · 작성중 ${ds.wip}`);
     apprW.forEach((d) => L.push(`    · 승인: ${d.name} ${d.version || ""}`));
     reqW.forEach((d) => L.push(`    · 검토요청: ${d.name} ${d.version || ""}`));
     const sentW = hos.filter((h) => inW(h.sentAt)), doneW = hos.filter((h) => h.events.some((e) => e.type === "done" && inW(e.at))), verW = hos.filter((h) => h.events.some((e) => e.type === "verified" && inW(e.at)));
-    L.push(`  - 개발 전달: 전달 ${sentW.length} · 완료 노티 ${doneW.length} · 검수완료 ${verW.length} · 진행 중 ${hos.filter(isOpenHO).length}`);
+    L.push(`  - 개발 전달: 전달 ${sentW.length} · 완료 노티 ${doneW.length} · 검수완료 ${verW.length} · 현재 진행 중 ${hos.filter(isOpenHO).length}`);
     sentW.forEach((h) => L.push(`    · 전달: [${h.code}] ${h.title}${h.to ? " → " + h.to : ""}`));
     if (datas.length) {
       const logW = datas.filter((x) => x.log.some((e) => inW(e.at)));

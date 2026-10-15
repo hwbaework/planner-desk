@@ -319,6 +319,39 @@ function tests(w, errors) {
     w.tlSet("task", "t_md", "due", w.addDays(t, 5));
     assert(!w.missingDates(pid()).task.some((x) => x.id === "t_md"), "입력 후에도 남음");
   });
+  check("타임라인: 인지일만 있고 마감 없는 업무도 마감 입력칸이 뜸 (3차 1번)", () => {
+    S().ui.pid = pid(); S().ui.tab = "timeline"; S().ui.tlMissing = 1; S().ui.tlHideDone = 1;
+    S().tasks.push({ id: "t_nd", projectId: pid(), title: "마감만 없는 업무", status: "진행중", priority: "mid", start: w.addDays(t, -150), due: "" });
+    w.render();
+    assert(w.document.querySelector(`.tl-fill input[onchange*="t_nd"][onchange*="'due'"]`), "마감 입력칸 없음");
+    S().ui.tlKinds.ho = 1; w.render();
+    assert(!w.document.querySelector(`.tl-fill input[onchange*="'sentAt'"]`), "개발 전달에 전달일 입력칸이 뜸");
+  });
+  check("상태 재계산은 입력 순서 기준 (3차 2번)", () => {
+    const h = { id: "ho_ord", code: "HO-903", projectId: pid(), title: "순서 점검", status: "sent", sentAt: w.addDays(t, -5), events: [], docIds: [], screenIds: [] };
+    S().handoffs.push(h);
+    w.pushEvent(h, { type: "sent", at: w.addDays(t, -5), text: "" });
+    w.noteStatus(h, "hold", "보류");
+    w.pushEvent(h, { type: "ack", at: w.addDays(t, -1), text: "소급 입력" });
+    assert(h.status === "ack", "화면 상태: " + h.status);
+    w.pushEvent(h, { type: "note", at: t, text: "메모" });
+    h.events = h.events.filter((e) => e.type !== "note" || e.toStatus); w.recomputeHOStatus(h);
+    assert(h.status === "ack", "재계산 후: " + h.status);
+  });
+  check("업무 완료일 기록 · 메모만 고쳐도 금주 완료로 안 잡힘 (3차 3번)", () => {
+    const tk = { id: "t_cd", projectId: pid(), title: "완료일 점검", status: "진행중", priority: "mid", start: t, due: "" };
+    S().tasks.push(tk); w.setTask("t_cd", "status", "완료");
+    assert(tk.completedAt === t, "completedAt: " + tk.completedAt);
+    tk.completedAt = w.addDays(t, -10); w.setTask("t_cd", "memo", "메모 수정");
+    assert(!w.buildReport([pid()], 0).includes("완료: 완료일 점검"), "이번 주 완료로 잡힘");
+    w.setTask("t_cd", "status", "진행중"); assert(!tk.completedAt, "다시 열면 완료일이 남음");
+  });
+  check("대시보드 맨 위 '오늘 할 일', 0인 지표는 접힘 (3차 5번)", () => {
+    S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
+    const v = w.document.getElementById("view");
+    assert(v.firstElementChild && v.innerHTML.indexOf("오늘 할 일") < v.innerHTML.indexOf("kpis") || !v.querySelector(".kpis"), "오늘 할 일이 맨 위가 아님");
+    assert(![...v.querySelectorAll(".kpi .v")].some((e) => e.textContent.trim() === "0"), "0인 지표가 카드로 남음");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
