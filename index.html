@@ -650,6 +650,7 @@ function normalize(d) {
   s.seq = Object.assign({ ho: 0, tc: 0 }, d?.seq || {});
   ["projects", "tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
+  s.screens.forEach((x) => { x.history = x.history || []; if (x.hoId && x.lastSentVer === undefined) x.lastSentVer = x.version || ""; });
   ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
   s.ui.tlKinds = Object.assign(emptyState().ui.tlKinds, d?.ui?.tlKinds || {});
@@ -848,6 +849,10 @@ function computeAlerts(pid) {
     if (c.result === "Fail" && !ho) out.push({ level: "mine", kind: "결함 미전달", ref: ["tc", c.id], pid: c.projectId, days: c.testedAt ? calDays(c.testedAt) : 0, title: `${c.code} ${c.scenario}`, desc: `Fail ${c.testedAt ? shortD(c.testedAt) : ""} · 개발에 결함을 전달하지 않음` });
     if (["Fail", "Block"].includes(c.result) && ho && ["done", "verified"].includes(ho.status)) out.push({ level: "mine", kind: "재테스트 필요", ref: ["tc", c.id], pid: c.projectId, days: 0, title: `${c.code} ${c.scenario}`, desc: `결함 [${ho.code}] ${hoStLabel(ho.status)} → 다시 테스트해서 결과 갱신` });
   });
+  S.screens.filter(scope).forEach((sc) => {
+    if (sc.hoId && sc.lastSentVer !== undefined && (sc.version || "") !== sc.lastSentVer)
+      out.push({ level: "mine", kind: "화면 변경 후 미전달", ref: ["screen", sc.id], pid: sc.projectId, days: sc.revisedAt ? calDays(sc.revisedAt) : 0, title: `${sc.code} ${sc.name}`, desc: `개발엔 ${sc.lastSentVer || "-"} 전달 → 지금 ${sc.version}${sc.revisedAt ? ` (${shortD(sc.revisedAt)} 개정)` : ""} · 변경분 전달 필요` });
+  });
   S.recurring.filter(scope).forEach((r) => {
     if (r.nextDue && r.nextDue < t) out.push({ level: "warn", kind: "정기 업무 지남", ref: ["recur", r.id], pid: r.projectId, days: calDays(r.nextDue), title: r.title, desc: `예정 ${shortD(r.nextDue)} (${dday(r.nextDue)}) · 완료 처리 안 됨` });
   });
@@ -911,7 +916,7 @@ function renderSide() {
   $("side").innerHTML = h + `<div id="sideNav" class="side-nav"></div>`;
 }
 const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "docs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
-const NAV_ALERT = { tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
+const NAV_ALERT = { screens: ["screen"], tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
 function renderTabs() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
   const alerts = computeAlerts(pid);
@@ -1049,11 +1054,11 @@ function statusOverview(pid) {
 // 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
 function todayCard(pid, alerts) {
   const t = today();
-  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "완료 노티 없음", "접수 노티 없음", "승인 회신 없음", "내 검수 대기", "결함 미전달", "재테스트 필요"].includes(a.kind));
+  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "완료 노티 없음", "접수 노티 없음", "승인 회신 없음", "내 검수 대기", "결함 미전달", "재테스트 필요", "화면 변경 후 미전달"].includes(a.kind));
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
-  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')` }[type];
+  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')` }[type];
     return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
@@ -1085,11 +1090,12 @@ function missingCard(pid) {
 }
 function alertRow(a) {
   const [type, id] = a.ref;
-  const open = { tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
+  const open = { screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
   let acts = "";
   if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
   if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
   if (type === "task") acts = `<button class="btn sm" onclick="setTask('${id}','status','완료')">완료</button>`;
+  if (type === "screen") acts = `<button class="btn sm" onclick="S.ui.pid='${a.pid}';sendRevision('${id}')">변경분 전달</button>`;
   if (type === "recur") acts = `<button class="btn sm" onclick="completeRecur('${id}')">완료</button>`;
   if (type === "doc" && a.kind === "승인 회신 없음") acts = `<button class="btn sm" onclick="setDocStatus('${id}','승인')">승인 받음</button>`;
   return `<div class="alert ${a.level}"><span class="ic"></span><div class="body">
@@ -1778,7 +1784,7 @@ function editHO(id, preset) {
       const h = Object.assign({ id: uid("h"), code: nextHOCode(), status: "sent", events: [] }, v);
       h.events.push({ id: uid("e"), at: h.sentAt || today(), ts: new Date().toISOString(), type: "sent", text: "기획 전달" + (h.to ? ` → ${h.to}` : "") });
       S.handoffs.push(h);
-      h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) s.hoId = h.id; });
+      h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) { s.hoId = h.id; s.lastSentVer = s.version || ""; } });
       setTimeout(() => openHO(h.id), 0);
     }
     commit();
@@ -1839,6 +1845,7 @@ function pushEvent(x, e) {
   if (EV_TO_ST[e.type]) x.status = EV_TO_ST[e.type];
   else if (e.type === "question" && ["plan", "sent"].includes(x.status)) x.status = "ack";
   if (e.type === "sent" && !x.sentAt) x.sentAt = e.at;
+  if (e.type === "sent") (x.screenIds || []).forEach((sid) => { const sc = S.screens.find((z) => z.id === sid); if (sc) { sc.hoId = x.id; sc.lastSentVer = sc.version || ""; } });
   if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
 }
 function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
@@ -2034,13 +2041,33 @@ function renderScreens() {
         <td><span class="link" onclick="editScreen('${s.id}')">${esc(s.name)}</span></td>
         <td class="small muted">${esc(s.menu || "")}</td>
         <td><select class="inline" onchange="setScreen('${s.id}','status',this.value)">${SCREEN_ST.map((x) => `<option ${x === s.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
-        <td class="mono">${esc(s.version || "")}</td>
+        <td class="nowrap"><span class="mono">${esc(s.version || "")}</span>${(s.history || []).length ? ` <span class="chip-ref" title="개정 이력">이력 ${s.history.length}</span>` : ""}${s.hoId && s.lastSentVer !== undefined && (s.version || "") !== s.lastSentVer ? `<div>${badge("변경 후 미전달", "amber")}</div>` : ""}
+          <button class="btn sm ghost" onclick="reviseScreen('${s.id}')" title="화면 변경 → 버전업">개정</button></td>
         <td class="nowrap">${esc(s.owner || "")}</td>
         <td class="nowrap">${ho ? `<span class="link mono small" onclick="openHO('${ho.id}')">${esc(ho.code)}</span> ${badge(hoStLabel(ho.status), HO_CLS[ho.status])}` : `<button class="btn sm ghost" onclick="editHO(null,{screenIds:['${s.id}'],projectId:'${pid}',title:${esc(JSON.stringify(`${s.code} ${s.name} 화면 개발 전달`))}})">전달 등록</button>`}</td>
         <td class="nowrap">${esc(s.dev || (ho && ho.to) || "")}</td>
         <td class="small">${esc(s.memo || "")}</td></tr>`;
     }).join("") || `<tr><td colspan="10" class="empty">화면이 없어. 엑셀의 화면 목록을 [엑셀 붙여넣기]로 한 번에 넣을 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
   return h;
+}
+// 화면 개정: 버전업 + 변경 내용 이력. 이미 개발에 넘긴 화면이면 '변경 후 미전달'로 표시된다.
+function reviseScreen(id) {
+  const sc = S.screens.find((x) => x.id === id);
+  const why = prompt(`「${sc.code} ${sc.name}」 변경 내용 (예: 약관 항목 추가, 버튼 문구 변경)`, "");
+  if (why === null) return;
+  const m = String(sc.version || "v0.0").match(/(\d+)\.(\d+)/);
+  const nv = m ? `v${m[1]}.${Number(m[2]) + 1}` : "v0.1";
+  sc.history = [...(sc.history || []), { at: today(), ts: new Date().toISOString(), from: sc.version || "", to: nv, text: why }];
+  sc.version = nv; sc.status = "변경중"; sc.revisedAt = today();
+  commit(); toast(`${sc.code} ${nv}${sc.hoId ? " — 개발에 변경분 전달 필요" : ""}`);
+}
+// 변경분 전달: 이전 전달 이후 이력을 요약해서 새 전달 건으로
+function sendRevision(id) {
+  const sc = S.screens.find((x) => x.id === id);
+  const changes = (sc.history || []).filter((hh) => !sc.lastSentVer || hh.from >= sc.lastSentVer || hh.to > sc.lastSentVer).map((hh) => `- ${hh.to}: ${hh.text}`).join("\n");
+  const prev = S.handoffs.find((x) => x.id === sc.hoId);
+  editHO(null, { projectId: sc.projectId, screenIds: [sc.id], to: prev?.to || sc.dev || "", toEmail: prev?.toEmail || "", title: `${sc.code} ${sc.name} 변경분(${sc.version}) 전달`,
+    memo: `[변경 내용] ${sc.lastSentVer || ""} → ${sc.version}\n${changes}` });
 }
 function setScreen(id, k, v) { const s = S.screens.find((x) => x.id === id); s[k] = v; commit(); }
 function editScreen(id) {
@@ -2057,9 +2084,12 @@ function editScreen(id) {
     { k: "path", l: "설계서 경로 / 페이지", t: "text", full: true, ph: "화면설계서 p.12 또는 파일 경로" },
     { k: "memo", l: "비고", t: "textarea", full: true },
   ], s, (v) => {
-    if (id) Object.assign(s, v); else S.screens.push(Object.assign({ id: uid("s"), projectId: pid }, v));
+    if (id) Object.assign(s, v); else S.screens.push(Object.assign({ id: uid("s"), projectId: pid, history: [] }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); commit(); closeModal(); } } },
+           { l: "개정", cls: "left", fn: () => { closeModal(); reviseScreen(id); } },
+           ...(s.hoId && s.lastSentVer !== undefined && (s.version || "") !== s.lastSentVer ? [{ l: "변경분 전달", cls: "left", fn: () => { closeModal(); sendRevision(id); } }] : [])] : [],
+  id && (s.history || []).length ? `<div class="sec-t">개정 이력</div><ul class="tl">${[...s.history].reverse().map((hh) => `<li><div class="h"><b>${esc(hh.from || "")} → ${esc(hh.to)}</b> · ${hh.at}</div><div class="x">${esc(hh.text || "")}</div></li>`).join("")}</ul>${s.lastSentVer !== undefined ? `<div class="small muted">개발에 전달한 버전: ${esc(s.lastSentVer || "-")}</div>` : ""}` : "");
 }
 function bulkScreens() {
   openModal("화면 목록 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사해 붙여넣기 (탭 구분): <b>화면ID · 화면명 · 메뉴경로 · 기획담당 · 개발담당</b> — 뒤쪽 열은 생략 가능. 같은 화면ID는 갱신.</p>
