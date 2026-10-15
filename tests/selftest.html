@@ -641,6 +641,41 @@ function tests(w, errors) {
     assert(tk.memo === "배경 설명" && tk.log.filter((e) => e.type === "comment").length === 3, "메모 옮기기: " + JSON.stringify(tk.memo));
     assert(tk.log.some((e) => e.at.endsWith("-09-18") && e.text === "자료 요청함"), "날짜 인식 실패");
   });
+  check("메모 날짜 줄: 마감 표현 제외 · 목록 줄 붙이기 · M/D 인식", () => {
+    const rows = w.memoDated("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석: 3개 기관\n· 다음 회의 미정\n5/19 오전 통화\n6월 3일 중 확정 예정\n메모 끝");
+    assert(rows.length === 2, "인식 줄 수: " + rows.length);
+    assert(rows[0].text === "회의함\n- 참석: 3개 기관\n· 다음 회의 미정" && rows[0].at.endsWith("-06-09"), "목록 줄/조사: " + JSON.stringify(rows[0]));
+    assert(rows[1].at.endsWith("-05-19") && rows[1].text === "오전 통화", "M/D: " + JSON.stringify(rows[1]));
+    assert(!rows.some((r) => r.text.includes("자료 제출") || r.text.includes("확정 예정")), "마감 줄이 옮겨짐");
+    const rest = w.removeLines("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝", w.memoDated("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝"));
+    assert(rest === "7월 9일까지 자료 제출\n메모 끝", "남은 메모: " + JSON.stringify(rest));
+  });
+  check("메모 일괄 변환: 미리보기에서 체크 해제한 줄은 남김", () => {
+    const tk = { id: "t_bulk", projectId: pid(), title: "일괄 변환 점검", status: "진행중", priority: "mid", start: t, due: "", memo: "8월 1일 기준 A 요청\n8월 2일 기준 B 회신" };
+    S().tasks.push(tk);
+    w.splitAllMemos();
+    assert(w.document.getElementById("modalTitle").textContent.includes("미리보기"), "미리보기 창 없음");
+    const box = w.document.querySelector('.mchk[data-t="t_bulk"][data-i="1"]'); box.checked = false;
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "체크한 줄 옮기기").click();
+    assert(tk.memo === "8월 2일 기준 B 회신" && (tk.log || []).some((e) => e.text === "A 요청"), "일괄 변환: " + JSON.stringify(tk.memo));
+  });
+  check("업무 폼: 저장 시 기록 칸 내용 기록, 옮기기 전에 폼 값 저장", () => {
+    const tk = { id: "t_form", projectId: pid(), title: "폼 점검", status: "진행중", priority: "mid", start: t, due: "", memo: "9월 1일 기준 착수" };
+    S().tasks.push(tk);
+    w.editTask("t_form");
+    w.document.querySelector('#fForm [data-k="title"]').value = "폼 점검 수정";
+    w.formSaveThen(() => w.splitMemoToLog("t_form"));
+    assert(tk.title === "폼 점검 수정" && tk.memo === "" && tk.log.some((e) => e.text === "착수"), "옮기기 전 저장: " + tk.title + "/" + tk.memo);
+    w.document.getElementById("tlText").value = "저장 버튼으로 기록";
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "저장").click();
+    assert(tk.log.some((e) => e.text === "저장 버튼으로 기록"), "저장 시 기록 누락");
+  });
+  check("단축키: 한글 입력 상태(ㅊ)에서도 만들기", () => {
+    w.closeModal();
+    w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "ㅊ", code: "KeyC" }));
+    assert(w.document.getElementById("modalTitle").textContent === "만들기", "한글 상태 C 단축키 안 됨");
+    w.closeModal();
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
