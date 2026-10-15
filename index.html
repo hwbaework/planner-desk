@@ -2258,7 +2258,12 @@ function pushEvent(x, e) {
   else if (e.type === "question" && ["plan", "sent"].includes(x.status)) x.status = "ack";
   if (e.type === "sent" && !x.sentAt) x.sentAt = e.at;
   if (e.type === "sent") (x.screenIds || []).forEach((sid) => { const sc = S.screens.find((z) => z.id === sid); if (sc) { sc.hoId = x.id; sc.lastSentVer = sc.version || ""; sc.lastSentAt = new Date().toISOString(); } });
-  if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
+  if (e.type === "verified" && hoKind(x) !== "bug") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
+  // 재테스트를 먼저 Pass 해둔 결함은 완료 노티가 오면 바로 검수 완료
+  if (e.type === "done" && hoKind(x) === "bug") {
+    const linked = S.tcs.filter((c) => c.hoId === x.id);
+    if (linked.length && linked.every((c) => c.result === "Pass")) pushEvent(x, { type: "verified", at: e.at, text: `재테스트 Pass (${linked.map((c) => c.code).join(", ")})` });
+  }
 }
 function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
 // 남은 기록으로 상태를 다시 계산. 직접 바꾼 상태(toStatus 기록)도 순서대로 반영한다.
@@ -2820,7 +2825,12 @@ function renderTC() {
 function tcResultChanged(c) {
   c.testedAt = c.result === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || "";
   const ho = c.hoId && S.handoffs.find((h) => h.id === c.hoId);
-  if (c.result !== "미수행") c.history = [...(c.history || []), { at: today(), result: c.result, tester: c.tester || "", ho: ho?.code || "" }];
+  if (c.result !== "미수행") {
+    // 같은 날 같은 수행자가 연달아 바꾼 것은 마지막 것만 (잘못 고른 결과 정정)
+    const hs = c.history || [], last = hs[hs.length - 1];
+    c.history = last && last.at === today() && last.tester === (c.tester || "") && !last.ho ? [...hs.slice(0, -1)] : hs;
+    c.history = [...c.history, { at: today(), result: c.result, tester: c.tester || "", ho: ho?.code || "" }];
+  }
   if (ho && c.result === "Pass" && ho.status === "done") {
     // 완료 노티 받은 결함을 재테스트해서 Pass → 이 결함에 걸린 TC가 모두 Pass면 검수 완료
     const linked = S.tcs.filter((x) => x.hoId === ho.id);
@@ -2839,7 +2849,10 @@ function tcResultChanged(c) {
   }
 }
 function setTC(id, k, v) {
-  const c = S.tcs.find((x) => x.id === id); c[k] = v;
+  const c = S.tcs.find((x) => x.id === id);
+  // 같은 칸에 다시 놓기 등 변화 없음은 무시 (완료 노티·검수 완료된 결함의 재테스트 Fail은 기록)
+  if (k === "result" && c.result === v && !(["Fail", "Block"].includes(v) && ["done", "verified"].includes(S.handoffs.find((h) => h.id === c.hoId)?.status))) return;
+  c[k] = v;
   if (k === "result") tcResultChanged(c);
   commit();
   if (k === "result" && v === "Fail" && !c.hoId) toast("Fail — [결함 전달]로 개발에 넘길 수 있어");
@@ -2894,7 +2907,7 @@ function tcDefectSend(id, v) {
 function genTCs() {
   const pid = S.ui.pid, screens = S.screens.filter((x) => x.projectId === pid);
   if (!screens.length) { toast("화면 목록에 화면이 없어. 화면 목록부터 만들어줘"); return; }
-  const target = screens.filter((x) => !S.tcs.some((c) => c.screenId === x.id));
+  const target = screens.filter((x) => !S.tcs.some((c) => c.screenId === x.id && !c.reqId));
   if (!target.length) { toast("모든 화면에 TC가 이미 있어"); return; }
   if (!confirm(`TC가 없는 화면 ${target.length}개에 기본 시나리오 ${TC_TEMPLATES.length}개씩, 총 ${target.length * TC_TEMPLATES.length}개를 만들까?`)) return;
   target.forEach((x) => TC_TEMPLATES.forEach(([scn, steps, exp]) => S.tcs.push({

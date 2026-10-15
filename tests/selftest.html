@@ -238,6 +238,26 @@ function tests(w, errors) {
     h.events = h.events.filter((e) => e !== ev); w.recomputeHOStatus(h);
     assert(h.status === "ack", "상태: " + h.status);
   });
+  check("결함: 완료 노티 전 Pass → 노티 시 검수 완료, 화면 상태는 그대로, 같은 결과 재선택은 이력 안 늘림", () => {
+    const c = S().tcs.find((x) => !x.hoId && x.projectId === pid() && x.screenId);
+    const sc = S().screens.find((x) => x.id === c.screenId); sc.status = "검토중";
+    w.setTC(c.id, "result", "Fail"); w.tcDefectSend(c.id, { to: "개발 담당", toEmail: "", dueDate: "" }); w.closeModal();
+    const ho = S().handoffs.find((h) => h.id === c.hoId);
+    w.setTC(c.id, "result", "Pass");
+    const n = c.history.length; w.setTC(c.id, "result", "Pass");
+    assert(c.history.length === n, "같은 결과로 이력 증가");
+    w.quickEvent(ho.id, "done");
+    assert(ho.status === "verified", "노티 후 검수 완료 안 됨: " + ho.status);
+    assert(sc.status === "검토중", "결함 검수로 화면이 확정됨: " + sc.status);
+  });
+  check("요구사항 TC가 있어도 화면 기본 TC는 생성", () => {
+    window.confirm = () => true; S().ui.pid = pid();
+    const sc = { id: "s_rq", projectId: pid(), code: "SCR-RQ-1", name: "요구사항 화면", status: "작성중", version: "v0.1" };
+    S().screens.push(sc); S().tcs.push({ id: "tc_rq", projectId: pid(), reqId: "rq_x", screenId: sc.id, code: "TC-991", scenario: "요구 TC", result: "미수행" });
+    w.genTCs();
+    assert(S().tcs.filter((x) => x.screenId === sc.id && !x.reqId).length === C("TC_TEMPLATES").length, "기본 TC 안 만들어짐");
+    S().tcs = S().tcs.filter((x) => x.screenId !== sc.id); S().screens = S().screens.filter((x) => x.id !== sc.id);
+  });
   check("요구사항에서 TC 생성 (reqId 연결, 추적표 반영)", () => {
     window.confirm = () => true;
     S().ui.pid = pid();
