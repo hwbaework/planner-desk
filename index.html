@@ -2506,35 +2506,58 @@ function openSettings() {
    { l: "JSON 내보내기", cls: "left", fn: () => download(`planner-desk_${stamp()}.json`, JSON.stringify(S, null, 1), "application/json") }]);
 }
 function toggleTheme() { S.settings.theme = S.settings.theme === "dark" ? "light" : "dark"; persist(); render(); }
-function openReport() {
-  const pids = S.ui.pid === "all" ? activeProjects().map((p) => p.id) : [S.ui.pid];
-  const t = today(), ws = addDays(t, -6), nx = addDays(t, 7);
-  const out = pids.map((pid) => {
-    const p = proj(pid); const s = docStats(pid);
-    const hos = S.handoffs.filter((h) => h.projectId === pid);
-    const sentW = hos.filter((h) => h.sentAt >= ws && h.sentAt <= t);
-    const doneW = hos.filter((h) => h.events.some((e) => e.type === "done" && e.at >= ws));
-    const verW = hos.filter((h) => h.events.some((e) => e.type === "verified" && e.at >= ws));
-    const apprW = S.docs.filter((d) => d.projectId === pid && d.approvedAt && d.approvedAt >= ws);
-    const al = computeAlerts(pid);
-    const nextW = S.wbs.filter((w) => w.projectId === pid && Number(w.progress) < 100 && ((w.start && w.start <= nx && w.start > t) || (w.end && w.end <= nx && w.end >= t)));
-    const ph = currentPhase(pid);
-    const L = [];
+// 주간보고: 금주 실적 → 이슈 → 차주 계획 (개조식). wk=0 이번 주, -1 지난 주
+function buildReport(pids, wk) {
+  const t = addDays(today(), 7 * wk), ws = addDays(t, -6), nx = addDays(t, 7);
+  const inW = (d) => d && d.slice(0, 10) >= ws && d.slice(0, 10) <= t;
+  const inN = (d) => d && d > t && d <= nx;
+  const body = pids.map((pid) => {
+    const p = proj(pid), ds = docStats(pid), ph = currentPhase(pid), L = [];
+    const tasks = S.tasks.filter((x) => x.projectId === pid), hos = S.handoffs.filter((h) => h.projectId === pid);
+    const datas = S.datas.filter((x) => x.projectId === pid), tcs = tcStats(pid);
     L.push(`■ ${p.name}${ph ? ` (현재 ${ph} ${phase(ph).name})` : ""}`);
-    L.push(`1. 산출물: 승인 ${s.ok}/${s.total} · 검토요청 ${s.req} · 작성중 ${s.wip}`);
-    apprW.forEach((d) => L.push(`   - 승인: ${d.name} ${d.version || ""} (${shortD(d.approvedAt)})`));
-    L.push(`2. 개발 전달: 금주 전달 ${sentW.length}건 · 완료 노티 ${doneW.length}건 · 검수완료 ${verW.length}건 · 진행 중 ${hos.filter(isOpenHO).length}건`);
-    sentW.forEach((h) => L.push(`   - 전달: [${h.code}] ${h.title} → ${h.to || "-"}`));
-    const issues = al.filter((a) => a.level === "danger");
-    L.push(`3. 이슈 / 회신 지연: ${issues.length}건`);
-    issues.forEach((a) => L.push(`   - ${a.kind}: ${a.title} — ${a.desc}`));
-    al.filter((a) => a.kind === "WBS 지연" || a.kind === "산출물 일정 지연").forEach((a) => L.push(`   - ${a.kind}: ${a.title} (${a.desc})`));
-    L.push(`4. 차주 계획`);
-    (nextW.length ? nextW : [{ title: "(WBS 일정 입력 필요)" }]).forEach((w) => L.push(`   - ${w.title}${w.end ? ` ~${shortD(w.end)}` : ""}${w.owner ? ` / ${w.owner}` : ""}`));
+    // 1. 금주 실적
+    L.push(`1. 금주 실적`);
+    const tDone = tasks.filter((x) => x.status === "완료" && inW(x.updatedAt));
+    const tOpen = tasks.filter((x) => x.status !== "완료");
+    L.push(`  - 업무: 완료 ${tDone.length}건 · 진행 ${tOpen.length}건`);
+    tDone.forEach((x) => L.push(`    · 완료: ${x.title}`));
+    tOpen.filter((x) => x.priority === "high" || (x.due && x.due <= nx)).slice(0, 6).forEach((x) => L.push(`    · 진행: ${x.title}${x.due ? ` (마감 ${shortD(x.due)})` : ""}${x.owner ? ` / ${x.owner}` : ""}`));
+    S.recurring.filter((r) => r.projectId === pid && (r.history || []).some(inW)).forEach((r) => L.push(`    · 정기: ${r.title} 완료`));
+    const apprW = S.docs.filter((d) => d.projectId === pid && inW(d.approvedAt)), reqW = S.docs.filter((d) => d.projectId === pid && inW(d.requestedAt));
+    L.push(`  - 산출물: 승인 ${ds.ok}/${ds.total}${apprW.length ? ` (금주 승인 ${apprW.length})` : ""} · 검토요청 ${ds.req} · 작성중 ${ds.wip}`);
+    apprW.forEach((d) => L.push(`    · 승인: ${d.name} ${d.version || ""}`));
+    reqW.forEach((d) => L.push(`    · 검토요청: ${d.name} ${d.version || ""}`));
+    const sentW = hos.filter((h) => inW(h.sentAt)), doneW = hos.filter((h) => h.events.some((e) => e.type === "done" && inW(e.at))), verW = hos.filter((h) => h.events.some((e) => e.type === "verified" && inW(e.at)));
+    L.push(`  - 개발 전달: 전달 ${sentW.length} · 완료 노티 ${doneW.length} · 검수완료 ${verW.length} · 진행 중 ${hos.filter(isOpenHO).length}`);
+    sentW.forEach((h) => L.push(`    · 전달: [${h.code}] ${h.title}${h.to ? " → " + h.to : ""}`));
+    if (datas.length) {
+      const logW = datas.filter((x) => x.log.some((e) => inW(e.at)));
+      L.push(`  - 데이터 협의: 수신 완료 ${datas.filter((x) => x.status === "수신 완료").length}/${datas.length} · 협의 중 ${datas.filter((x) => x.status === "협의 중").length}`);
+      logW.forEach((x) => { const e = [...x.log].filter((l) => inW(l.at)).pop(); L.push(`    · ${x.org || "기관"} ${x.name}: ${e.type} — ${(e.text || "").split("\n")[0].slice(0, 50)}`); });
+    }
+    if (tcs.total) L.push(`  - 테스트: ${tcs.total}건 중 수행 ${tcs.total - tcs.todo} · Pass ${tcs.pass} · Fail ${tcs.fail} · Block ${tcs.block}`);
+    // 2. 이슈
+    const al = computeAlerts(pid);
+    L.push(`2. 이슈 / 리스크: ${al.length ? al.length + "건" : "없음"}`);
+    al.slice(0, 10).forEach((a) => L.push(`  - [${a.kind}] ${a.title} — ${a.desc}`));
+    // 3. 차주 계획
+    L.push(`3. 차주 계획 (${shortD(addDays(t, 1))} ~ ${shortD(nx)})`);
+    const plan = calItems(addDays(t, 1), nx, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
+    const wbsRun = S.wbs.filter((w) => w.projectId === pid && Number(w.progress) < 100 && w.start && w.end && w.start <= nx && w.end > t);
+    if (!plan.length && !wbsRun.length) L.push(`  - (일정이 등록된 항목 없음 — 타임라인에서 날짜를 채워줘)`);
+    plan.forEach((i) => L.push(`  - ${shortD(i.date)} ${CAL_TAG[i.kind] ? "[" + CAL_TAG[i.kind] + "] " : "[" + (i.sub || "일정") + "] "}${i.title}`));
+    wbsRun.filter((w) => !plan.some((i) => i.kind === "wbs" && i.title.endsWith(w.title))).forEach((w) => L.push(`  - [WBS 진행] ${w.title} ${w.progress || 0}% (~${shortD(w.end)})`));
     return L.join("\n");
   }).join("\n\n");
-  const txt = `주간 보고 (${ws} ~ ${t})\n\n` + out;
-  openModal("주간보고 초안", `<textarea id="rep" class="mono" style="min-height:380px">${esc(txt)}</textarea>`, [
+  return `주간 보고 (${ws} ~ ${t})${S.settings.me ? " · " + S.settings.me : ""}\n\n` + body;
+}
+function openReport(wk = 0) {
+  const pids = S.ui.pid === "all" ? activeProjects().map((p) => p.id) : [S.ui.pid];
+  const txt = buildReport(pids, wk);
+  openModal("주간보고 초안", `<div class="seg" style="margin-bottom:10px">${[[0, "이번 주"], [-1, "지난 주"]].map(([k, l]) => `<button class="${k === wk ? "on" : ""}" onclick="openReport(${k})">${l}</button>`).join("")}</div>
+    <div class="small muted" style="margin-bottom:6px">${S.ui.pid === "all" ? "전체 프로젝트" : esc(projName(S.ui.pid))} 기준 · 금주 실적 → 이슈 → 차주 계획. 고쳐서 복사하면 돼.</div>
+    <textarea id="rep" class="mono" style="min-height:420px">${esc(txt)}</textarea>`, [
     { l: ".txt 저장", cls: "left", fn: () => download(`주간보고_${stamp()}.txt`, $("rep").value, "text/plain") },
     { l: "복사", cls: "primary", fn: () => copyText($("rep").value) },
   ], true);
