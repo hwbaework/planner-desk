@@ -303,6 +303,33 @@
   .col .add { border: none; background: none; text-align: left; color: var(--dim); padding: 6px 4px; border-radius: 4px; cursor: pointer; font-size: 13.5px; font-family: inherit; }
   .col .add:hover { background: var(--line); color: var(--text); }
 
+  /* Timeline (Jira 타임라인 구조) */
+  .tl-bar-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .tlw { display: grid; grid-template-columns: minmax(260px, 380px) 1fr; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; box-shadow: var(--shadow); }
+  .tl-left { border-right: 1px solid var(--line); min-width: 0; }
+  .tl-right { overflow-x: auto; position: relative; }
+  .tl-h, .tl-r { height: 36px; display: flex; align-items: center; border-bottom: 1px solid var(--line); }
+  .tl-h { background: var(--sub); font-size: 12.5px; color: var(--dim); font-weight: 600; }
+  .tl-left .tl-r { padding: 0 10px; gap: 6px; font-size: 13.5px; min-width: 0; }
+  .tl-left .tl-r .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+  .tl-left .tl-r .nm:hover { color: var(--accent); }
+  .tl-left .tl-r.grp { background: var(--sub); font-weight: 700; }
+  .tl-left .tl-r.epic { font-weight: 600; }
+  .tl-left .tl-r .who { font-size: 12px; color: var(--faint); max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tl-right .tl-r, .tl-right .tl-h { position: relative; padding: 0; }
+  .tl-right .tl-r.grp { background: var(--sub); }
+  .tl-cell { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); font-size: 11.5px; padding: 0 4px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; }
+  .tl-cell.we { background: rgba(9,30,66,.03); }
+  .tl-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 2; pointer-events: none; }
+  .tl-bar { position: absolute; top: 9px; height: 18px; border-radius: 4px; cursor: pointer; z-index: 1; font-size: 11px; color: #fff; padding: 0 6px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; }
+  .tl-bar.done { opacity: .45; }
+  .tl-bar.late { box-shadow: 0 0 0 2px var(--danger); }
+  .tl-bar.epic { top: 12px; height: 12px; border-radius: 3px; }
+  .tl-ms { position: absolute; top: 11px; width: 14px; height: 14px; transform: rotate(45deg); cursor: pointer; z-index: 1; border-radius: 2px; }
+  .tl-fill { position: absolute; left: 8px; top: 0; bottom: 0; display: flex; gap: 4px; align-items: center; z-index: 1; }
+  .tl-fill input[type=date] { width: 124px; height: 24px; padding: 0 4px; font-size: 12px; border-radius: 4px; }
+  .tl-fill span { font-size: 11.5px; color: var(--warn); font-weight: 600; white-space: nowrap; }
+
   /* Modal */
   .modal-bg { position: fixed; inset: 0; background: rgba(15,20,30,.38); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 40px 16px; overflow-y: auto; }
   .modal-bg.open { display: flex; }
@@ -466,7 +493,7 @@ const RESP_EV = ["ack", "question", "progress", "done"];   // 개발자 쪽에�
 const MINE_EV = ["sent", "answer", "nudge", "verified", "reject"];
 const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
 const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
-const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
 const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e8a9a", "#b5487a", "#5b6474"];
 const TASK_ST = ["진행중", "대기", "예정", "완료"];
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "예정": "gray", "완료": "green" };
@@ -561,7 +588,7 @@ function emptyState() {
     v: 1, updatedAt: null,
     settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1",
       mail: { provider: "hiworks", protocol: "pop3", host: "pop3s.hiworks.com", port: 995, user: "", folder: "INBOX", days: 14, devSenders: "", last: null } },
-    ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "" },
+    ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "", tlZoom: "month", tlAnchor: "", tlHideDone: 1, tlMissing: 1, tlKinds: { wbs: 1, task: 1, ho: 1, data: 1, doc: 1 } },
     seq: { ho: 0, tc: 0 },
     projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
   };
@@ -577,6 +604,7 @@ function normalize(d) {
   s.datas.forEach((x) => { x.log = x.log || []; });
   ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
+  s.ui.tlKinds = Object.assign(emptyState().ui.tlKinds, d?.ui?.tlKinds || {});
   s.projects.forEach((p, i) => { if (!p.color) p.color = PROJ_COLORS[i % PROJ_COLORS.length]; });
   s.handoffs.forEach((h) => { h.events = h.events || []; h.docIds = h.docIds || []; h.screenIds = h.screenIds || []; });
   s.docs.forEach((x) => { x.history = x.history || []; });
@@ -805,7 +833,7 @@ function render() {
     : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
   renderBanner(); renderSide(); renderTabs();
-  const v = { dash: renderDash, board: renderBoard, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  const v = { dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
   $("view").innerHTML = v();
   if (S.ui.tab === "mail") bindDrop();
   if (S.ui.tab === "notes") bindNoteEditor();
@@ -834,7 +862,7 @@ function renderSide() {
   }
   $("side").innerHTML = h + `<div id="sideNav" class="side-nav"></div>`;
 }
-const NAV_GROUPS = [["한눈에", ["dash", "cal", "board"]], ["관리", ["tasks", "data", "ho", "docs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
+const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "docs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
 const NAV_ALERT = { tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
 function renderTabs() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
@@ -1080,6 +1108,118 @@ function boardAdd(col) {
   else if (bk === "docs") editDoc(null, "P1", col);
   else if (bk === "data") editData(null, { status: col, projectId: pid });
   else if (bk === "tc") editTC(null, { projectId: pid });
+}
+
+// ───────────── 타임라인 (Jira 타임라인 구조) ─────────────
+// 막대 = 시작~종료. 날짜 없는 항목은 그 자리에서 바로 날짜를 입력한다.
+const TL_KIND = {
+  wbs: { l: "WBS", list: () => S.wbs, title: (x) => x.title, s: "start", e: "end", who: (x) => x.owner, st: (x) => `${Number(x.progress) || 0}%`, done: (x) => Number(x.progress) >= 100, open: (x) => `editWBS('${x.id}')` },
+  task: { l: "업무", list: () => S.tasks, title: (x) => x.title, s: "start", e: "due", who: (x) => x.owner, st: (x) => x.status, done: (x) => x.status === "완료", open: (x) => `editTask('${x.id}')` },
+  ho: { l: "개발 전달", list: () => S.handoffs, title: (x) => `[${x.code}] ${x.title}`, s: "sentAt", e: "dueDate", who: (x) => x.to, st: (x) => hoStLabel(x.status), done: (x) => ["verified"].includes(x.status), open: (x) => `openHO('${x.id}')`, icon: hoKind },
+  data: { l: "데이터 협의", list: () => S.datas, title: (x) => `${x.org ? x.org + " · " : ""}${x.name}`, s: "requestedAt", e: "dueDate", who: (x) => x.contact, st: (x) => x.status, done: (x) => x.status === "수신 완료", open: (x) => `openData('${x.id}')` },
+  doc: { l: "산출물 계획", list: () => S.docs, title: (x) => x.name, s: null, e: "plan", who: (x) => x.owner, st: (x) => x.status, done: (x) => ["승인", "해당없음"].includes(x.status), open: (x) => `editDoc('${x.id}')` },
+};
+const TL_ZOOM = { week: { l: "주", days: 42, px: 30 }, month: { l: "개월", days: 120, px: 9 }, quarter: { l: "분기", days: 365, px: 3 } };
+function tlRange() {
+  const z = TL_ZOOM[S.ui.tlZoom] || TL_ZOOM.month;
+  const anchor = S.ui.tlAnchor || today();
+  const lead = Math.round(z.days * 0.25);
+  let r0 = addDays(anchor, -lead);
+  if (S.ui.tlZoom !== "quarter") r0 = addDays(r0, -((parseD(r0).getDay() + 6) % 7));   // 월요일부터
+  else r0 = r0.slice(0, 8) + "01";
+  return { z, r0, r1: addDays(r0, z.days - 1) };
+}
+function tlRows(pid) {
+  const kinds = S.ui.tlKinds, hide = S.ui.tlHideDone, q = (S.ui.tlQ || "").toLowerCase();
+  const out = [];
+  const projects = pid ? [proj(pid)] : activeProjects();
+  projects.forEach((p) => {
+    const rows = [];
+    Object.entries(TL_KIND).forEach(([k, K]) => {
+      if (!kinds[k]) return;
+      let items = K.list().filter((x) => x.projectId === p.id && !(k === "doc" && x.status === "해당없음"));
+      if (hide) items = items.filter((x) => !K.done(x));
+      if (q) items = items.filter((x) => K.title(x).toLowerCase().includes(q));
+      if (!S.ui.tlMissing) items = items.filter((x) => x[K.e] || (K.s && x[K.s]));
+      if (k === "wbs") {
+        // WBS는 단계(에픽) 아래에 묶는다
+        const groups = [...PHASES.map((ph) => [ph.id, `${ph.id} ${ph.name}`]), ["", "일반 업무"]];
+        groups.forEach(([gid, gl]) => {
+          const ch = items.filter((x) => (x.phase || "") === gid);
+          if (!ch.length) return;
+          const ds = ch.flatMap((x) => [x.start, x.end]).filter(Boolean).sort();
+          rows.push({ epic: true, kind: "wbs", title: gl, color: gid ? phaseColor(gid) : "#8590a2", s: ds[0], e: ds[ds.length - 1], st: `${ch.length}개`, pid: p.id });
+          ch.sort((a, b) => (a.start || "9").localeCompare(b.start || "9")).forEach((x) => rows.push({ kind: k, x, K, indent: true }));
+        });
+      } else items.sort((a, b) => (a[K.e] || "9").localeCompare(b[K.e] || "9")).forEach((x) => rows.push({ kind: k, x, K }));
+    });
+    if (rows.length || pid) out.push({ grp: true, p, n: rows.filter((r) => !r.epic).length }, ...rows);
+  });
+  return out;
+}
+function renderTimeline() {
+  const pid = S.ui.pid === "all" ? null : S.ui.pid, t = today();
+  const { z, r0, r1 } = tlRange(), W = z.days * z.px;
+  const x = (d) => calDays(r0, d) * z.px;
+  const rows = tlRows(pid);
+  let h = pageHead("타임라인", `${pid ? esc(projName(pid)) : "전체 프로젝트"} · 시작~종료 막대, 날짜 없는 항목은 그 자리에서 바로 입력`);
+  h += `<div class="tl-bar-top">
+    <input class="search" placeholder="타임라인 검색" value="${esc(S.ui.tlQ || "")}" oninput="S.ui.tlQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)">
+    ${Object.entries(TL_KIND).map(([k, K]) => `<label class="check small">${typeIcon(k === "ho" ? "ho" : k)}<input type="checkbox" ${S.ui.tlKinds[k] ? "checked" : ""} onchange="S.ui.tlKinds.${k}=this.checked?1:0;persistUI();render()">${K.l}</label>`).join("")}
+    <label class="check small"><input type="checkbox" ${S.ui.tlHideDone ? "checked" : ""} onchange="S.ui.tlHideDone=this.checked?1:0;persistUI();render()">완료 숨기기</label>
+    <label class="check small"><input type="checkbox" ${S.ui.tlMissing ? "checked" : ""} onchange="S.ui.tlMissing=this.checked?1:0;persistUI();render()">날짜 없는 항목 표시</label>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <button class="btn sm" onclick="tlShift(-1)">이전</button><button class="btn sm" onclick="S.ui.tlAnchor='';render()">오늘</button><button class="btn sm" onclick="tlShift(1)">다음</button>
+      <div class="seg">${Object.entries(TL_ZOOM).map(([k, v]) => `<button class="${S.ui.tlZoom === k ? "on" : ""}" onclick="S.ui.tlZoom='${k}';persistUI();render()">${v.l}</button>`).join("")}</div></span></div>`;
+  // 머리줄 칸
+  const cells = [];
+  if (S.ui.tlZoom === "week") for (let i = 0; i < z.days; i++) { const d = addDays(r0, i), dt = parseD(d); cells.push([x(d), z.px, `${dt.getDate() === 1 || i === 0 ? dt.getMonth() + 1 + "/" : ""}${dt.getDate()}`, dt.getDay() === 0 || dt.getDay() === 6]); }
+  else if (S.ui.tlZoom === "month") for (let d = r0; d <= r1; d = addDays(d, 7)) cells.push([x(d), 7 * z.px, shortD(d).replace(/\(.*\)/, ""), false]);
+  else for (let d = r0; d <= r1; ) { const dt = parseD(d), n = fmtD(new Date(dt.getFullYear(), dt.getMonth() + 1, 1)); cells.push([x(d), calDays(d, n) * z.px, `${dt.getFullYear() % 100}.${dt.getMonth() + 1}`, false]); d = n; }
+  const grid = cells.map(([l, w, lb, we]) => `<div class="tl-cell ${we ? "we" : ""}" style="left:${l}px;width:${w}px">${lb}</div>`).join("");
+  const gridBody = cells.map(([l, w, , we]) => `<div class="tl-cell ${we ? "we" : ""}" style="left:${l}px;width:${w}px"></div>`).join("");
+  const todayLine = t >= r0 && t <= r1 ? `<div class="tl-today" style="left:${x(t) + z.px / 2}px"></div>` : "";
+  let L = `<div class="tl-h" style="padding:0 10px">항목<span style="margin-left:auto">상태 · 담당</span></div>`, R = `<div class="tl-h" style="width:${W}px">${grid}</div>`;
+  rows.forEach((r) => {
+    if (r.grp) {
+      L += `<div class="tl-r grp">${projTag(r.p.id)} <span class="muted small">${r.n}</span></div>`;
+      R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}</div>`;
+      return;
+    }
+    if (r.epic) {
+      L += `<div class="tl-r epic" style="padding-left:14px"><span style="width:10px;height:10px;border-radius:2px;background:${r.color};flex:none"></span><span class="nm">${esc(r.title)}</span><span class="who">${esc(r.st)}</span></div>`;
+      R += `<div class="tl-r" style="width:${W}px">${gridBody}${r.s ? tlSpan(r.s, r.e, x, z, r0, r1, r.color, "", "epic", "") : ""}${todayLine}</div>`;
+      return;
+    }
+    const { x: it, K, kind } = r, s0 = K.s ? it[K.s] : "", e0 = it[K.e], done = K.done(it);
+    const icon = typeIcon(K.icon ? K.icon(it) : kind), color = TYPE_ICON[K.icon ? K.icon(it) : kind][0];
+    L += `<div class="tl-r" style="padding-left:${r.indent ? 30 : 10}px">${icon}<span class="nm" onclick="${K.open(it)}" title="${esc(K.title(it))}">${esc(K.title(it))}</span><span class="who">${esc(K.st(it))}${K.who(it) ? " · " + esc(K.who(it)) : ""}</span></div>`;
+    let bar = "";
+    if (!e0 && !s0) bar = `<div class="tl-fill"><span>날짜 없음</span>${K.s ? `<input type="date" title="시작" onchange="tlSet('${kind}','${it.id}','${K.s}',this.value)">` : ""}<input type="date" title="${K.s ? "종료" : "계획일"}" onchange="tlSet('${kind}','${it.id}','${K.e}',this.value)"></div>`;
+    else if (!K.s || !s0 || !e0) bar = tlMilestone(e0 || s0, x, r0, r1, color, K.open(it), K.title(it), done);
+    else bar = tlSpan(s0, e0, x, z, r0, r1, color, K.open(it), done ? "done" : !done && e0 < t ? "late" : "", K.title(it));
+    R += `<div class="tl-r" style="width:${W}px">${gridBody}${bar}${todayLine}</div>`;
+  });
+  if (rows.length <= (pid ? 1 : 0)) L += `<div class="empty">표시할 항목이 없어</div>`;
+  h += `<div class="tlw"><div class="tl-left">${L}</div><div class="tl-right" id="tlRight">${R}</div></div>`;
+  return h;
+}
+function tlSpan(s0, e0, x, z, r0, r1, color, click, cls, title) {
+  if (e0 < s0) [s0, e0] = [e0, s0];
+  if (e0 < r0 || s0 > r1) return "";
+  const a = s0 < r0 ? r0 : s0, b = e0 > r1 ? r1 : e0;
+  const w = Math.max(z.px, (calDays(a, b) + 1) * z.px);
+  return `<div class="tl-bar ${cls}" style="left:${x(a)}px;width:${w}px;background:${color}" ${click ? `onclick="${click}"` : ""} title="${esc(title)} ${s0} ~ ${e0}">${w > 70 && title ? esc(title) : ""}</div>`;
+}
+function tlMilestone(d, x, r0, r1, color, click, title, done) {
+  if (!d || d < r0 || d > r1) return "";
+  return `<div class="tl-ms" style="left:${x(d)}px;background:${color};${done ? "opacity:.45" : ""}" onclick="${click}" title="${esc(title)} ${d}"></div>`;
+}
+function tlShift(k) { const z = TL_ZOOM[S.ui.tlZoom] || TL_ZOOM.month; S.ui.tlAnchor = addDays(S.ui.tlAnchor || today(), Math.round(z.days / 2) * k); render(); }
+function tlSet(kind, id, field, val) {
+  const it = TL_KIND[kind].list().find((x) => x.id === id); if (!it) return;
+  it[field] = val; if ("updatedAt" in it || kind === "task") it.updatedAt = new Date().toISOString();
+  commit(); toast("날짜 저장");
 }
 
 // ───────────── 캘린더 ─────────────

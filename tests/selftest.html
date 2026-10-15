@@ -265,6 +265,18 @@ function tests(w, errors) {
     S().settings.hoPrefix = keep;
     assert(r?.h.id === "hp", "매칭 실패");
   });
+  check("타임라인: 주·개월·분기 보기, 날짜 없는 항목에 바로 입력하면 막대가 생김", () => {
+    S().ui.pid = pid(); S().ui.tab = "timeline"; S().ui.tlHideDone = 0; S().ui.tlMissing = 1;
+    for (const z of ["week", "month", "quarter"]) { S().ui.tlZoom = z; w.render(); }
+    S().ui.tlZoom = "month";
+    const tk = { id: "t_tl", projectId: pid(), title: "타임라인 점검", status: "진행중", priority: "mid", start: "", due: "", owner: "" };
+    S().tasks.push(tk); w.render();
+    const L = w.document.querySelectorAll(".tl-left > div").length, R = w.document.querySelectorAll(".tl-right > div").length;
+    assert(L === R, `왼쪽 ${L}줄 · 오른쪽 ${R}줄`);
+    w.tlSet("task", "t_tl", "start", w.addDays(t, -3)); w.tlSet("task", "t_tl", "due", w.addDays(t, 3));
+    assert(tk.start && tk.due, "날짜가 저장 안 됨");
+    assert([...w.document.querySelectorAll(".tl-bar")].some((b) => (b.getAttribute("title") || "").includes("타임라인 점검")), "막대가 안 생김");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
