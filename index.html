@@ -2794,7 +2794,7 @@ function renderNotes() {
       <div><input type="date" id="noteDate" value="${esc(cur.date || "")}"></div></div>
       <textarea id="noteContent" placeholder="회의 내용, 결정사항, 액션아이템…">${esc(cur.content || "")}</textarea>
       <div style="display:flex;gap:6px;margin-top:8px;align-items:center"><span class="muted small" id="noteSaved">자동 저장됨</span>
-      <button class="btn sm" style="margin-left:auto" onclick="noteToTasks('${cur.id}')">액션 → 업무 만들기</button>
+      <button class="btn sm" style="margin-left:auto" onclick="noteToTasks('${cur.id}')">업무·결정·리스크 등록</button>
       <button class="btn sm" onclick="copyText(document.getElementById('noteContent').value)">복사</button>
       <button class="btn sm danger" onclick="delNote('${cur.id}')">삭제</button></div>
       ${noteTasksHtml(cur)}` : `<div class="empty">왼쪽에서 메모를 고르거나 새로 만들어</div>`) +
@@ -2871,27 +2871,50 @@ function noteSuggestions(text) {
     .map((l) => { const fd = findDate(l); return { title: fd.rest, owner: "", due: fd.due, suggested: true }; })
     .filter((a) => verb.test(a.title) && (!/예정\s*[.!]?$/.test(a.title) || /(요청|필요|확인|할\s*것)/.test(a.title)));
 }
+// [결정]/[합의] 아래 줄은 결정, [리스크]/[이슈]/[문제] 아래 줄은 리스크·이슈 후보
+function noteSections(text) {
+  const out = []; let kind = "";
+  String(text || "").split(/\r?\n/).forEach((raw) => {
+    const l = raw.trim();
+    const hm = l.match(/^\[?\s*(결정\s*사항|결정|합의\s*사항|합의|리스크|위험|이슈|문제)\s*\]?\s*:?$/);
+    if (hm) { kind = /결정|합의/.test(hm[1]) ? "결정" : /이슈|문제/.test(hm[1]) ? "이슈" : "리스크"; return; }
+    if (/^\[.+\]$/.test(l) || /^#+\s/.test(l)) { kind = ""; return; }
+    const m = l.match(/^(?:[-*•·]|\d+[.)])\s*(.+)$/);
+    if (kind && m && m[1].trim().length >= 3) out.push({ title: m[1].trim(), owner: "", due: "", type: kind });
+  });
+  return out;
+}
 function noteToTasks(nid) {
   if (noteFlush) noteFlush();
   const n = S.notes.find((x) => x.id === nid);
-  const explicit = noteActions(n.content);
-  const acts = (explicit.length ? explicit : noteSuggestions(n.content)).filter((a) => !S.tasks.some((t) => t.noteId === nid && t.title === a.title));
-  if (!acts.length) { toast("만들 액션이 없어 — [액션] 아래에 '- 담당: 내용 (~10/20)' 형식으로 적어줘"); return; }
-  openModal("회의록에서 업무 만들기", `<p class="small muted" style="margin-bottom:8px">「${esc(n.title || "(제목 없음)")}」에서 ${explicit.length ? "찾은 액션이야. 만들 것만 체크해." : "[액션] 표시가 없어서, 할 일처럼 보이는 줄을 제안했어. 만들 것만 체크해."}</p>` +
-    acts.map((a, i) => `<label class="mrow" style="cursor:pointer"><input type="checkbox" class="actchk" value="${i}" ${a.suggested ? "" : "checked"} style="width:auto">
-      <span class="nm">${esc(a.title)}</span><span class="small muted">${esc(a.owner || "담당 미정")}</span><span class="small muted">${a.due ? "~" + shortD(a.due) : "마감 미정"}</span></label>`).join(""), [
+  const explicit = noteActions(n.content).map((a) => Object.assign(a, { type: "업무" }));
+  const secs = noteSections(n.content);
+  const base = explicit.length || secs.length ? [...explicit, ...secs] : noteSuggestions(n.content).map((a) => Object.assign(a, { type: "업무" }));
+  const acts = base.filter((a) => !S.tasks.some((t) => t.noteId === nid && t.title === a.title) && !S.risks.some((r) => r.noteId === nid && r.title === a.title));
+  if (!acts.length) { toast("만들 항목이 없어 — [액션]·[결정]·[리스크] 아래에 '- 내용' 형식으로 적어줘"); return; }
+  const types = ["업무", "결정", "리스크", "이슈", "건너뛰기"];
+  openModal("회의록에서 등록", `<p class="small muted" style="margin-bottom:8px">「${esc(n.title || "(제목 없음)")}」에서 ${explicit.length || secs.length ? "찾은 항목이야." : "[액션] 표시가 없어서, 할 일처럼 보이는 줄을 제안했어."} 줄마다 업무·결정·리스크·이슈로 골라.</p>` +
+    acts.map((a, i) => `<div class="mrow"><select class="inline actType" data-i="${i}">${types.map((t) => `<option ${t === (a.suggested ? "건너뛰기" : a.type) ? "selected" : ""}>${t}</option>`).join("")}</select>
+      <span class="nm" title="${esc(a.title)}">${esc(a.title)}</span><span class="small muted">${esc(a.owner || "")}</span><span class="small muted">${a.due ? "~" + shortD(a.due) : ""}</span></div>`).join(""), [
     { l: "취소", fn: closeModal },
-    { l: "업무 만들기", cls: "primary", fn: () => {
-      const picks = [...document.querySelectorAll(".actchk:checked")].map((c) => acts[Number(c.value)]);
-      picks.forEach((a) => S.tasks.push({ id: uid("t"), projectId: n.projectId, title: a.title, owner: a.owner, due: a.due, start: n.date || today(), status: "진행중", priority: "mid", memo: `회의록: ${n.title || n.date}`, noteId: n.id, updatedAt: new Date().toISOString() }));
-      commit(); closeModal(); toast(`업무 ${picks.length}건 추가`);
+    { l: "등록", cls: "primary", fn: () => {
+      const cnt = { 업무: 0, 결정: 0, 리스크: 0, 이슈: 0 };
+      document.querySelectorAll(".actType").forEach((sel) => {
+        const a = acts[Number(sel.dataset.i)], ty = sel.value;
+        if (ty === "건너뛰기") return;
+        if (ty === "업무") S.tasks.push({ id: uid("t"), projectId: n.projectId, title: a.title, owner: a.owner, due: a.due, start: n.date || today(), status: "진행중", priority: "mid", memo: `회의록: ${n.title || n.date}`, noteId: n.id, updatedAt: new Date().toISOString() });
+        else S.risks.push({ id: uid("ri"), code: nextRiskCode(), projectId: n.projectId, type: ty, title: a.title, owner: a.owner, due: a.due, impact: "M", prob: "M", status: ty === "결정" ? "종료" : "오픈", raisedAt: n.date || today(), desc: `회의록: ${n.title || n.date}`, plan: "", noteId: n.id });
+        cnt[ty]++;
+      });
+      commit(); closeModal(); toast(Object.entries(cnt).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(" · ") + " 등록");
     } },
   ]);
 }
 function noteTasksHtml(n) {
-  const ts = S.tasks.filter((t) => t.noteId === n.id);
-  if (!ts.length) return `<div class="small muted" style="margin-top:10px">액션 적는 법: <span class="mono">[액션]</span> 아래에 <span class="mono">- 담당: 내용 (~10/20)</span></div>`;
-  return `<div class="sec-t">이 회의에서 나온 업무 ${ts.length}</div>` + ts.map((t) => `<div class="mrow" style="cursor:pointer" onclick="editTask('${t.id}')">${typeIcon("task")}<span class="nm" style="${t.status === "완료" ? "text-decoration:line-through;color:var(--faint)" : ""}">${esc(t.title)}</span><span class="small muted">${esc(t.owner || "")}</span>${badge(t.status, TASK_CLS[t.status] || "gray")}${t.due ? `<span class="small muted">${shortD(t.due)}</span>` : ""}</div>`).join("");
+  const ts = S.tasks.filter((t) => t.noteId === n.id), rs = S.risks.filter((r) => r.noteId === n.id);
+  if (!ts.length && !rs.length) return `<div class="small muted" style="margin-top:10px">적는 법: <span class="mono">[액션]</span> 아래 <span class="mono">- 담당: 내용 (~10/20)</span> · <span class="mono">[결정]</span> · <span class="mono">[리스크]</span> 아래 <span class="mono">- 내용</span></div>`;
+  return (rs.length ? `<div class="sec-t">이 회의의 결정·리스크 ${rs.length}</div>` + rs.map((r) => `<div class="mrow" style="cursor:pointer" onclick="editRisk('${r.id}')">${typeIcon(r.type === "이슈" ? "bug" : r.type === "결정" ? "task" : "data")}<span class="nm">${esc(r.title)}</span>${badge(r.type, r.type === "결정" ? "green" : r.type === "이슈" ? "red" : "amber")}</div>`).join("") : "") +
+    (ts.length ? `<div class="sec-t">이 회의에서 나온 업무 ${ts.length}</div>` : "") + ts.map((t) => `<div class="mrow" style="cursor:pointer" onclick="editTask('${t.id}')">${typeIcon("task")}<span class="nm" style="${t.status === "완료" ? "text-decoration:line-through;color:var(--faint)" : ""}">${esc(t.title)}</span><span class="small muted">${esc(t.owner || "")}</span>${badge(t.status, TASK_CLS[t.status] || "gray")}${t.due ? `<span class="small muted">${shortD(t.due)}</span>` : ""}</div>`).join("");
 }
 function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); }
 

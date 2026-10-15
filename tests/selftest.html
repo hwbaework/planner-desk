@@ -370,7 +370,7 @@ function tests(w, errors) {
     assert(acts[2].title === "회의실 예약", "체크박스 줄: " + acts[2].title);
     const n = { id: "n_act", projectId: pid(), title: "액션 점검 회의", date: t, content: "[액션]\n- 기획: 액션 점검 업무" };
     S().notes.push(n); w.noteToTasks("n_act");
-    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "업무 만들기").click();
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "등록").click();
     const made = S().tasks.filter((x) => x.noteId === "n_act");
     assert(made.length === 1 && made[0].owner === "기획", "생성: " + made.length);
     w.noteToTasks("n_act");
@@ -381,8 +381,8 @@ function tests(w, errors) {
     assert(sg.length === 2 && sg.every((x) => x.suggested), JSON.stringify(sg));
     const n = { id: "n_sg", projectId: pid(), title: "제안 점검", date: t, content: " - 견적서 회신 확인\n - 참고 사항" };
     S().notes.push(n); w.noteToTasks("n_sg");
-    const boxes = [...w.document.querySelectorAll(".actchk")];
-    assert(boxes.length === 1 && !boxes[0].checked, "제안이 미체크가 아님");
+    const sels = [...w.document.querySelectorAll(".actType")];
+    assert(sels.length === 1 && sels[0].value === "건너뛰기", "제안이 기본 건너뛰기가 아님");
     w.closeModal();
   });
   check("화면 개정 → '화면 변경 후 미전달' → 변경분 전달하면 해제", () => {
@@ -453,6 +453,17 @@ function tests(w, errors) {
     assert(w.buildReport([pid()], 0).includes("점검 리스크 데이터 지연"), "주간보고에 없음");
     w.setRisk("ri2", "status", "종료");
     assert(!w.computeAlerts(pid()).some((a) => a.ref[1] === "ri2"), "종료 후에도 경고");
+  });
+  check("회의록 [결정]·[리스크] 줄을 결정·리스크로 등록", () => {
+    const n = { id: "n_dr", projectId: pid(), title: "결정 점검 회의", date: t, content: "[결정]\n- 8:2 지분으로 진행\n[리스크]\n- 기관 데이터 제공 지연 가능\n[액션]\n- 기획: 일정표 공유" };
+    S().notes.push(n); w.noteToTasks("n_dr");
+    const types = [...w.document.querySelectorAll(".actType")].map((x) => x.value);
+    assert(types.join(",") === "업무,결정,리스크", "유형: " + types.join(","));
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "등록").click();
+    const rs = S().risks.filter((r) => r.noteId === "n_dr");
+    assert(rs.length === 2 && rs.find((r) => r.type === "결정").status === "종료", "결정·리스크 등록 실패");
+    assert(S().tasks.some((x) => x.noteId === "n_dr"), "업무 등록 실패");
+    assert(!w.computeAlerts(pid()).some((a) => rs.find((r) => r.type === "결정").id === a.ref[1]), "결정에 경고가 뜸");
   });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
