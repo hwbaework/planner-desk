@@ -650,13 +650,23 @@ function tests(w, errors) {
     const rest = w.removeLines("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝", w.memoDated("7월 9일까지 자료 제출\n6월 9일에 회의함\n- 참석\n메모 끝"));
     assert(rest === "7월 9일까지 자료 제출\n메모 끝", "남은 메모: " + JSON.stringify(rest));
   });
+  check("메모 날짜 줄: 날짜만 있는 머리줄 · 번호 목록 · 요일·조사 · 같은 줄 두 번", () => {
+    const memo = "6월 4일\n1. 요구사항 회의\n2. 화면 검토\n\n7월 15일(수) 확정\n9월 11기준으로 메일로 보고완료\n9월 12일 회의 예정\n같은 줄\n6월 1일 기준 A\n6월 1일 기준 A";
+    const rows = w.memoDated(memo);
+    assert(rows[0].text === "1. 요구사항 회의\n2. 화면 검토" && rows[0].at.endsWith("-06-04"), "머리줄: " + JSON.stringify(rows[0]));
+    assert(rows[1].text === "확정", "요일: " + rows[1].text);
+    assert(rows[2].text === "메일로 보고완료" && rows[2].at.endsWith("-09-11"), "기준으로: " + JSON.stringify(rows[2]));
+    assert(rows[3].plan === true && rows[1].plan === false, "계획 표시");
+    const rest = w.removeLines(memo, [rows[5]]);
+    assert(rest.endsWith("같은 줄\n6월 1일 기준 A"), "같은 줄 하나만 지워야 함: " + JSON.stringify(rest));
+  });
   check("메모 일괄 변환: 미리보기에서 체크 해제한 줄은 남김", () => {
     const tk = { id: "t_bulk", projectId: pid(), title: "일괄 변환 점검", status: "진행중", priority: "mid", start: t, due: "", memo: "8월 1일 기준 A 요청\n8월 2일 기준 B 회신" };
     S().tasks.push(tk);
     w.splitAllMemos();
     assert(w.document.getElementById("modalTitle").textContent.includes("미리보기"), "미리보기 창 없음");
     const box = w.document.querySelector('.mchk[data-t="t_bulk"][data-i="1"]'); box.checked = false;
-    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "체크한 줄 옮기기").click();
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "체크한 것 옮기기").click();
     assert(tk.memo === "8월 2일 기준 B 회신" && (tk.log || []).some((e) => e.text === "A 요청"), "일괄 변환: " + JSON.stringify(tk.memo));
   });
   check("업무 폼: 저장 시 기록 칸 내용 기록, 옮기기 전에 폼 값 저장", () => {

@@ -1921,49 +1921,61 @@ function addTaskLog(id) {
 }
 function delTaskLog(id, lid) { const x = S.tasks.find((t) => t.id === id); x.log = (x.log || []).filter((e) => e.id !== lid); persist(); $("taskLog").innerHTML = taskLogHtml(x); }
 // 예전 메모의 "9월 18일 기준 …" 줄을 날짜가 있는 진행 기록으로
-// 예전 메모의 날짜 줄 → 진행 기록. "6월 9일 기준 …", "6월 9일에 …", "5/19 …" 로 시작하는 줄만,
-// 바로 아래 '-·*' 목록 줄은 그 기록에 붙인다. "7월 9일까지/~/부터/중/경 …"은 마감·기간이라 옮기지 않는다.
-function memoDated(memo) {
-  const rows = []; let cur = null;
-  String(memo || "").split(/\r?\n/).forEach((raw) => {
+// 예전 메모의 날짜 줄 → 진행 기록. "6월 9일 기준 …", "6월 9일에 …", "5/19 …" 로 시작하는 줄,
+// 바로 아래 목록 줄('-·*', '1.')은 그 기록에 붙인다. 날짜만 있는 줄은 머리줄로 보고 빈 줄 전까지를 본문으로 한다.
+// "7월 9일까지/~/부터/중/경 …"은 마감·기간이라 옮기지 않고 skipped 로 돌려준다.
+function memoScan(memo) {
+  const rows = [], skipped = []; let cur = null;
+  const close = () => { if (cur && cur.header && !cur.text) rows.pop(); cur = null; };
+  String(memo || "").split(/\r?\n/).forEach((raw, i) => {
     const l = raw.trim();
-    if (!l) { cur = null; return; }
-    const m = l.match(/^(\d{1,2})\s*월\s*(\d{1,2})\s*일(.*)$/) || l.match(/^(\d{1,2})\/(\d{1,2})(?=\s)(.*)$/);
+    if (!l) { close(); return; }
+    const m = l.match(/^(\d{1,2})\s*월\s*(\d{1,2})\s*(?:일|(?=\s*기준))(.*)$/) || l.match(/^(\d{1,2})\/(\d{1,2})(?=\s|$)(.*)$/);
     if (m) {
-      const rest0 = m[3];
-      if (/^\s*(까지|~|부터|중|경|～)/.test(rest0)) { cur = null; return; }   // 마감·기간 표현
-      const rest = rest0.replace(/^\s*(기준|에)?\s*[,:]?\s*/, "").trim();
-      if (!rest) { cur = null; return; }
+      close();
+      const rest0 = m[3].replace(/^\s*\([월화수목금토일]\)/, "");
+      if (/^\s*(까지|~|부터|중|경|～)/.test(rest0)) { skipped.push(l); return; }
+      const rest = rest0.replace(/^\s*(?:기준\s*)?(?:으로|에)?\s*[,:]?\s*/, "").trim();
       const y = new Date().getFullYear(), mo = Number(m[1]), d = Number(m[2]);
-      if (mo < 1 || mo > 12 || d < 1 || d > 31) { cur = null; return; }
-      cur = { lines: [raw], at: `${mo > new Date().getMonth() + 2 ? y - 1 : y}-${pad(mo)}-${pad(d)}`, text: rest };
+      if (mo < 1 || mo > 12 || d < 1 || d > 31) return;
+      cur = { idx: [i], lines: [raw], at: `${mo > new Date().getMonth() + 2 ? y - 1 : y}-${pad(mo)}-${pad(d)}`, text: rest, header: !rest };
+      cur.plan = /(예정|필요|요청)\s*\.?$/.test(rest);
       rows.push(cur);
-    } else if (cur && /^[-*•·]/.test(l)) { cur.lines.push(raw); cur.text += "\n" + l; }
-    else cur = null;
+    } else if (cur && (cur.header || /^([-*•·]|\d{1,2}[.)]\s)/.test(l))) {
+      cur.idx.push(i); cur.lines.push(raw); cur.text += (cur.text ? "\n" : "") + l;
+    } else cur = null;
   });
-  return rows;
+  close();
+  return { rows, skipped };
 }
+function memoDated(memo) { return memoScan(memo).rows; }
 function removeLines(memo, rows) {
-  const drop = new Set(rows.flatMap((r) => r.lines));
-  return String(memo || "").split(/\r?\n/).filter((l) => !drop.has(l)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const drop = new Set(rows.flatMap((r) => r.idx));
+  return String(memo || "").split(/\r?\n/).filter((l, i) => !drop.has(i)).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+function memoPick(mode) {
+  document.querySelectorAll(".mchk").forEach((c) => (c.checked = mode === "all" ? true : mode === "none" ? false : c.dataset.plan !== "1" && c.checked));
 }
 // 일괄 변환은 미리보기에서 줄마다 고른 뒤 실행
 function splitAllMemos() {
   const list = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length);
   if (!list.length) { toast("옮길 날짜 줄이 없어"); return; }
   const total = list.reduce((a, t) => a + memoDated(t.memo).length, 0);
-  openModal("메모 → 진행 기록 미리보기", `<div class="small muted" style="margin-bottom:8px">업무 ${list.length}건 · ${total}줄. 체크한 줄만 옮겨. '~까지·~중' 같은 마감 줄은 처음부터 빠져 있어. (Ctrl+Z로 되돌릴 수 있어)</div>` +
-    list.map((t) => `<div class="sec-t">${esc(t.title)}</div>` + memoDated(t.memo).map((r, i) => `<label class="mrow" style="cursor:pointer;align-items:flex-start"><input type="checkbox" class="mchk" data-t="${t.id}" data-i="${i}" checked style="width:auto;margin-top:3px">
-      <span class="small mono" style="flex:none">${shortD(r.at)}</span><span class="nm" style="white-space:pre-wrap">${esc(r.text)}</span></label>`).join("")).join(""), [
+  const skipped = list.concat(S.tasks.filter((t) => inScope(t) && !list.includes(t))).flatMap((t) => memoScan(t.memo).skipped.map((l) => [t.title, l]));
+  openModal("메모 → 진행 기록 미리보기", `<div class="small muted" style="margin-bottom:8px">업무 ${list.length}건 · ${total}건. 체크한 것만 옮겨. '계획' 표시는 예정·필요·요청으로 끝나는 줄이야. (Ctrl+Z로 되돌릴 수 있어)</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px"><button class="chip" onclick="memoPick('all')">전체 선택</button><button class="chip" onclick="memoPick('none')">전체 해제</button><button class="chip" onclick="memoPick('plan')">계획 줄 해제</button></div>` +
+    list.map((t) => { const rows = memoDated(t.memo); return `<details open><summary class="sec-t" style="cursor:pointer">${esc(t.title)} <span class="chip-ref">${esc(projName(t.projectId))}</span> <span class="small muted">${rows.length}건</span></summary>` + rows.map((r, i) => `<label class="mrow" style="cursor:pointer;align-items:flex-start"><input type="checkbox" class="mchk" data-t="${t.id}" data-i="${i}" data-plan="${r.plan ? 1 : 0}" checked style="width:auto;margin-top:3px">
+      <span class="small mono" style="flex:none">${shortD(r.at)}</span>${r.plan ? `<span class="chip-ref" style="flex:none">계획</span>` : ""}<span class="nm" style="white-space:pre-wrap">${esc(r.text)}</span></label>`).join("") + `</details>`; }).join("") +
+    (skipped.length ? `<details style="margin-top:10px"><summary class="small muted" style="cursor:pointer">마감 표현이라 안 옮김 ${skipped.length}줄</summary>${skipped.map(([tt, l]) => `<div class="small muted" style="padding:2px 0">${esc(tt)} · ${esc(l)}</div>`).join("")}</details>` : ""), [
     { l: "취소", fn: closeModal },
-    { l: "체크한 줄 옮기기", cls: "primary", fn: () => {
+    { l: "체크한 것 옮기기", cls: "primary", fn: () => {
       let n = 0;
       list.forEach((x) => {
         const rows = memoDated(x.memo), pick = rows.filter((r, i) => document.querySelector(`.mchk[data-t="${x.id}"][data-i="${i}"]`)?.checked);
         if (!pick.length) return;
         pick.forEach((r) => logTask(x, "comment", r.text, r.at)); x.memo = removeLines(x.memo, pick); n += pick.length;
       });
-      commit(); closeModal(); toast(`${n}줄을 진행 기록으로 옮겼어`, true);
+      commit(); closeModal(); toast(`${n}건을 진행 기록으로 옮겼어`, true);
     } },
   ], true);
 }
@@ -1972,7 +1984,7 @@ function splitMemoToLog(id) {
   if (!rows.length) return;
   rows.forEach((r) => logTask(x, "comment", r.text, r.at));
   x.memo = removeLines(x.memo, rows);
-  commit(); closeModal(); editTask(id); toast(`${rows.length}줄을 진행 기록으로 옮겼어`, true);
+  commit(); closeModal(); editTask(id); toast(`${rows.length}건을 진행 기록으로 옮겼어`, true);
 }
 // 열린 폼을 먼저 저장하고 다음 동작 (폼에서 고친 값이 날아가지 않게)
 function formSaveThen(fn) {
