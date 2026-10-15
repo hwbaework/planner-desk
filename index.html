@@ -533,7 +533,7 @@ const RESP_EV = ["ack", "question", "progress", "done"];   // 개발자 쪽에�
 const MINE_EV = ["sent", "answer", "nudge", "verified", "reject"];
 const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
 const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
-const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["reqs", "요구사항"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
 const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e8a9a", "#b5487a", "#5b6474"];
 const TASK_ST = ["진행중", "대기", "예정", "완료"];
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "예정": "gray", "완료": "green" };
@@ -544,6 +544,9 @@ const DATA_CLS = { "협의 전": "gray", "협의 중": "violet", "합의": "blue
 const DATA_METHOD = ["API", "파일(엑셀/CSV)", "DB 연계", "RTU/계측기", "수기 입력", "미정"];
 const DATA_CYCLE = ["실시간", "15분", "1시간", "일", "주", "월", "1회", "미정"];
 const DATA_LOG = ["회의", "메일", "전화", "공문", "수신", "기타"];
+const REQ_ST = ["접수", "검토중", "확정", "보류", "제외"];
+const REQ_CLS = { "접수": "gray", "검토중": "violet", "확정": "green", "보류": "amber", "제외": "muted" };
+const REQ_KIND = ["기능", "비기능", "데이터", "인터페이스", "보안", "기타"];
 const TC_RES = ["미수행", "Pass", "Fail", "Block"];
 const TC_CLS = { "미수행": "gray", "Pass": "green", "Fail": "red", "Block": "amber" };
 // 화면 목록에서 기본 TC를 만들 때 쓰는 기획자용 표준 시나리오
@@ -637,8 +640,8 @@ function emptyState() {
     settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1",
       mail: { provider: "hiworks", protocol: "pop3", host: "pop3s.hiworks.com", port: 995, user: "", folder: "INBOX", days: 14, devSenders: "", last: null } },
     ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "", tlZoom: "month", tlAnchor: "", tlHideDone: 1, tlMissing: 1, tlKinds: { wbs: 1, task: 1, ho: 1, data: 1, doc: 1 } },
-    seq: { ho: 0, tc: 0 },
-    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
+    seq: { ho: 0, tc: 0, req: 0 },
+    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], reqs: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
   };
 }
 function normalize(d) {
@@ -647,11 +650,11 @@ function normalize(d) {
   s.settings = Object.assign(emptyState().settings, d?.settings || {});
   s.settings.mail = Object.assign(emptyState().settings.mail, d?.settings?.mail || {});
   s.ui = Object.assign(emptyState().ui, d?.ui || {});
-  s.seq = Object.assign({ ho: 0, tc: 0 }, d?.seq || {});
-  ["projects", "tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+  s.seq = Object.assign({ ho: 0, tc: 0, req: 0 }, d?.seq || {});
+  ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
   s.screens.forEach((x) => { x.history = x.history || []; if (x.hoId && x.lastSentVer === undefined) x.lastSentVer = x.version || ""; });
-  ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
+  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
   s.ui.tlKinds = Object.assign(emptyState().ui.tlKinds, d?.ui?.tlKinds || {});
   s.projects.forEach((p, i) => { if (!p.color) p.color = PROJ_COLORS[i % PROJ_COLORS.length]; });
@@ -678,7 +681,7 @@ function writeLocal() {
 }
 function persist() {
   S.updatedAt = new Date().toISOString();
-  ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
+  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
   writeLocal(); dirty = true; updateSaveInd();
   if (fileHandle) { clearTimeout(fileTimer); fileTimer = setTimeout(() => writeToHandle(true), 1500); }
 }
@@ -853,6 +856,10 @@ function computeAlerts(pid) {
     if (sc.hoId && sc.lastSentVer !== undefined && (sc.version || "") !== sc.lastSentVer)
       out.push({ level: "mine", kind: "화면 변경 후 미전달", ref: ["screen", sc.id], pid: sc.projectId, days: sc.revisedAt ? calDays(sc.revisedAt) : 0, title: `${sc.code} ${sc.name}`, desc: `개발엔 ${sc.lastSentVer || "-"} 전달 → 지금 ${sc.version}${sc.revisedAt ? ` (${shortD(sc.revisedAt)} 개정)` : ""} · 변경분 전달 필요` });
   });
+  S.reqs.filter(scope).forEach((r) => {
+    if (r.status === "확정" && !(r.screenIds || []).length && r.kind !== "비기능")
+      out.push({ level: "mine", kind: "화면 미반영 요구사항", ref: ["req", r.id], pid: r.projectId, days: r.confirmedAt ? calDays(r.confirmedAt) : 0, title: `${r.code} ${r.title}`, desc: `확정${r.confirmedAt ? " " + shortD(r.confirmedAt) : ""} · 연결된 화면 없음 — 화면설계에 반영 필요` });
+  });
   S.recurring.filter(scope).forEach((r) => {
     if (r.nextDue && r.nextDue < t) out.push({ level: "warn", kind: "정기 업무 지남", ref: ["recur", r.id], pid: r.projectId, days: calDays(r.nextDue), title: r.title, desc: `예정 ${shortD(r.nextDue)} (${dday(r.nextDue)}) · 완료 처리 안 됨` });
   });
@@ -886,7 +893,7 @@ function render() {
     : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
   renderBanner(); renderSide(); renderTabs();
-  const v = { dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  const v = { dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, reqs: renderReqs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
   $("view").innerHTML = v();
   if (S.ui.tab === "mail") bindDrop();
   if (S.ui.tab === "notes") bindNoteEditor();
@@ -915,8 +922,8 @@ function renderSide() {
   }
   $("side").innerHTML = h + `<div id="sideNav" class="side-nav"></div>`;
 }
-const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "docs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
-const NAV_ALERT = { screens: ["screen"], tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
+const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "docs", "reqs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
+const NAV_ALERT = { reqs: ["req"], screens: ["screen"], tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
 function renderTabs() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
   const alerts = computeAlerts(pid);
@@ -1058,7 +1065,7 @@ function todayCard(pid, alerts) {
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
-  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')` }[type];
+  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, req: `editReq('${id}')` }[type];
     return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
@@ -1090,7 +1097,7 @@ function missingCard(pid) {
 }
 function alertRow(a) {
   const [type, id] = a.ref;
-  const open = { screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
+  const open = { req: `editReq('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
   let acts = "";
   if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
   if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
@@ -1223,6 +1230,7 @@ function gSearchItems(q) {
   S.handoffs.filter(live).forEach((x) => hit(x.code, x.title, x.to, x.memo) && add("개발 전달", hoKind(x), x, `[${x.code}] ${x.title}`, hoStLabel(x.status), () => openHO(x.id)));
   S.datas.filter(live).forEach((x) => hit(x.name, x.org, x.contact, x.memo, x.spec) && add("데이터 협의", "data", x, `${x.org ? x.org + " · " : ""}${x.name}`, x.status, () => openData(x.id)));
   S.docs.filter(live).forEach((x) => hit(x.name, x.owner, x.memo, x.path) && add("산출물", "doc", x, `${x.phase} ${x.name}`, `${x.status} ${x.version || ""}`, () => editDoc(x.id)));
+  S.reqs.filter(live).forEach((x) => hit(x.code, x.title, x.desc, x.source) && add("요구사항", "doc", x, `${x.code} ${x.title}`, x.status, () => { selProject(x.projectId); selTab("reqs"); editReq(x.id); }));
   S.screens.filter(live).forEach((x) => hit(x.code, x.name, x.menu, x.memo) && add("화면", "doc", x, `${x.code} ${x.name}`, x.status, () => { selProject(x.projectId); selTab("screens"); editScreen(x.id); }));
   S.tcs.filter(live).forEach((x) => hit(x.code, x.scenario, x.steps, x.expected) && add("테스트 케이스", x.result === "Fail" ? "bug" : "tc", x, `${x.code} ${x.scenario}`, x.result, inProj(x, () => editTC(x.id))));
   S.events.filter(live).forEach((x) => hit(x.title, x.location, x.memo) && add("일정", "event", x, x.title, `${x.type} · ${shortD(x.start)}`, () => editEvent(x.id)));
@@ -1939,7 +1947,7 @@ function renderDocs() {
         const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
         const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
         return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
-          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
+          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${/요구사항 정의서/.test(d.name) ? reqChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap">${esc(d.owner || "")}</td>
@@ -2020,6 +2028,91 @@ function exportDocsCsv() {
   const rows = [["단계", "산출물", "상태", "버전", "담당", "계획일", "검토요청일", "승인자", "승인일", "경로", "메모"]];
   S.docs.filter((d) => d.projectId === pid).forEach((d) => rows.push([d.phase, d.name, d.status, d.version, d.owner, d.plan, d.requestedAt, d.approver, d.approvedAt, d.path, d.memo]));
   download(`산출물_${projName(pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+}
+
+// ───────────── 요구사항 · 추적표 (요구사항 → 화면 → 테스트) ─────────────
+function nextReqCode() { S.seq.req = (S.seq.req || 0) + 1; return `REQ-${String(S.seq.req).padStart(3, "0")}`; }
+function reqTrace(r) {
+  const screens = (r.screenIds || []).map((id) => S.screens.find((x) => x.id === id)).filter(Boolean);
+  const tcs = S.tcs.filter((c) => screens.some((sc) => sc.id === c.screenId));
+  return { screens, tcs, pass: tcs.filter((c) => c.result === "Pass").length, fail: tcs.filter((c) => c.result === "Fail").length };
+}
+function reqChip(pid) {
+  const l = S.reqs.filter((r) => r.projectId === pid && r.status !== "제외"); if (!l.length) return "";
+  const done = l.filter((r) => r.status === "확정").length, mapped = l.filter((r) => (r.screenIds || []).length).length;
+  return ` <span class="chip-ref" style="cursor:pointer" onclick="selTab('reqs')" title="요구사항 현황">REQ 확정 ${done}/${l.length} · 화면 반영 ${mapped}</span>`;
+}
+function renderReqs() {
+  if (S.ui.pid === "all") return pageHead("요구사항", "") + needProject("요구사항");
+  const pid = S.ui.pid, f = S.ui.reqFilter || "all", q = (S.ui.reqQ || "").toLowerCase();
+  let list = S.reqs.filter((r) => r.projectId === pid);
+  const cnt = { all: list.length }; REQ_ST.forEach((st) => (cnt[st] = list.filter((r) => r.status === st).length));
+  const live = list.filter((r) => r.status !== "제외");
+  const mapped = live.filter((r) => (r.screenIds || []).length).length, verified = live.filter((r) => { const t = reqTrace(r); return t.tcs.length && t.pass === t.tcs.length; }).length;
+  if (f !== "all") list = list.filter((r) => r.status === f);
+  if (q) list = list.filter((r) => (r.code + r.title + (r.desc || "") + (r.source || "")).toLowerCase().includes(q));
+  list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
+  let h = pageHead("요구사항 · 추적표", `${esc(projName(pid))} · ${live.length}건 · 화면 반영 ${mapped} · 테스트 통과 ${verified} — 요구사항 → 화면 → 테스트가 이어지는지 확인`,
+    `<button class="btn" onclick="bulkReqs()">엑셀 붙여넣기</button><button class="btn" onclick="exportReqCsv()">추적표 CSV</button><button class="btn primary" onclick="editReq()">+ 요구사항</button>`);
+  const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.reqFilter='${k}';render()">${l} ${cnt[k]}</button>`;
+  h += `<div class="filters">${chip("all", "전체")}${REQ_ST.map((st) => chip(st, st)).join("")}
+    <input class="search" placeholder="REQ·요구사항·출처 검색" value="${esc(S.ui.reqQ || "")}" oninput="S.ui.reqQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>REQ</th><th>요구사항</th><th>구분</th><th>우선</th><th>상태</th><th>출처</th><th>반영 화면</th><th>테스트</th></tr></thead><tbody>` +
+    (list.map((r) => {
+      const tr = reqTrace(r), miss = r.status === "확정" && !tr.screens.length && r.kind !== "비기능";
+      return `<tr style="${r.status === "제외" ? "opacity:.5" : ""}"><td class="mono nowrap">${esc(r.code)}</td>
+        <td><span class="link" onclick="editReq('${r.id}')">${esc(r.title)}</span>${r.desc ? `<div class="small muted clamp1">${esc(r.desc)}</div>` : ""}</td>
+        <td class="small nowrap">${esc(r.kind || "")}</td>
+        <td class="nowrap small">${priIcon(r.priority)}</td>
+        <td><select class="inline" onchange="setReq('${r.id}','status',this.value)">${REQ_ST.map((st) => `<option ${st === r.status ? "selected" : ""}>${st}</option>`).join("")}</select></td>
+        <td class="small">${esc(r.source || "")}</td>
+        <td>${tr.screens.map((sc) => `<span class="chip-ref">${esc(sc.code)}</span>`).join("") || (miss ? badge("화면 미반영", "amber") : '<span class="muted">-</span>')}</td>
+        <td class="nowrap small">${tr.tcs.length ? `${tr.pass}/${tr.tcs.length} Pass${tr.fail ? ` <span style="color:var(--danger);font-weight:700">Fail ${tr.fail}</span>` : ""}` : '<span class="muted">-</span>'}</td></tr>`;
+    }).join("") || `<tr><td colspan="8" class="empty">요구사항이 없어. 요구사항 정의서 엑셀을 [엑셀 붙여넣기]로 한 번에 넣을 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
+function setReq(id, k, v) { const r = S.reqs.find((x) => x.id === id); r[k] = v; if (k === "status" && v === "확정" && !r.confirmedAt) r.confirmedAt = today(); commit(); }
+function editReq(id) {
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const r = id ? S.reqs.find((x) => x.id === id) : { status: "접수", kind: "기능", priority: "mid", receivedAt: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id, screenIds: [] };
+  const scOpts = S.screens.filter((x) => x.projectId === r.projectId).map((x) => [x.id, `${x.code} ${x.name}`]);
+  openForm(id ? `요구사항 · ${r.code}` : "요구사항 추가", [
+    { k: "title", l: "요구사항", t: "text", full: true, req: true, ph: "예: 회원은 휴대폰 본인인증으로 가입할 수 있다" },
+    { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
+    { k: "kind", l: "구분", t: "select", opts: REQ_KIND },
+    { k: "status", l: "상태", t: "select", opts: REQ_ST },
+    { k: "priority", l: "우선순위", t: "select", opts: PRI },
+    { k: "source", l: "출처", t: "text", ph: "예: 1차 착수회의, 고객 PM 메일" },
+    { k: "receivedAt", l: "접수일", t: "date" },
+    { k: "desc", l: "상세 / 수용 기준", t: "textarea", full: true, ph: "어떤 조건이면 완료로 보는지" },
+    { k: "screenIds", l: "반영 화면", t: "multi", opts: scOpts, hint: "화면설계서에서 이 요구사항을 반영한 화면" },
+  ], r, (v) => {
+    if (v.status === "확정" && !r.confirmedAt) v.confirmedAt = today();
+    if (id) Object.assign(r, v); else S.reqs.push(Object.assign({ id: uid("rq"), code: nextReqCode() }, v));
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("요구사항을 삭제할까?")) { S.reqs = S.reqs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+}
+function bulkReqs() {
+  const pid = S.ui.pid;
+  openModal("요구사항 붙여넣기", `<p class="small muted" style="margin-bottom:8px">요구사항 정의서 엑셀에서 열 순서대로 복사 (탭 구분): <b>REQ ID · 요구사항 · 구분 · 출처 · 반영 화면ID(쉼표로 여러 개)</b>. REQ ID를 비우면 자동 번호. 같은 REQ ID는 갱신.</p>
+    <textarea id="bulkText" style="min-height:220px" class="mono"></textarea>`, [
+    { l: "취소", fn: closeModal },
+    { l: "추가", cls: "primary", fn: () => {
+      let add = 0, upd = 0;
+      $("bulkText").value.split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((r) => r[1]).forEach(([code, title, kind, source, scr]) => {
+        const screenIds = String(scr || "").split(/[,\s]+/).filter(Boolean).map((c) => S.screens.find((x) => x.projectId === pid && x.code === c)?.id).filter(Boolean);
+        const ex = code && S.reqs.find((r) => r.projectId === pid && r.code === code);
+        if (ex) { Object.assign(ex, { title, kind: REQ_KIND.includes(kind) ? kind : ex.kind, source: source || ex.source, screenIds: screenIds.length ? screenIds : ex.screenIds }); upd++; }
+        else { S.reqs.push({ id: uid("rq"), projectId: pid, code: code || nextReqCode(), title, kind: REQ_KIND.includes(kind) ? kind : "기능", source: source || "", status: "접수", priority: "mid", receivedAt: today(), screenIds }); add++; }
+      });
+      commit(); closeModal(); toast(`추가 ${add} · 갱신 ${upd}`);
+    } },
+  ]);
+}
+function exportReqCsv() {
+  const rows = [["REQ ID", "요구사항", "구분", "상태", "출처", "반영 화면", "테스트 케이스", "Pass", "Fail"]];
+  S.reqs.filter((r) => r.projectId === S.ui.pid).forEach((r) => { const t = reqTrace(r); rows.push([r.code, r.title, r.kind, r.status, r.source, t.screens.map((x) => x.code).join(" "), t.tcs.map((c) => c.code).join(" "), t.pass, t.fail]); });
+  download(`요구사항추적표_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
 
 // ───────────── 화면 목록 (화면설계서) ─────────────
@@ -2748,7 +2841,7 @@ function editProject(id) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => {
     if (!confirm(`「${p.name}」와 관련 데이터(업무·일정·산출물·전달·화면·WBS·메모)를 모두 삭제할까? 되돌릴 수 없어. (보관 처리를 추천)`)) return;
-    ["tasks", "events", "recurring", "datas", "tcs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
+    ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
     S.projects = S.projects.filter((x) => x.id !== id); commit(); closeModal();
   } }] : []);
 }

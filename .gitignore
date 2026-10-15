@@ -16,3 +16,4 @@ tools/.mail_state.json
 mail_inbox.json
 __pycache__/
 통합테스트결과_*.csv
+요구사항추적표_*.csv

@@ -427,6 +427,21 @@ function tests(w, errors) {
     assert(S().ui.pid === other.id, "프로젝트 전환 안 됨: " + S().ui.pid);
     assert(w.document.getElementById("tabs").textContent.includes(other.name), "경로 표시가 이전 프로젝트");
   });
+  check("요구사항 추적: 확정인데 화면 없음 경고 → 화면 연결 → 테스트 집계", () => {
+    S().ui.pid = pid(); S().ui.tab = "reqs";
+    const sc = S().screens.find((x) => x.projectId === pid());
+    S().reqs.push({ id: "rq1", projectId: pid(), code: "REQ-901", title: "추적 점검 요구사항", kind: "기능", status: "검토중", priority: "high", screenIds: [] });
+    w.setReq("rq1", "status", "확정");
+    const r = S().reqs.find((x) => x.id === "rq1");
+    assert(r.confirmedAt === t, "확정일 없음");
+    assert(w.computeAlerts(pid()).some((a) => a.ref[1] === "rq1" && a.kind === "화면 미반영 요구사항"), "경고 없음");
+    r.screenIds = [sc.id];
+    assert(!w.computeAlerts(pid()).some((a) => a.ref[1] === "rq1"), "화면 연결 후에도 경고");
+    const tr = w.reqTrace(r);
+    assert(tr.screens.length === 1 && tr.tcs.length === S().tcs.filter((c) => c.screenId === sc.id).length, "추적 집계 틀림");
+    w.render();
+    assert(w.document.getElementById("view").innerHTML.includes("REQ-901"), "목록에 없음");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
