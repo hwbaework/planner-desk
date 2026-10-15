@@ -258,8 +258,8 @@
 
   /* Board (Jira 보드 구조) */
   .board-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-  .seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 4px; overflow: hidden; }
-  .seg button { border: none; background: var(--panel); color: var(--dim); padding: 6px 12px; font-size: 13.5px; cursor: pointer; font-family: inherit; }
+  .seg { display: inline-flex; border: 1px solid var(--line2); border-radius: 4px; overflow-x: auto; max-width: 100%; }
+  .seg button { white-space: nowrap; flex: none; border: none; background: var(--panel); color: var(--dim); padding: 6px 12px; font-size: 13.5px; cursor: pointer; font-family: inherit; }
   .seg button + button { border-left: 1px solid var(--line2); }
   .seg button.on { background: var(--accentw); color: var(--accent); font-weight: 700; }
   .lane-h { font-weight: 700; font-size: 14px; margin: 14px 0 6px; display: flex; align-items: center; gap: 6px; }
@@ -344,7 +344,17 @@
   @media (max-width: 900px) {
     .shell { grid-template-columns: 1fr; }
     .side { border-right: none; border-bottom: 1px solid var(--line); }
-    .side-nav { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .top { position: static; padding: 8px 12px; gap: 8px; }
+    .top .save-ind, .brand small { display: none; }
+    .side { padding: 10px 10px 12px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .side > h3 { display: none; }
+    .proj { border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; }
+    .proj.active { box-shadow: none; border-color: var(--accent); border-radius: 14px; }
+    .side .add { width: auto; margin: 0; }
+    .side .archived { display: none; }
+    .cal .day { min-height: 70px; padding: 3px; }
+    .pill { font-size: 11px; padding: 1px 3px; }
+    .side-nav { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; width: 100%; }
     .side-nav h3 { display: none; }
     .navi { border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; }
     .navi.active { box-shadow: none; border-color: var(--accent); }
