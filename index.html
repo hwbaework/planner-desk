@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planner Desk · 기획 데스크</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Crect x='14' y='17' width='36' height='32' rx='5' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M14 27h36M24 12v9M40 12v9' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M24 38l5 5 10-10' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232684FF'/%3E%3Cstop offset='1' stop-color='%230C66E4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23g%29'/%3E%3Cpath d='M32 12 L48 28 L32 44 L16 28 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M32 36 L40 44 L32 52 L24 44 Z' fill='white'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <style>
   :root {
@@ -217,6 +217,9 @@
   input.progress { width: 58px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; text-align: right; background: var(--panel); color: var(--text); font-family: inherit; font-size: 12px; }
 
   /* Project tag */
+  .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
+  .ti + .tlabel { margin-left: 6px; }
+  .pill .ti { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
   .ptag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
   .ptag i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
@@ -344,7 +347,7 @@
 
 <header class="top">
   <div>
-    <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232563eb'/%3E%3Crect x='14' y='17' width='36' height='32' rx='5' fill='none' stroke='white' stroke-width='4'/%3E%3Cpath d='M14 27h36M24 12v9M40 12v9' stroke='white' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M24 38l5 5 10-10' fill='none' stroke='white' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" alt="">Planner Desk <small>기획 · PMO 데스크</small></div>
+    <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232684FF'/%3E%3Cstop offset='1' stop-color='%230C66E4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23g%29'/%3E%3Cpath d='M32 12 L48 28 L32 44 L16 28 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M32 36 L40 44 L32 52 L24 44 Z' fill='white'/%3E%3C/svg%3E" alt="">Planner Desk <small>기획 · PMO 데스크</small></div>
     <div class="today" id="todayLabel"></div>
   </div>
   <div class="spacer"></div>
@@ -448,6 +451,28 @@ let fileTimer = null, lastFileSave = null, dirty = false;
 let modalOnClose = null;
 
 // ───────────── utils ─────────────
+// Jira 이슈 유형처럼 색 사각 아이콘으로 항목 종류를 구분한다.
+const TYPE_ICON = {
+  task: ["#4688ec", "업무", '<path d="M4.5 8.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'],
+  ho: ["#22a06b", "개발 전달", '<path d="M5.5 4h5v8l-2.5-1.8L5.5 12z" fill="#fff"/>'],
+  bug: ["#e2483d", "결함", '<circle cx="8" cy="8" r="3.2" fill="#fff"/>'],
+  doc: ["#8270db", "산출물", '<path d="M5 5h6M5 8h6M5 11h4" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>'],
+  data: ["#2898bd", "데이터", '<ellipse cx="8" cy="5.4" rx="3.4" ry="1.4" fill="#fff"/><path d="M4.6 5.4v5.2c0 .8 1.5 1.4 3.4 1.4s3.4-.6 3.4-1.4V5.4" stroke="#fff" stroke-width="1.4" fill="none"/>'],
+  tc: ["#e06c00", "테스트", '<path d="M3.8 5.6l1.2 1.2 2.2-2.2M3.8 10.6l1.2 1.2 2.2-2.2M9 6h3.2M9 11h3.2" stroke="#fff" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'],
+  event: ["#626f86", "일정", '<rect x="4" y="4.5" width="8" height="7.5" rx="1" stroke="#fff" stroke-width="1.4" fill="none"/><path d="M4 7.2h8" stroke="#fff" stroke-width="1.4"/>'],
+  recur: ["#626f86", "정기 업무", '<path d="M11.4 6.6A3.7 3.7 0 0 0 5 5.6M4.6 9.4A3.7 3.7 0 0 0 11 10.4" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M5 3.6v2.1h2.1M11 12.4v-2.1H8.9" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'],
+  wbs: ["#626f86", "WBS", '<path d="M4 5h5M6 8h6M4 11h4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>'],
+};
+function typeIcon(kind) {
+  const t = TYPE_ICON[kind]; if (!t) return "";
+  return `<svg class="ti" viewBox="0 0 16 16" aria-label="${t[1]}"><title>${t[1]}</title><rect width="16" height="16" rx="3" fill="${t[0]}"/>${t[2]}</svg>`;
+}
+function hoKind(h) { return /^\[결함\]/.test(h.title || "") ? "bug" : "ho"; }
+function priIcon(p) {
+  const d = { high: ["#e2483d", "높음", "M3 10.5l5-4.5 5 4.5"], mid: ["#f18d13", "보통", "M3 6.5h10M3 10h10"], low: ["#1d7afc", "낮음", "M3 6l5 4.5 5-4.5"] }[p];
+  if (!d) return "";
+  return `<svg class="ti" viewBox="0 0 16 16" aria-label="우선순위 ${d[1]}"><title>우선순위 ${d[1]}</title><path d="${d[2]}" stroke="${d[0]}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
 const $ = (id) => document.getElementById(id);
 const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
@@ -869,15 +894,16 @@ function recentActivity(pid) {
 // ───────────── 보드 (Jira 보드 구조, 기획 흐름 기준) ─────────────
 // 카드를 끌어다 놓거나 "다음 →"으로 넘기면 상태가 바뀌고 기록이 남는다.
 const BOARDS = {
-  ho: { l: "개발 전달 흐름", cols: HO_ST.map(([k, l]) => [k, l]), list: () => S.handoffs,
+  // icon: 카드 왼쪽 아래 유형 아이콘, pri: 우선순위
+  ho: { icon: hoKind, pri: (x) => x.priority, l: "개발 전달 흐름", cols: HO_ST.map(([k, l]) => [k, l]), list: () => S.handoffs,
     st: (x) => x.status, key: (x) => x.code, who: (x) => x.to, due: (x) => x.dueDate, done: ["verified"], open: (x) => `openHO('${x.id}')` },
-  tasks: { l: "업무", cols: [["예정", "예정"], ["진행중", "진행중"], ["대기", "대기 (회신 대기)"], ["완료", "완료"]], list: () => S.tasks,
-    st: (x) => x.status, key: () => "업무", who: (x) => x.owner, due: (x) => x.due, done: ["완료"], open: (x) => `editTask('${x.id}')` },
-  docs: { l: "산출물", cols: DOC_ST.map((k) => [k, k]), list: () => S.docs,
+  tasks: { icon: () => "task", pri: (x) => x.priority, l: "업무", cols: [["예정", "예정"], ["진행중", "진행중"], ["대기", "대기 (회신 대기)"], ["완료", "완료"]], list: () => S.tasks,
+    st: (x) => x.status, key: () => "", who: (x) => x.owner, due: (x) => x.due, done: ["완료"], open: (x) => `editTask('${x.id}')` },
+  docs: { icon: () => "doc", l: "산출물", cols: DOC_ST.map((k) => [k, k]), list: () => S.docs,
     st: (x) => x.status, key: (x) => `${x.phase} · ${x.version || ""}`, who: (x) => x.owner, due: (x) => x.plan, done: ["승인", "해당없음"], open: (x) => `editDoc('${x.id}')` },
-  tc: { l: "테스트", cols: TC_RES.map((k) => [k, k]), list: () => S.tcs,
+  tc: { icon: (x) => (x.result === "Fail" ? "bug" : "tc"), l: "테스트", cols: TC_RES.map((k) => [k, k]), list: () => S.tcs,
     st: (x) => x.result, key: (x) => x.code, who: (x) => x.tester, due: (x) => x.testedAt, done: ["Pass"], open: (x) => `editTC('${x.id}')` },
-  data: { l: "데이터 협의", cols: DATA_ST.map((k) => [k, k]), list: () => S.datas,
+  data: { icon: () => "data", l: "데이터 협의", cols: DATA_ST.map((k) => [k, k]), list: () => S.datas,
     st: (x) => x.status, key: (x) => x.org || "기관 미정", who: (x) => x.contact, due: (x) => x.dueDate, done: ["수신 완료"], open: (x) => `openData('${x.id}')` },
 };
 function boardTitle(b, x) { return b === "docs" ? x.name : b === "tc" ? x.scenario : x.title || x.name; }
@@ -917,7 +943,7 @@ function renderBoard() {
           return `<div class="kcard" draggable="true" data-id="${x.id}" style="border-left-color:${projColor(x.projectId)}" ondragstart="event.dataTransfer.setData('text/plain','${x.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')">
             <div class="tt" onclick="${B.open(x)}">${esc(boardTitle(bk, x))}</div>
             ${al ? `<div class="warnline">${esc(al.kind)}</div>` : ""}
-            <div class="meta"><span class="key">${esc(B.key(x) || "")}</span>${due ? `<span class="due ${dcls}">${shortD(due)}${isDone ? "" : " " + dday(due)}</span>` : ""}
+            <div class="meta">${typeIcon(B.icon(x))}<span class="key">${esc(B.key(x) || "")}</span>${B.pri ? priIcon(B.pri(x)) : ""}${due ? `<span class="due ${dcls}">${shortD(due)}${isDone ? "" : " " + dday(due)}</span>` : ""}
               ${next ? `<button class="next" onclick="boardMove('${x.id}','${esc(next[0])}')" title="${esc(next[1])}(으)로 넘기기">다음 →</button>` : ""}${avatar(B.who(x))}</div></div>`;
         }).join("") +
         (all.length > cards.length ? `<button class="add" onclick="S.ui.boardAllDone=1;render()">최근 ${cards.length}개만 표시 · ${all.length - cards.length}개 더 보기</button>` : isDoneCol && S.ui.boardAllDone && all.length > 8 ? `<button class="add" onclick="S.ui.boardAllDone=0;render()">접기</button>` : "") +
@@ -972,7 +998,7 @@ function calItems(from, to, pid, kinds = S.ui.calKinds) {
   });
   if (kinds.data) S.datas.filter(sc).forEach((x) => { if (inR(x.dueDate) && x.status !== "보류") add(x.dueDate, "data", `${x.name}${x.org ? " · " + x.org : ""}`, x, `openData('${x.id}')`, { done: x.status === "수신 완료" }); });
   if (kinds.task) S.tasks.filter(sc).forEach((t) => { if (inR(t.due)) add(t.due, "task", t.title, t, `editTask('${t.id}')`, { done: t.status === "완료" }); });
-  if (kinds.ho) S.handoffs.filter(sc).forEach((h) => { if (inR(h.dueDate) && h.status !== "hold") add(h.dueDate, "ho", `[${h.code}] ${h.title}`, h, `openHO('${h.id}')`, { done: ["done", "verified"].includes(h.status) }); });
+  if (kinds.ho) S.handoffs.filter(sc).forEach((h) => { if (inR(h.dueDate) && h.status !== "hold") add(h.dueDate, "ho", `[${h.code}] ${h.title}`, h, `openHO('${h.id}')`, { done: ["done", "verified"].includes(h.status), icon: hoKind(h) }); });
   if (kinds.doc) S.docs.filter(sc).forEach((d) => { if (inR(d.plan) && d.status !== "해당없음") add(d.plan, "doc", d.name, d, `editDoc('${d.id}')`, { done: d.status === "승인" }); });
   if (kinds.recur) S.recurring.filter(sc).forEach((r) => recurDates(r, from, to).forEach((d) => add(d, "recur", r.title, r, `editRecur('${r.id}')`)));
   if (kinds.wbs) S.wbs.filter(sc).forEach((w) => {
@@ -1014,13 +1040,13 @@ function renderCal() {
 }
 function calPill(i) {
   const tag = CAL_TAG[i.kind];
-  return `<div class="pill ${i.done ? "done" : ""}" style="border-left-color:${projColor(i.pid)}" title="${esc(projName(i.pid))} · ${esc((tag ? tag + " · " : "") + i.title)}" onclick="event.stopPropagation();${i.click}">${tag ? `<span class="k">${tag}</span>` : ""}${esc(i.title)}</div>`;
+  return `<div class="pill ${i.done ? "done" : ""}" style="border-left-color:${projColor(i.pid)}" title="${esc(projName(i.pid))} · ${esc((tag ? tag + " · " : "") + i.title)}" onclick="event.stopPropagation();${i.click}">${typeIcon(i.icon || i.kind)}${esc(i.title)}</div>`;
 }
 function itemList(items, showDate) {
   if (!items.length) return `<div class="empty">일정 없음</div>`;
   return items.map((i) => `<div class="alert" style="cursor:pointer" onclick="${i.click}"><span class="ic" style="background:${projColor(i.pid)}"></span><div class="body">
     <div class="d">${showDate ? `<b>${shortD(i.date)}</b> · ` : ""}${esc(CAL_TAG[i.kind] || i.sub || "일정")} · ${esc(projName(i.pid))}</div>
-    <div class="tt" style="${i.done ? "text-decoration:line-through;color:var(--faint)" : ""}">${esc(i.title)}</div></div></div>`).join("");
+    <div class="tt" style="${i.done ? "text-decoration:line-through;color:var(--faint)" : ""}">${typeIcon(i.icon || i.kind)}<span class="tlabel">${esc(i.title)}</span></div></div></div>`).join("");
 }
 function upcomingList(pid, n) {
   const t = today();
@@ -1073,7 +1099,7 @@ function renderData() {
       const last = [...x.log].sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).pop();
       return `<tr style="${x.status === "보류" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
         <td class="nowrap"><b>${esc(x.org || "-")}</b>${x.contact ? `<div class="small muted">${esc(x.contact)}</div>` : ""}</td>
-        <td><span class="link" onclick="openData('${x.id}')">${esc(x.name)}</span>${x.usage ? `<div class="small muted clamp1">활용: ${esc(x.usage)}</div>` : ""}</td>
+        <td><span class="link" onclick="openData('${x.id}')">${typeIcon("data")}<span class="tlabel">${esc(x.name)}</span></span>${x.usage ? `<div class="small muted clamp1">활용: ${esc(x.usage)}</div>` : ""}</td>
         <td class="nowrap small">${esc(x.method || "-")}<div class="muted">${esc(x.cycle || "")}</div></td>
         <td><select class="inline" onchange="setData('${x.id}','status',this.value)">${DATA_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td class="nowrap" style="${late ? "color:var(--danger);font-weight:700" : ""}">${x.dueDate ? `${shortD(x.dueDate)}${x.status !== "수신 완료" ? ` <span class="small ${late ? "" : "muted"}">${dday(x.dueDate)}</span>` : ""}` : '<span class="muted">-</span>'}</td>
@@ -1203,9 +1229,9 @@ function renderTasks() {
       const late = x.status !== "완료" && x.due && x.due < t;
       const memo = (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
       return `<tr style="${x.status === "완료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
-        <td><div class="link" onclick="editTask('${x.id}')">${esc(x.title)}</div>${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
+        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${esc(x.title)}</span></div>${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
         <td><select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-        <td class="nowrap">${x.priority === "high" ? badge("높음", "red") : x.priority === "low" ? `<span class="muted small">낮음</span>` : `<span class="small">보통</span>`}</td>
+        <td class="nowrap small">${priIcon(x.priority)} ${{ high: "높음", mid: "보통", low: "낮음" }[x.priority] || "보통"}</td>
         <td class="nowrap">${x.start ? `${shortD(x.start)}${x.status !== "완료" ? ` <span class="muted small">${calDays(x.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
         <td class="nowrap" style="${late ? "color:var(--danger);font-weight:700" : ""}">${x.due ? `${shortD(x.due)} <span class="small ${late ? "" : "muted"}">${x.status !== "완료" ? dday(x.due) : ""}</span>` : '<span class="muted">-</span>'}</td>
         <td class="small">${esc(x.owner || "")}</td></tr>`;
@@ -1321,7 +1347,7 @@ function renderHO() {
     const resp = lr ? `${shortD(lr.at)} <span class="muted small">${evLabel(lr.type)}</span>` : x.status === "sent" ? `<span style="color:var(--danger);font-weight:600">응답 없음</span> <span class="muted small">영업일 ${bizDays(x.sentAt)}일</span>` : "-";
     const due = x.dueDate ? `${shortD(x.dueDate)} <span class="${x.dueDate < today() && isOpenHO(x) && x.status !== "done" ? "" : "muted"} small" style="${x.dueDate < today() && isOpenHO(x) && x.status !== "done" ? "color:var(--danger);font-weight:700" : ""}">${dday(x.dueDate)}</span>` : `<span class="muted">-</span>`;
     return `<tr>
-      <td class="mono nowrap">${esc(x.code)}</td>
+      <td class="mono nowrap">${typeIcon(hoKind(x))} ${esc(x.code)}</td>
       <td><div class="link" onclick="openHO('${x.id}')">${esc(x.title)}</div>${refs}${al.length ? `<div>${al.map((a) => badge(a.kind, a.level === "danger" ? "red" : a.level === "mine" ? "blue" : "amber")).join(" ")}</div>` : ""}</td>
       ${pid ? "" : `<td class="small nowrap">${esc(projName(x.projectId))}</td>`}
       <td class="nowrap">${esc(x.to || "-")}</td>
@@ -1492,7 +1518,7 @@ function renderDocs() {
         const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
         const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
         return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
-          <td><span class="link" onclick="editDoc('${d.id}')">${esc(d.name)}</span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
+          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap">${esc(d.owner || "")}</td>
@@ -1757,7 +1783,7 @@ function renderTC() {
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>TC ID</th><th>화면</th><th>시나리오</th><th>예상 결과</th><th>결과</th><th>수행일</th><th>결함 전달</th></tr></thead><tbody>` +
     (list.map((c) => {
       const sc = S.screens.find((x) => x.id === c.screenId), ho = c.hoId && S.handoffs.find((x) => x.id === c.hoId);
-      return `<tr><td class="mono nowrap">${esc(c.code)}</td>
+      return `<tr><td class="mono nowrap">${typeIcon(c.result === "Fail" ? "bug" : "tc")} ${esc(c.code)}</td>
         <td class="nowrap small">${sc ? `${esc(sc.code)}<div class="muted">${esc(sc.name)}</div>` : '<span class="muted">-</span>'}</td>
         <td><span class="link" onclick="editTC('${c.id}')">${esc(c.scenario)}</span>${c.steps ? `<div class="small muted clamp1">${esc(c.steps)}</div>` : ""}</td>
         <td class="small">${esc(c.expected || "")}</td>
