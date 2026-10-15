@@ -8,3 +8,9 @@ WBS_*.csv
 node_modules/
 .DS_Store
 Thumbs.db
+
+# 도구 상태 / 메일 연동 개인 설정
+.omc/
+tools/mail_config.json
+tools/.mail_state.json
+mail_inbox.json
