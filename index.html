@@ -61,6 +61,7 @@
   .gres .gi .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gres .gi .sub { font-size: 12px; color: var(--faint); white-space: nowrap; }
   .gres mark { background: var(--warnw); color: inherit; border-radius: 2px; }
+  @page { size: A4 landscape; margin: 10mm; }
   @media print {
     :root, [data-theme="dark"] { --bg: #fff; --panel: #fff; --sub: #f4f5f7; --hover: #fff; --line: #c9ced6; --text: #000; --dim: #333; --faint: #555; }
     body { background: #fff; zoom: 1 !important; font-size: 12px; }
@@ -72,7 +73,10 @@
     table.t th { position: static; }
     a { color: #000; text-decoration: none; }
     select.inline { border: none; appearance: none; -webkit-appearance: none; padding: 0; }
-    .tbl-wrap, .tl-right, .board { overflow: visible !important; }
+    .tbl-wrap, .tl-right, .board, .tlw { overflow: visible !important; }
+    .tlw { zoom: .62; }
+    .board { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cal .day { min-height: 70px; }
   }
   @media (max-width: 900px) { .gsearch { order: 5; flex: 1 1 100%; } }
   .save-ind { font-size: 12.5px; color: var(--faint); }
@@ -705,23 +709,28 @@ function load() {
   }
   S = normalize(emptyState()); seedDemo(); writeLocal();
 }
-let lastJson = null, undoStack = [], lastPushAt = 0;
+let lastJson = null, undoStack = [], lastPushAt = 0, lastCount = 0, suppressUndo = false;
 function snapshot() { const copy = Object.assign({}, S); delete copy._embeddedOlder; return JSON.stringify(copy); }
+function itemCount() { return ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes", "projects"].reduce((a, k) => a + S[k].length, 0); }
 function writeLocal(trackUndo) {
-  const json = snapshot();
-  if (trackUndo && lastJson && json !== lastJson && Date.now() - lastPushAt > 1000) {
+  const json = snapshot(), count = itemCount();
+  const removed = count < lastCount;
+  lastCount = count;
+  if (trackUndo && !suppressUndo && lastJson && json !== lastJson && (removed || Date.now() - lastPushAt > 1000)) {
     undoStack.push(lastJson); if (undoStack.length > 30) undoStack.shift(); lastPushAt = Date.now();
   }
   lastJson = json;
   try { localStorage.setItem(STORE_KEY, json); } catch (e) { toast("브라우저 저장 실패: " + e.message); }
 }
 function undo() {
+  if (noteFlush) noteFlush();
   if (!undoStack.length) { toast("되돌릴 변경이 없어"); return; }
-  const ui = S.ui, prev = JSON.parse(undoStack.pop());
+  const ui = S.ui, savedAt = S.fileSavedAt, prev = JSON.parse(undoStack.pop());
   S = normalize(prev); S.ui = Object.assign(S.ui, { tab: ui.tab, pid: ui.pid });   // 보던 화면은 그대로
-  lastJson = snapshot(); lastPushAt = 0;
-  try { localStorage.setItem(STORE_KEY, lastJson); } catch (e) {}
-  dirty = true; closeModal(); render(); toast(`되돌림 (남은 ${undoStack.length}단계)`);
+  S.fileSavedAt = savedAt;
+  suppressUndo = true; persist(); suppressUndo = false;   // 새 변경으로 저장 → 파일보다 최신, 자동 파일 저장도 예약
+  lastPushAt = 0; lastCount = itemCount();
+  closeModal(); render(); toast(`되돌림 (남은 ${undoStack.length}단계)`);
 }
 function persist() {
   S.updatedAt = new Date().toISOString();
@@ -734,9 +743,29 @@ function commit() { persist(); render(); }
 // ───────────── file save / load ─────────────
 function buildHtml() {
   const copy = Object.assign({}, S); delete copy._embeddedOlder;
+  copy.fileSavedAt = new Date().toISOString();
   const json = JSON.stringify(copy).replace(/</g, "\\u003c");
   return PRISTINE.replace(EMBED_RE, () => "var EMBEDDED_DATA = " + json + "; /*EMBEDDED_DATA" + "_PLACEHOLDER*/");
 }
+// 저장 위치(FileSystemFileHandle)를 IndexedDB에 기억 — 새로 열어도 [저장]이 같은 파일에 쓴다
+function idb(mode, fn) {
+  return new Promise((res) => {
+    try {
+      const rq = indexedDB.open("planner-desk", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("kv");
+      rq.onsuccess = () => { const tx = rq.result.transaction("kv", mode); const r = fn(tx.objectStore("kv")); tx.oncomplete = () => res(r && r.result); tx.onerror = () => res(null); };
+      rq.onerror = () => res(null);
+    } catch (e) { res(null); }
+  });
+}
+const HANDLE_KEY = "fileHandle:" + STORE_KEY;
+function rememberHandle(h) { if (h) idb("readwrite", (st) => st.put(h, HANDLE_KEY)); }
+async function restoreHandle() {
+  if (!window.showSaveFilePicker) return;
+  const h = await idb("readonly", (st) => st.get(HANDLE_KEY));
+  if (h && h.kind === "file") { savedHandle = h; updateSaveInd(); }
+}
+let savedHandle = null;
 // 파일로 저장한 시각 (브라우저 데이터만 있는 기간을 알리기 위해)
 function markFileSaved() { S.fileSavedAt = new Date().toISOString(); writeLocal(); render(); }
 async function writeToHandle(silent) {
@@ -749,9 +778,14 @@ async function writeToHandle(silent) {
   } catch (e) { fileHandle = null; updateSaveInd(); toast("파일 쓰기 실패 — 다시 저장 위치를 지정해줘"); return false; }
 }
 async function saveFile(pick) {
+  // 지난번 저장 위치가 기억돼 있으면 권한만 다시 받아 같은 파일에
+  if (!pick && !fileHandle && savedHandle) {
+    try { if ((await savedHandle.requestPermission({ mode: "readwrite" })) === "granted") fileHandle = savedHandle; } catch (e) {}
+  }
   if (window.showSaveFilePicker && (pick || !fileHandle)) {
     try {
-      fileHandle = await window.showSaveFilePicker({ suggestedName: `planner-desk_${stamp()}.html`, types: [{ description: "HTML", accept: { "text/html": [".html"] } }] });
+      fileHandle = await window.showSaveFilePicker({ suggestedName: savedHandle?.name || `planner-desk_${stamp()}.html`, types: [{ description: "HTML", accept: { "text/html": [".html"] } }] });
+      savedHandle = fileHandle; rememberHandle(fileHandle);
     } catch (e) { if (e.name === "AbortError") return; fileHandle = null; }
   }
   if (fileHandle && (await writeToHandle(false))) return;
@@ -762,6 +796,7 @@ async function saveFile(pick) {
 function updateSaveInd() {
   const el = $("saveInd"); if (!el) return;
   const t = lastFileSave ? lastFileSave.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : null;
+  if (!fileHandle && savedHandle) { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = `${savedHandle.name} · [저장]으로 이어서 저장`; return; }
   if (fileHandle) { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = `${fileHandle.name} · ${dirty ? "저장 대기…" : "자동저장 " + t}`; }
   else { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = dirty ? "브라우저에 저장됨 · 파일 미저장" : t ? `파일 저장 ${t}` : "브라우저에 자동 저장 중"; }
 }
@@ -3238,7 +3273,8 @@ document.addEventListener("keydown", (e) => {
 });
 window.addEventListener("beforeunload", (e) => { if (fileHandle && dirty) { e.preventDefault(); e.returnValue = ""; } });
 load();
-lastJson = snapshot();
+lastJson = snapshot(); lastCount = itemCount();
+restoreHandle();
 render();
 </script>
 </body>

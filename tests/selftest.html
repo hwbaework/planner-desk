@@ -542,6 +542,23 @@ function tests(w, errors) {
     S().ui.tab = "timeline"; S().ui.tlZoom = "month"; w.render();
     assert([...w.document.querySelectorAll(".tl-r.grp .tl-ms")].some((e) => (e.getAttribute("title") || "").includes("중간점검 보고")), "타임라인 마름모 없음");
   });
+  check("되돌리기 후에도 최신 변경으로 저장, 저장 시각 유지, 삭제는 별도 단계 (6차 1·2·5번)", () => {
+    S().fileSavedAt = "2026-10-15T00:00:00.000Z"; w.persist();
+    w.eval("lastPushAt = 0");
+    const tk = S().tasks.find((x) => x.projectId === pid() && x.status !== "완료");
+    const prevStatus = tk.status;
+    w.setTask(tk.id, "status", "대기");
+    S().tasks = S().tasks.filter((x) => x.id !== tk.id); w.commit();   // 1초 안에 삭제
+    const before = S().updatedAt;
+    w.undo();
+    const back = S().tasks.find((x) => x.id === tk.id);
+    assert(back && back.status === "대기", "삭제만 되돌려야 함: " + (back && back.status));
+    assert(S().updatedAt > before, "되돌린 뒤 updatedAt이 과거로 감");
+    assert(S().fileSavedAt === "2026-10-15T00:00:00.000Z", "파일 저장 시각이 되돌아감");
+    w.undo(); assert(S().tasks.find((x) => x.id === tk.id).status === prevStatus, "상태 변경 되돌리기 실패");
+    const m = w.buildHtml().match(/var EMBEDDED_DATA = ([\s\S]+?); \/\*EMBEDDED_DATA_PLACEHOLDER\*\//);
+    assert(JSON.parse(m[1]).fileSavedAt, "저장 파일에 저장 시각 없음");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
