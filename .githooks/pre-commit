@@ -1,0 +1,7 @@
+#!/bin/sh
+# 스크립트 문법 오류·이모지가 있으면 커밋을 막는다.
+# 사용: git config core.hooksPath .githooks
+node "$(git rev-parse --show-toplevel)/tools/check.js" || {
+  echo "커밋 중단: node tools/check.js 결과를 확인해줘."
+  exit 1
+}

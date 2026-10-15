@@ -76,6 +76,14 @@ schtasks /Create /SC MINUTE /MO 30 /TN "PlannerDesk 메일 동기화" /TR "\"C:\
 npx --yes http-server@14.1.1 -p 5178 -c-1
 ```
 
+## 커밋 전 검사
+
+`node tools/check.js`가 `index.html`과 `tests/selftest.html`의 스크립트 문법 오류와 이모지를 확인한다. 저장소를 받은 뒤 한 번 아래를 실행하면 커밋할 때마다 자동으로 돈다.
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## 커밋하지 않는 것
 
 데이터가 든 저장본(`planner-desk_*.html`), 메일 설정과 수신 파일(`mail_config.json`, `.mail_state.json`, `mail_inbox.json`), CSV·주간보고 내보내기는 `.gitignore`로 제외한다.
