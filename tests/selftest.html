@@ -579,7 +579,7 @@ function tests(w, errors) {
     const shown = [], keep = w.Notification;
     w.Notification = function (title, opt) { shown.push({ title, body: opt.body }); this.close = () => {}; };
     w.Notification.permission = "granted"; w.Notification.requestPermission = () => Promise.resolve("granted");
-    S().settings.desktopNotify = "on"; S().ui.notified = null;
+    S().settings.desktopNotify = "on"; w.localStorage.removeItem("planner-desk-selftest:notified");
     S().tasks.push({ id: "t_nt", projectId: pid(), title: "알림 점검 업무", status: "진행중", priority: "mid", start: t, due: w.addDays(t, -3) });
     const first = w.checkNotify();
     const second = w.checkNotify();
@@ -596,6 +596,27 @@ function tests(w, errors) {
     const acts = w.noteActions(n.content);
     assert(acts.length === 1 && acts[0].owner === "기획", JSON.stringify(acts));
     w.closeModal();
+  });
+  check("CSV 다시 가져오기: 없는 열·빈 칸은 기존 값 유지, Jira 날짜·Parent 숫자 처리 (7차 1·2번)", () => {
+    const t1 = S().tasks.find((x) => x.extKey === "KAN-1");
+    t1.owner = "본인"; t1.due = "2026-10-30"; t1.epic = "RE100 교육";
+    w.importTaskCsv("Summary,Issue key,Status\nRE100 교육 1차,KAN-1,In Progress\n");
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "가져오기").click();
+    assert(t1.owner === "본인" && t1.due === "2026-10-30" && t1.epic === "RE100 교육" && t1.status === "진행중", JSON.stringify(t1));
+    assert(w.normDate("15/Oct/26 3:20 PM") === "2026-10-15" && w.normDate("20/Oct/26") === "2026-10-20", "Jira 날짜");
+    const r = w.csvToTasks("Summary,Parent,Parent summary\nA,10000,통합관제\nB,10001,\n");
+    assert(r.items[0].epic === "통합관제" && r.items[1].epic === "", JSON.stringify(r.items));
+  });
+  check("엑셀 CSV(CP949)도 한글이 안 깨짐 (7차 4번)", () => {
+    const bytes = new Uint8Array([0xbf, 0xe4, 0xbe, 0xe0, 0x2c, 0xbb, 0xf3, 0xc5, 0xc2, 0x0a, 0xc5, 0xd7, 0xbd, 0xba, 0xc6, 0xae, 0x2c, 0xbf, 0xcf, 0xb7, 0xe1]);   // "요약,상태\n테스트,완료" (EUC-KR)
+    const txt = w.decodeText(bytes.buffer);
+    assert(txt.startsWith("요약,상태") && txt.includes("테스트"), txt);
+  });
+  check("30분 자동 갱신은 입력 중이면 건너뜀 (7차 3번)", () => {
+    S().ui.pid = pid(); S().ui.tab = "mail"; w.render();
+    w.document.getElementById("mailPaste").value = "붙여넣는 중인 메일";
+    w.eval("lastTick = { date: '1999-01-01', n: -1 }"); w.tick();
+    assert(w.document.getElementById("mailPaste").value === "붙여넣는 중인 메일", "입력 중 내용이 날아감");
   });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;

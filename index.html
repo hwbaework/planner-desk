@@ -1329,20 +1329,22 @@ function enableNotify() {
   if (!("Notification" in window)) { toast("이 브라우저는 바탕화면 알림을 지원하지 않아"); return; }
   Notification.requestPermission().then((p) => { toast(p === "granted" ? "바탕화면 알림 켜짐" : "알림 권한이 거부됐어 — 브라우저 사이트 설정에서 허용해줘"); if (p === "granted") checkNotify(true); });
 }
+function notifiedLog() { try { return JSON.parse(localStorage.getItem(STORE_KEY + ":notified")) || { date: "", keys: [] }; } catch (e) { return { date: "", keys: [] }; } }
 function pendingNotifications() {
-  const t = today(), sent = S.ui.notified && S.ui.notified.date === t ? S.ui.notified.keys : [];
+  const t = today(), nf = notifiedLog(), sent = nf.date === t ? nf.keys : [];
   return computeAlerts(null).filter((a) => NOTIFY_KINDS.includes(a.kind) && !sent.includes(a.kind + ":" + a.ref[1]));
 }
 function checkNotify(force) {
   if (S.settings.desktopNotify !== "on" || !("Notification" in window) || Notification.permission !== "granted") return [];
   const list = pendingNotifications(); if (!list.length) return [];
   const t = today();
-  if (!S.ui.notified || S.ui.notified.date !== t) S.ui.notified = { date: t, keys: [] };
-  S.ui.notified.keys.push(...list.map((a) => a.kind + ":" + a.ref[1])); persistUI();
+  const nf = notifiedLog(); if (nf.date !== t) { nf.date = t; nf.keys = []; }
+  nf.keys.push(...list.map((a) => a.kind + ":" + a.ref[1]));
+  try { localStorage.setItem(STORE_KEY + ":notified", JSON.stringify(nf)); } catch (e) {}
   const head = list.slice(0, 3).map((a) => `${a.kind}: ${a.title}`).join("\n");
   try {
     const n = new Notification(`Planner Desk · 확인 필요 ${list.length}건`, { body: head + (list.length > 3 ? `\n외 ${list.length - 3}건` : ""), tag: "planner-desk" });
-    n.onclick = () => { window.focus(); S.ui.tab = "dash"; render(); n.close(); };
+    n.onclick = () => { window.focus(); S.ui.tab = "dash"; persistUI(); render(); n.close(); };
   } catch (e) {}
   return list;
 }
@@ -1803,22 +1805,31 @@ function csvToTasks(text) {
   const rows = parseCsv(text); if (rows.length < 2) return { items: [], cols: {} };
   const head = rows[0].map((h) => h.trim()), cols = {};
   Object.entries(CSV_COLS).forEach(([k, re]) => { const i = head.findIndex((h) => re.test(h)); if (i >= 0) cols[k] = i; });
+  const pe = [/^(parent summary|상위 요약)$/i, /^(epic link summary|epic name)$/i, /^(에픽|분류)$/i].map((re) => head.findIndex((h) => re.test(h))).find((i) => i >= 0);
+  if (pe !== undefined) cols.epic = pe;
   const st = (v) => { v = String(v || "").toLowerCase(); return /done|완료|closed|resolved/.test(v) ? "완료" : /progress|진행/.test(v) ? "진행중" : /review|검토|대기|blocked|hold/.test(v) ? "대기" : "예정"; };
   const pr = (v) => /highest|high|높|긴급|critical/i.test(v || "") ? "high" : /low|낮/i.test(v || "") ? "low" : "mid";
   const items = rows.slice(1).map((r) => {
     const g = (k) => (cols[k] !== undefined ? String(r[cols[k]] || "").trim() : "");
-    return { title: g("title"), key: g("key"), status: st(g("status")), owner: g("owner"), due: normDate(g("due")), start: normDate(g("start")), epic: g("epic"), priority: pr(g("priority")), memo: g("memo").slice(0, 2000) };
+    return { title: g("title"), key: g("key"), status: st(g("status")), owner: g("owner"), due: normDate(g("due")), start: normDate(g("start")), epic: /^\d+$/.test(g("epic")) ? "" : g("epic"), priority: pr(g("priority")), memo: g("memo").slice(0, 2000) };
   }).filter((x) => x.title);
   return { items, cols };
+}
+// UTF-8로 읽어 깨지면(엑셀 '쉼표로 분리' CSV = CP949) EUC-KR로 다시 읽는다
+function decodeText(buf) {
+  const u = new TextDecoder("utf-8").decode(buf);
+  if ((u.match(/\ufffd/g) || []).length > 2) { try { return new TextDecoder("euc-kr").decode(buf); } catch (e) {} }
+  return u;
 }
 function pickTaskCsv() {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".csv,text/csv";
-  inp.onchange = () => inp.files[0] && inp.files[0].text().then(importTaskCsv);
+  inp.onchange = () => inp.files[0] && inp.files[0].arrayBuffer().then((buf) => importTaskCsv(decodeText(buf)));
   inp.click();
 }
 function importTaskCsv(text) {
   const { items, cols } = csvToTasks(text);
+  const has = (k) => cols[k] !== undefined;
   if (!items.length) { toast("업무를 못 찾았어 — 첫 줄에 Summary/요약 같은 열 이름이 있어야 해"); return; }
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
   const found = Object.keys(cols).map((k) => ({ title: "제목", key: "키", status: "상태", owner: "담당", due: "기한", start: "시작", epic: "분류(에픽)", priority: "우선순위", memo: "설명" }[k])).join(" · ");
@@ -1834,7 +1845,11 @@ function importTaskCsv(text) {
       items.forEach((x) => {
         const ex = x.key && S.tasks.find((t) => t.extKey === x.key);
         const v = { title: x.title, status: x.status, owner: x.owner, due: x.due, epic: x.epic, priority: x.priority, updatedAt: new Date().toISOString() };
-        if (ex) { const prev = ex.status; Object.assign(ex, v); markDone(ex, prev); up++; }
+        if (ex) {
+          const prev = ex.status, upd = { title: x.title, updatedAt: v.updatedAt };
+          ["status", "owner", "due", "epic", "priority"].forEach((k) => { if (has(k) && x[k]) upd[k] = x[k]; });   // 없는 열·빈 칸은 기존 값 유지
+          Object.assign(ex, upd); markDone(ex, prev); up++;
+        }
         else { const n = Object.assign({ id: uid("t"), projectId: target, start: x.start || today(), memo: x.memo, extKey: x.key }, v); markDone(n, ""); S.tasks.push(n); add++; }
       });
       commit(); closeModal(); toast(`가져오기: 새로 ${add} · 갱신 ${up}`, true);
@@ -2554,6 +2569,8 @@ function normDate(s) {
   if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
   m = String(s).match(/^(\d{1,2})[./-](\d{1,2})$/);
   if (m) return `${new Date().getFullYear()}-${pad(m[1])}-${pad(m[2])}`;
+  m = String(s).match(/(\d{1,2})[\/\- ](jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\/\- ](\d{2,4})/i);   // Jira: 15/Oct/26
+  if (m) { const mo = "janfebmaraprmayjunjulaugsepoctnovdec".indexOf(m[2].toLowerCase()) / 3 + 1; const y = m[3].length === 2 ? "20" + m[3] : m[3]; return `${y}-${pad(mo)}-${pad(m[1])}`; }
   return "";
 }
 function exportWbsCsv() {
@@ -3387,7 +3404,16 @@ load();
 lastJson = snapshot(); lastCount = itemCount();
 restoreHandle();
 setTimeout(() => checkNotify(), 3000);
-setInterval(() => { render(); checkNotify(); }, 30 * 60 * 1000);   // 열어 둔 채로 날짜·경고가 바뀌어도 갱신
+let lastTick = { date: today(), n: computeAlerts(null).length };
+function tick() {
+  checkNotify();
+  const a = document.activeElement, typing = a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
+  const pendingPaste = $("mailPaste") && $("mailPaste").value.trim();
+  if (document.hidden || typing || pendingPaste || $("modalBg").classList.contains("open")) return;
+  const now = { date: today(), n: computeAlerts(null).length };
+  if (now.date !== lastTick.date || now.n !== lastTick.n) { lastTick = now; render(); }
+}
+setInterval(tick, 30 * 60 * 1000);   // 열어 둔 채로 날짜·경고가 바뀌면 갱신 (입력 중엔 건너뜀)
 render();
 </script>
 </body>
