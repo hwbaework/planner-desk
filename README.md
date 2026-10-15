@@ -38,3 +38,23 @@ npx --yes http-server@14.1.1 -p 5178 -c-1
 ```
 
 데이터 구조: `index.html` 안의 `emptyState()` 참고. 저장 파일은 `var EMBEDDED_DATA = {...}` 한 줄만 바뀐다.
+
+## 하이웍스 메일 연동 (POP3S, 읽기 전용)
+
+하이웍스는 IMAP 대신 POP3S(`pop3s.hiworks.com:995`)를 제공한다. 메일을 지우지 않고 읽기만 한다.
+
+1. 하이웍스 웹메일 → 환경설정 → POP3/SMTP 사용을 켠다 (관리자가 막았다면 IT팀에 문의).
+2. `tools/sync_mail.bat`을 한 번 실행하면 `tools/mail_config.json`이 생긴다. `user`에 메일 주소를 넣는다.
+   - 비밀번호는 환경변수 `HIWORKS_PASSWORD`에 넣는 것을 추천한다 (`setx HIWORKS_PASSWORD "..."`). 비워두면 실행할 때 물어본다.
+   - `dev_senders`에 개발자 메일 주소를 넣으면 코드가 없는 메일도 가져온다.
+3. 연결 확인: `tools\sync_mail.bat --test`
+4. 동기화: `tools\sync_mail.bat` → 저장소 루트에 `mail_inbox.json` 생성
+5. Planner Desk → 메일 수신 → **동기화 파일 불러오기** → 자동 매칭 확인 → 반영
+
+주기 실행 (30분마다):
+
+```bash
+schtasks /Create /SC MINUTE /MO 30 /TN "PlannerDesk 메일 동기화" /TR "\"C:\Users\RMS\Desktop\java\planner-desk\tools\sync_mail.bat\" --quiet"
+```
+
+`mail_config.json`, `.mail_state.json`, `mail_inbox.json`은 `.gitignore`로 커밋하지 않는다.

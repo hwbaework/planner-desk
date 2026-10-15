@@ -497,6 +497,7 @@ function importFile(ev) {
       m = txt.match(/var EMBEDDED_BACKUP_DATA = ([\s\S]+?); \/\*EMBEDDED_BACKUP_PLACEHOLDER\*\//);
       if (m && m[1].trim() !== "null") { importLegacy(JSON.parse(m[1])); return; }
       const d = JSON.parse(txt);
+      if (Array.isArray(d.mails) && !d.projects) { importMailJson(d); return; }
       if (d.tasks && !d.handoffs) { importLegacy(d); return; }
       if (!confirm("JSON 데이터를 불러올까? 현재 데이터는 덮어씌워져.")) return;
       S = normalize(d); commit(); toast("불러오기 완료");
@@ -1176,7 +1177,10 @@ function renderMail() {
       <div class="drop" id="dropZone">.eml 파일을 여기로 끌어다 놓기 (여러 개 가능) · 또는 <a href="#" onclick="document.getElementById('emlFile').click();return false">파일 선택</a></div>
       <input type="file" id="emlFile" accept=".eml,.txt" multiple style="display:none" onchange="readEmlFiles(this.files);this.value=''">
     </div></div>
-    <div class="card"><div class="card-h"><h3>반영 대기</h3><span class="sub">${pending.length}통 · 확인 후 [반영]</span></div><div class="card-b">` +
+    <div class="card"><div class="card-h"><h3>하이웍스 동기화</h3><span class="sub">${S.ui.mailSyncAt ? "마지막 불러오기 " + esc(S.ui.mailSyncAt) : "tools/sync_mail.bat 실행 → mail_inbox.json"}</span>
+      <div class="actions"><button class="btn sm primary" onclick="pickMailJson()">동기화 파일 불러오기</button></div></div></div>
+    <div class="card"><div class="card-h"><h3>반영 대기</h3><span class="sub">${pending.length}통 · 확인 후 [반영]</span>
+      ${pending.some((m) => m.hoId) ? `<div class="actions"><button class="btn sm" onclick="applyAllMatched()">자동 매칭 ${pending.filter((m) => m.hoId).length}통 모두 반영</button></div>` : ""}</div><div class="card-b">` +
       (pending.map((m) => `<div class="mailcand">
         <div class="subj">${esc(m.subject || "(제목 없음)")}</div>
         <div class="from">${esc(m.from || "")} · ${esc(m.date || "")}${m.why ? ` · <span style="color:var(--ok)">자동 매칭: ${esc(m.why)}</span>` : ` · <span style="color:var(--warn)">매칭 못함 — 직접 선택</span>`}</div>
@@ -1196,11 +1200,11 @@ function renderMail() {
     `</div>
     <div class="note-box" style="margin-top:14px"><b>자동 연동 로드맵</b> (메일 시스템 알려주면 맞춰서 붙일게)
       <ol>
-        <li><b>지금</b>: 붙여넣기 / .eml 끌어다 놓기 → 자동 매칭 → 반영</li>
-        <li><b>Outlook(회사 Exchange/M365)</b>: Microsoft Graph API 또는 Outlook 규칙으로 [HO-] 제목 메일을 폴더에 모으고, 작은 스크립트가 JSON으로 내보내면 여기서 한 번에 불러오기</li>
-        <li><b>IMAP 지원 메일(Gmail·네이버웍스·하이웍스 등)</b>: Python/Node 스크립트가 주기적으로 IMAP 조회 → JSON 생성 → 이 화면에서 가져오기</li>
+        <li><b>하이웍스 자동 수집</b>: <span class="mono">tools/sync_mail.bat</span> 실행(또는 작업 스케줄러로 30분마다) → POP3S로 [코드] 메일·개발자 메일만 읽어 <span class="mono">mail_inbox.json</span> 생성 (메일 삭제 안 함)</li>
+        <li><b>여기서</b>: [동기화 파일 불러오기] → 자동 매칭 → 확인 후 반영 (이미 불러온 메일은 건너뜀)</li>
+        <li><b>수동</b>: 붙여넣기 / .eml 끌어다 놓기</li>
       </ol>
-      브라우저에서 메일 사이트를 직접 크롤링하는 건 로그인·보안 정책 때문에 깨지기 쉬워서, 2·3번(공식 API/IMAP)을 추천해.</div>
+      처음 한 번: <span class="mono">tools/mail_config.json</span>에 메일 주소 입력, 하이웍스 환경설정에서 POP3 사용 켜기.</div>
     </div></div>`;
   return h;
 }
@@ -1234,10 +1238,49 @@ function applyMail(mid) {
   const hid = $("mh_" + mid).value, type = $("mt_" + mid).value, at = $("md_" + mid).value || today();
   if (!hid) { toast("연결할 전달 건을 골라줘"); return; }
   const h = S.handoffs.find((x) => x.id === hid);
-  const body = (m.body || "").trim().split(/\n/).filter((l) => l.trim()).slice(0, 6).join("\n");
-  pushEvent(h, { type, at, via: "mail", mailId: m.id, text: `${m.subject}\n${(m.from || "").replace(/<.*>/, "").trim()}: ${body}`.slice(0, 600) });
+  pushEvent(h, { type, at, via: "mail", mailId: m.id, text: mailEventText(m) });
   Object.assign(m, { state: "applied", hoId: hid, type, date: at });
   commit(); toast(`[${h.code}] ${evLabel(type)} 반영`);
+}
+function mailEventText(m) {
+  const body = (m.body || "").trim().split(/\n/).filter((l) => l.trim()).slice(0, 6).join("\n");
+  return `${m.subject}\n${(m.from || "").replace(/<.*>/, "").trim()}: ${body}`.slice(0, 600);
+}
+let mailFileHandle = null;
+async function pickMailJson() {
+  if (window.showOpenFilePicker) {
+    try {
+      if (!mailFileHandle) [mailFileHandle] = await window.showOpenFilePicker({ types: [{ description: "mail_inbox.json", accept: { "application/json": [".json"] } }] });
+      importMailJson(JSON.parse(await (await mailFileHandle.getFile()).text()));
+      return;
+    } catch (e) { if (e.name === "AbortError") return; mailFileHandle = null; }
+  }
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json";
+  inp.onchange = () => inp.files[0].text().then((t) => importMailJson(JSON.parse(t)));
+  inp.click();
+}
+// tools/hiworks_mail_sync.py 가 만든 mail_inbox.json → 반영 대기에 추가 (messageId로 중복 제외)
+function importMailJson(d) {
+  const known = new Set(S.mails.map((m) => m.messageId).filter(Boolean));
+  let n = 0;
+  (d.mails || []).forEach((m) => {
+    if (m.messageId && known.has(m.messageId)) return;
+    queueMail({ messageId: m.messageId || "", from: m.from || "", subject: m.subject || "", date: m.date || today(), body: m.body || "" });
+    known.add(m.messageId); n++;
+  });
+  S.ui.mailSyncAt = new Date().toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  S.ui.tab = "mail"; commit();
+  toast(n ? `새 메일 ${n}통 — 매칭 확인 후 반영해줘` : "새 메일 없음");
+}
+function applyAllMatched() {
+  const list = S.mails.filter((m) => m.state === "pending" && m.hoId);
+  list.forEach((m) => {
+    const h = S.handoffs.find((x) => x.id === m.hoId); if (!h) return;
+    const type = $("mt_" + m.id)?.value || m.type, at = $("md_" + m.id)?.value || m.date || today();
+    pushEvent(h, { type, at, via: "mail", mailId: m.id, text: mailEventText(m) });
+    Object.assign(m, { state: "applied", type, date: at });
+  });
+  commit(); toast(`${list.length}통 반영`);
 }
 function dropMail(mid) { const m = S.mails.find((x) => x.id === mid); m.state = "ignored"; commit(); }
 
