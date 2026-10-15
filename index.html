@@ -275,6 +275,14 @@
   .td-k.danger { color: var(--danger); } .td-k.warn { color: var(--warn); } .td-k.mine { color: var(--accent); }
   @media (max-width: 900px) { .td-grid { grid-template-columns: 1fr; } .td-col + .td-col { border-left: none; border-top: 1px solid var(--line); } }
 
+  .rg { display: grid; gap: 3px; }
+  .rg-row { display: grid; grid-template-columns: 36px repeat(3, 1fr); gap: 3px; align-items: center; }
+  .rg-l, .rg-x { font-size: 11px; color: var(--faint); text-align: center; }
+  .rg-c { height: 30px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+  .rg-c.h { background: var(--dangerw); color: var(--danger); }
+  .rg-c.m { background: var(--warnw); color: var(--warn); }
+  .rg-c.l { background: var(--sub); color: var(--dim); }
+
   /* Project tag */
   .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
   .ti + .tlabel { margin-left: 6px; }
@@ -533,7 +541,7 @@ const RESP_EV = ["ack", "question", "progress", "done"];   // 개발자 쪽에�
 const MINE_EV = ["sent", "answer", "nudge", "verified", "reject"];
 const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
 const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
-const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["reqs", "요구사항"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["reqs", "요구사항"], ["risks", "이슈·리스크"], ["screens", "화면 목록"], ["wbs", "WBS"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
 const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e8a9a", "#b5487a", "#5b6474"];
 const TASK_ST = ["진행중", "대기", "예정", "완료"];
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "예정": "gray", "완료": "green" };
@@ -545,6 +553,10 @@ const DATA_METHOD = ["API", "파일(엑셀/CSV)", "DB 연계", "RTU/계측기", 
 const DATA_CYCLE = ["실시간", "15분", "1시간", "일", "주", "월", "1회", "미정"];
 const DATA_LOG = ["회의", "메일", "전화", "공문", "수신", "기타"];
 const REQ_ST = ["접수", "검토중", "확정", "보류", "제외"];
+const RISK_TYPE = ["리스크", "이슈", "결정", "가정"];
+const RISK_ST = ["오픈", "대응중", "모니터링", "종료"];
+const LVL = [["H", "높음"], ["M", "보통"], ["L", "낮음"]];
+const LVL_N = { H: 3, M: 2, L: 1 };
 const REQ_CLS = { "접수": "gray", "검토중": "violet", "확정": "green", "보류": "amber", "제외": "muted" };
 const REQ_KIND = ["기능", "비기능", "데이터", "인터페이스", "보안", "기타"];
 const TC_RES = ["미수행", "Pass", "Fail", "Block"];
@@ -640,8 +652,8 @@ function emptyState() {
     settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1",
       mail: { provider: "hiworks", protocol: "pop3", host: "pop3s.hiworks.com", port: 995, user: "", folder: "INBOX", days: 14, devSenders: "", last: null } },
     ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "", tlZoom: "month", tlAnchor: "", tlHideDone: 1, tlMissing: 1, tlKinds: { wbs: 1, task: 1, ho: 1, data: 1, doc: 1 } },
-    seq: { ho: 0, tc: 0, req: 0 },
-    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], reqs: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
+    seq: { ho: 0, tc: 0, req: 0, risk: 0 },
+    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], reqs: [], risks: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
   };
 }
 function normalize(d) {
@@ -650,11 +662,11 @@ function normalize(d) {
   s.settings = Object.assign(emptyState().settings, d?.settings || {});
   s.settings.mail = Object.assign(emptyState().settings.mail, d?.settings?.mail || {});
   s.ui = Object.assign(emptyState().ui, d?.ui || {});
-  s.seq = Object.assign({ ho: 0, tc: 0, req: 0 }, d?.seq || {});
-  ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+  s.seq = Object.assign({ ho: 0, tc: 0, req: 0, risk: 0 }, d?.seq || {});
+  ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
   s.screens.forEach((x) => { x.history = x.history || []; if (x.hoId && x.lastSentVer === undefined) x.lastSentVer = x.version || ""; });
-  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
+  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
   s.ui.calKinds = Object.assign(emptyState().ui.calKinds, d?.ui?.calKinds || {});
   s.ui.tlKinds = Object.assign(emptyState().ui.tlKinds, d?.ui?.tlKinds || {});
   s.projects.forEach((p, i) => { if (!p.color) p.color = PROJ_COLORS[i % PROJ_COLORS.length]; });
@@ -681,7 +693,7 @@ function writeLocal() {
 }
 function persist() {
   S.updatedAt = new Date().toISOString();
-  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
+  ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
   writeLocal(); dirty = true; updateSaveInd();
   if (fileHandle) { clearTimeout(fileTimer); fileTimer = setTimeout(() => writeToHandle(true), 1500); }
 }
@@ -856,6 +868,11 @@ function computeAlerts(pid) {
     if (sc.hoId && sc.lastSentVer !== undefined && (sc.version || "") !== sc.lastSentVer)
       out.push({ level: "mine", kind: "화면 변경 후 미전달", ref: ["screen", sc.id], pid: sc.projectId, days: sc.revisedAt ? calDays(sc.revisedAt) : 0, title: `${sc.code} ${sc.name}`, desc: `개발엔 ${sc.lastSentVer || "-"} 전달 → 지금 ${sc.version}${sc.revisedAt ? ` (${shortD(sc.revisedAt)} 개정)` : ""} · 변경분 전달 필요` });
   });
+  S.risks.filter(scope).forEach((r) => {
+    if (r.status === "종료" || r.type === "결정" || r.type === "가정") return;
+    if (r.due && r.due < t) out.push({ level: "danger", kind: "이슈·리스크 기한 지남", ref: ["risk", r.id], pid: r.projectId, days: calDays(r.due), title: `${r.code} ${r.title}`, desc: `${r.type} · 대응 기한 ${shortD(r.due)} (${dday(r.due)}) · ${r.owner || "담당 미정"}` });
+    else if (riskScore(r) >= 6 && !(r.plan || "").trim()) out.push({ level: "warn", kind: "대응 방안 없음", ref: ["risk", r.id], pid: r.projectId, days: 0, title: `${r.code} ${r.title}`, desc: `${r.type} · 영향 ${r.impact} × 가능성 ${r.prob} · 대응 방안을 적어줘` });
+  });
   S.reqs.filter(scope).forEach((r) => {
     if (r.status === "확정" && !(r.screenIds || []).length && r.kind !== "비기능")
       out.push({ level: "mine", kind: "화면 미반영 요구사항", ref: ["req", r.id], pid: r.projectId, days: r.confirmedAt ? calDays(r.confirmedAt) : 0, title: `${r.code} ${r.title}`, desc: `확정${r.confirmedAt ? " " + shortD(r.confirmedAt) : ""} · 연결된 화면 없음 — 화면설계에 반영 필요` });
@@ -893,7 +910,7 @@ function render() {
     : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
   $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
   renderBanner(); renderSide(); renderTabs();
-  const v = { dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, reqs: renderReqs, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  const v = { dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderHO, docs: renderDocs, reqs: renderReqs, risks: renderRisks, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
   $("view").innerHTML = v();
   if (S.ui.tab === "mail") bindDrop();
   if (S.ui.tab === "notes") bindNoteEditor();
@@ -922,8 +939,8 @@ function renderSide() {
   }
   $("side").innerHTML = h + `<div id="sideNav" class="side-nav"></div>`;
 }
-const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "docs", "reqs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
-const NAV_ALERT = { reqs: ["req"], screens: ["screen"], tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
+const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline", "board"]], ["관리", ["tasks", "data", "ho", "risks", "docs", "reqs", "screens", "wbs", "tc"]], ["기록", ["mail", "notes"]]];
+const NAV_ALERT = { risks: ["risk"], reqs: ["req"], screens: ["screen"], tasks: ["task", "recur"], data: ["data"], ho: ["ho"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
 function renderTabs() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
   const alerts = computeAlerts(pid);
@@ -1061,11 +1078,11 @@ function statusOverview(pid) {
 // 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
 function todayCard(pid, alerts) {
   const t = today();
-  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "완료 노티 없음", "접수 노티 없음", "승인 회신 없음", "내 검수 대기", "결함 미전달", "재테스트 필요", "화면 변경 후 미전달"].includes(a.kind));
+  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "완료 노티 없음", "접수 노티 없음", "승인 회신 없음", "내 검수 대기", "결함 미전달", "재테스트 필요", "화면 변경 후 미전달", "이슈·리스크 기한 지남"].includes(a.kind));
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
-  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, req: `editReq('${id}')` }[type];
+  const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, req: `editReq('${id}')`, risk: `editRisk('${id}')` }[type];
     return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
@@ -1097,7 +1114,7 @@ function missingCard(pid) {
 }
 function alertRow(a) {
   const [type, id] = a.ref;
-  const open = { req: `editReq('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
+  const open = { risk: `editRisk('${id}')`, req: `editReq('${id}')`, screen: `S.ui.pid='${a.pid}';editScreen('${id}')`, tc: `editTC('${id}')`, data: `openData('${id}')`, ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')` }[type];
   let acts = "";
   if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
   if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
@@ -1230,6 +1247,7 @@ function gSearchItems(q) {
   S.handoffs.filter(live).forEach((x) => hit(x.code, x.title, x.to, x.memo) && add("개발 전달", hoKind(x), x, `[${x.code}] ${x.title}`, hoStLabel(x.status), () => openHO(x.id)));
   S.datas.filter(live).forEach((x) => hit(x.name, x.org, x.contact, x.memo, x.spec) && add("데이터 협의", "data", x, `${x.org ? x.org + " · " : ""}${x.name}`, x.status, () => openData(x.id)));
   S.docs.filter(live).forEach((x) => hit(x.name, x.owner, x.memo, x.path) && add("산출물", "doc", x, `${x.phase} ${x.name}`, `${x.status} ${x.version || ""}`, () => editDoc(x.id)));
+  S.risks.filter(live).forEach((x) => hit(x.code, x.title, x.desc, x.plan, x.owner) && add("이슈·리스크", x.type === "이슈" ? "bug" : "data", x, `${x.code} ${x.title}`, `${x.type} · ${x.status}`, () => editRisk(x.id)));
   S.reqs.filter(live).forEach((x) => hit(x.code, x.title, x.desc, x.source) && add("요구사항", "doc", x, `${x.code} ${x.title}`, x.status, () => { selProject(x.projectId); selTab("reqs"); editReq(x.id); }));
   S.screens.filter(live).forEach((x) => hit(x.code, x.name, x.menu, x.memo) && add("화면", "doc", x, `${x.code} ${x.name}`, x.status, () => { selProject(x.projectId); selTab("screens"); editScreen(x.id); }));
   S.tcs.filter(live).forEach((x) => hit(x.code, x.scenario, x.steps, x.expected) && add("테스트 케이스", x.result === "Fail" ? "bug" : "tc", x, `${x.code} ${x.scenario}`, x.result, inProj(x, () => editTC(x.id))));
@@ -2028,6 +2046,69 @@ function exportDocsCsv() {
   const rows = [["단계", "산출물", "상태", "버전", "담당", "계획일", "검토요청일", "승인자", "승인일", "경로", "메모"]];
   S.docs.filter((d) => d.projectId === pid).forEach((d) => rows.push([d.phase, d.name, d.status, d.version, d.owner, d.plan, d.requestedAt, d.approver, d.approvedAt, d.path, d.memo]));
   download(`산출물_${projName(pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+}
+
+// ───────────── 이슈 · 리스크 대장 (RAID: 리스크·이슈·결정·가정) ─────────────
+function riskScore(r) { return (LVL_N[r.impact] || 2) * (LVL_N[r.prob] || 2); }
+function riskLevel(r) { const n = riskScore(r); return n >= 6 ? ["높음", "red"] : n >= 3 ? ["보통", "amber"] : ["낮음", "gray"]; }
+function nextRiskCode() { S.seq.risk = (S.seq.risk || 0) + 1; return `RI-${String(S.seq.risk).padStart(3, "0")}`; }
+function renderRisks() {
+  const pid = S.ui.pid === "all" ? null : S.ui.pid, t = today();
+  const f = S.ui.riskFilter || "open", ty = S.ui.riskType || "";
+  let list = S.risks.filter(inScope);
+  const cnt = { open: list.filter((r) => r.status !== "종료").length, all: list.length };
+  RISK_TYPE.forEach((x) => (cnt[x] = list.filter((r) => r.type === x && r.status !== "종료").length));
+  list = list.filter((r) => (f === "all" ? true : r.status !== "종료")).filter((r) => !ty || r.type === ty);
+  list.sort((a, b) => (a.status === "종료") - (b.status === "종료") || riskScore(b) - riskScore(a) || (a.due || "9").localeCompare(b.due || "9"));
+  // 영향 × 가능성 격자
+  const grid = ["H", "M", "L"].map((im) => `<div class="rg-row"><span class="rg-l">${LVL.find((l) => l[0] === im)[1]}</span>` + ["L", "M", "H"].map((pr) => {
+    const n = S.risks.filter((r) => inScope(r) && r.status !== "종료" && (r.type === "리스크" || r.type === "이슈") && r.impact === im && r.prob === pr).length;
+    const sc = LVL_N[im] * LVL_N[pr];
+    return `<div class="rg-c ${sc >= 6 ? "h" : sc >= 3 ? "m" : "l"}">${n || ""}</div>`;
+  }).join("") + `</div>`).join("") + `<div class="rg-row"><span class="rg-l"></span><span class="rg-x">낮음</span><span class="rg-x">보통</span><span class="rg-x">높음</span></div>`;
+  let h = pageHead("이슈 · 리스크", `${pid ? esc(projName(pid)) + " · " : "전체 · "}리스크·이슈·결정·가정을 영향도와 대응 방안까지 한 곳에서`, `<button class="btn primary" onclick="editRisk()">+ 등록</button>`);
+  const chip = (k, l, n, onc) => `<button class="chip ${onc ? "active" : ""}" onclick="${k}">${l} ${n}</button>`;
+  h += `<div class="grid2" style="grid-template-columns:minmax(0,1fr) 260px;margin-bottom:12px"><div><div class="filters">
+      ${chip("S.ui.riskFilter='open';render()", "진행 중", cnt.open, f === "open")}${chip("S.ui.riskFilter='all';render()", "전체(종료 포함)", cnt.all, f === "all")}
+      <span class="small muted" style="margin-left:8px">유형</span>${chip("S.ui.riskType='';render()", "전체", "", !ty)}${RISK_TYPE.map((x) => chip(`S.ui.riskType='${x}';render()`, x, cnt[x], ty === x)).join("")}</div>
+      <div class="small muted">높음 = 영향 × 가능성 6 이상. 기한 지난 리스크·이슈와 높음인데 대응 방안이 없는 항목은 대시보드 '확인 필요'에 떠.</div></div>
+    <div class="card"><div class="card-b"><div class="small muted" style="margin-bottom:4px">영향(세로) × 가능성(가로) · 진행 중 리스크·이슈</div><div class="rg">${grid}</div></div></div></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>ID</th><th>유형</th><th>제목</th><th>등급</th><th>대응 방안</th><th>담당</th><th>기한</th><th>상태</th></tr></thead><tbody>` +
+    (list.map((r) => {
+      const [lv, lc] = riskLevel(r), late = r.status !== "종료" && r.due && r.due < t && (r.type === "리스크" || r.type === "이슈");
+      return `<tr style="${r.status === "종료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(r.projectId)}</td>`}
+        <td class="mono nowrap">${typeIcon(r.type === "이슈" ? "bug" : r.type === "결정" ? "task" : "data")} ${esc(r.code)}</td>
+        <td class="small nowrap">${esc(r.type)}</td>
+        <td><span class="link" onclick="editRisk('${r.id}')">${esc(r.title)}</span>${r.desc ? `<div class="small muted clamp1">${esc(r.desc)}</div>` : ""}</td>
+        <td class="nowrap">${r.type === "리스크" || r.type === "이슈" ? `${badge(lv, lc)} <span class="small muted">${r.impact}/${r.prob}</span>` : '<span class="muted">-</span>'}</td>
+        <td class="small">${r.plan ? `<span class="clamp1">${esc(r.plan)}</span>` : '<span class="muted">-</span>'}</td>
+        <td class="small nowrap">${esc(r.owner || "")}</td>
+        <td class="nowrap" style="${late ? "color:var(--danger);font-weight:700" : ""}">${r.due ? `${shortD(r.due)}${r.status !== "종료" ? ` <span class="small ${late ? "" : "muted"}">${dday(r.due)}</span>` : ""}` : '<span class="muted">-</span>'}</td>
+        <td><select class="inline" onchange="setRisk('${r.id}','status',this.value)">${RISK_ST.map((x) => `<option ${x === r.status ? "selected" : ""}>${x}</option>`).join("")}</select></td></tr>`;
+    }).join("") || `<tr><td colspan="9" class="empty">등록된 항목이 없어. 회의에서 나온 리스크·이슈·결정사항을 [+ 등록]으로 남겨.</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
+function setRisk(id, k, v) { const r = S.risks.find((x) => x.id === id); r[k] = v; if (k === "status" && v === "종료") r.closedAt = today(); commit(); }
+function editRisk(id, preset) {
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const r = id ? S.risks.find((x) => x.id === id) : Object.assign({ type: "리스크", status: "오픈", impact: "M", prob: "M", raisedAt: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
+  openForm(id ? `${r.type} · ${r.code}` : "이슈·리스크 등록", [
+    { k: "title", l: "제목", t: "text", full: true, req: true, ph: "예: 기관 데이터 제공 지연으로 상황실 화면 일정 지연 우려" },
+    { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
+    { k: "type", l: "유형", t: "select", opts: RISK_TYPE, hint: "리스크=생길 수 있는 문제, 이슈=이미 생긴 문제" },
+    { k: "impact", l: "영향도", t: "select", opts: LVL },
+    { k: "prob", l: "발생 가능성", t: "select", opts: LVL },
+    { k: "owner", l: "담당", t: "text" },
+    { k: "due", l: "대응 기한", t: "date" },
+    { k: "status", l: "상태", t: "select", opts: RISK_ST },
+    { k: "raisedAt", l: "등록일", t: "date" },
+    { k: "desc", l: "내용 / 원인", t: "textarea", full: true },
+    { k: "plan", l: "대응 방안 (결정은 결정 내용)", t: "textarea", full: true },
+  ], r, (v) => {
+    if (v.status === "종료" && r.status !== "종료") v.closedAt = today();
+    if (id) Object.assign(r, v); else S.risks.push(Object.assign({ id: uid("ri"), code: nextRiskCode() }, v));
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("삭제할까?")) { S.risks = S.risks.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
 }
 
 // ───────────── 요구사항 · 추적표 (요구사항 → 화면 → 테스트) ─────────────
@@ -2841,7 +2922,7 @@ function editProject(id) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => {
     if (!confirm(`「${p.name}」와 관련 데이터(업무·일정·산출물·전달·화면·WBS·메모)를 모두 삭제할까? 되돌릴 수 없어. (보관 처리를 추천)`)) return;
-    ["tasks", "events", "recurring", "datas", "tcs", "reqs", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
+    ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
     S.projects = S.projects.filter((x) => x.id !== id); commit(); closeModal();
   } }] : []);
 }
@@ -2916,9 +2997,13 @@ function buildReport(pids, wk) {
     }
     if (tcs.total) L.push(`  - 테스트: ${tcs.total}건 중 수행 ${tcs.total - tcs.todo} · Pass ${tcs.pass} · Fail ${tcs.fail} · Block ${tcs.block}`);
     // 2. 이슈
-    const al = computeAlerts(pid);
-    L.push(`2. 이슈 / 리스크: ${al.length ? al.length + "건" : "없음"}`);
-    al.slice(0, 10).forEach((a) => L.push(`  - [${a.kind}] ${a.title} — ${a.desc}`));
+    const al = computeAlerts(pid).filter((a) => a.ref[0] !== "risk");
+    const rk = S.risks.filter((r) => r.projectId === pid && r.status !== "종료" && (r.type === "리스크" || r.type === "이슈")).sort((a, b) => riskScore(b) - riskScore(a));
+    const decW = S.risks.filter((r) => r.projectId === pid && r.type === "결정" && inW(r.raisedAt));
+    L.push(`2. 이슈 / 리스크: 대장 ${rk.length}건 · 확인 필요 ${al.length}건`);
+    rk.slice(0, 8).forEach((r) => L.push(`  - [${r.type} ${r.impact}/${r.prob}] ${r.title}${r.plan ? " → " + r.plan.split("\n")[0].slice(0, 50) : ""}${r.owner ? " / " + r.owner : ""}${r.due ? " (~" + shortD(r.due) + ")" : ""}`));
+    decW.forEach((r) => L.push(`  - [결정] ${r.title}`));
+    al.slice(0, 8).forEach((a) => L.push(`  - [${a.kind}] ${a.title} — ${a.desc}`));
     // 3. 차주 계획
     L.push(`3. 차주 계획 (${shortD(addDays(t, 1))} ~ ${shortD(nx)})`);
     const plan = calItems(addDays(t, 1), nx, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);

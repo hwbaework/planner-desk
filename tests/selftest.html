@@ -442,6 +442,18 @@ function tests(w, errors) {
     w.render();
     assert(w.document.getElementById("view").innerHTML.includes("REQ-901"), "목록에 없음");
   });
+  check("이슈·리스크: 기한 지남·대응 방안 없음 경고, 주간보고 반영, 종료 시 해제", () => {
+    S().ui.pid = pid(); S().ui.tab = "risks";
+    S().risks.push({ id: "ri1", projectId: pid(), code: "RI-901", type: "리스크", title: "점검 리스크 데이터 지연", impact: "H", prob: "H", status: "오픈", due: "", plan: "" },
+                   { id: "ri2", projectId: pid(), code: "RI-902", type: "이슈", title: "점검 이슈 기한", impact: "M", prob: "L", status: "대응중", due: w.addDays(t, -2), plan: "재협의" });
+    const al = w.computeAlerts(pid());
+    assert(al.some((a) => a.ref[1] === "ri1" && a.kind === "대응 방안 없음"), "대응 방안 없음 경고 없음");
+    assert(al.some((a) => a.ref[1] === "ri2" && a.kind === "이슈·리스크 기한 지남"), "기한 지남 경고 없음");
+    w.render(); assert(w.document.querySelector(".rg-c.h"), "격자 없음");
+    assert(w.buildReport([pid()], 0).includes("점검 리스크 데이터 지연"), "주간보고에 없음");
+    w.setRisk("ri2", "status", "종료");
+    assert(!w.computeAlerts(pid()).some((a) => a.ref[1] === "ri2"), "종료 후에도 경고");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
