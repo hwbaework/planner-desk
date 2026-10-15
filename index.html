@@ -1,0 +1,1542 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planner Desk · 기획 데스크</title>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f5f6f8; --panel: #ffffff; --sub: #f1f3f6; --hover: #f7f9fc;
+    --line: #e3e6eb; --line2: #cdd2da;
+    --text: #1b2230; --dim: #5b6474; --faint: #8b93a1;
+    --accent: #2563eb; --accentw: #eaf1ff;
+    --danger: #d63a2f; --dangerw: #fdecea;
+    --warn: #a86400; --warnw: #fff4dc;
+    --ok: #18864b; --okw: #e5f5ec;
+    --violet: #6d4fd8; --violetw: #efeafe;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #111318; --panel: #191c22; --sub: #20242c; --hover: #1e222a;
+    --line: #2a2f39; --line2: #3a404c;
+    --text: #e6e8ec; --dim: #a2a8b4; --faint: #727986;
+    --accent: #6b9bff; --accentw: #1d2b4a;
+    --danger: #ff6b60; --dangerw: #3a1b19;
+    --warn: #f0b54a; --warnw: #352a12;
+    --ok: #4fd28a; --okw: #123122;
+    --violet: #a08bff; --violetw: #2a2346;
+    --shadow: none;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg); color: var(--text); font-size: 13.5px; line-height: 1.5;
+  }
+  a { color: var(--accent); }
+  button { font-family: inherit; }
+
+  /* ── Top bar ── */
+  .top {
+    display: flex; align-items: center; gap: 12px; padding: 10px 18px;
+    background: var(--panel); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; flex-wrap: wrap;
+  }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -.2px; }
+  .brand small { font-weight: 500; color: var(--faint); margin-left: 6px; font-size: 12px; }
+  .today { color: var(--dim); font-size: 12px; }
+  .top .spacer { flex: 1; }
+  .save-ind { font-size: 12px; color: var(--faint); }
+  .save-ind.dirty { color: var(--warn); }
+
+  .btn {
+    border: 1px solid var(--line2); background: var(--panel); color: var(--text);
+    padding: 6px 11px; border-radius: 6px; cursor: pointer; font-size: 12.5px; font-weight: 500; white-space: nowrap;
+  }
+  .btn:hover { background: var(--sub); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.07); }
+  .btn.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  .btn.sm { padding: 3px 8px; font-size: 12px; }
+  .btn.ghost { border-color: transparent; background: transparent; color: var(--dim); }
+  .btn.ghost:hover { background: var(--sub); color: var(--text); }
+
+  /* ── Shell ── */
+  .shell { display: grid; grid-template-columns: 232px 1fr; min-height: calc(100vh - 53px); }
+  .side { border-right: 1px solid var(--line); background: var(--panel); padding: 14px 10px; }
+  .side h3 { font-size: 11px; color: var(--faint); font-weight: 600; letter-spacing: .4px; margin: 4px 8px 8px; }
+  .proj {
+    display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 6px; cursor: pointer; color: var(--dim);
+  }
+  .proj:hover { background: var(--sub); color: var(--text); }
+  .proj.active { background: var(--accentw); color: var(--accent); font-weight: 600; }
+  .proj .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line2); flex: none; }
+  .cnt { font-size: 11px; padding: 0 6px; border-radius: 9px; background: var(--dangerw); color: var(--danger); font-weight: 700; }
+  .side .add { margin: 10px 8px 0; width: calc(100% - 16px); }
+  .side .archived { margin-top: 16px; }
+
+  main { padding: 16px 22px 60px; min-width: 0; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 16px; overflow-x: auto; }
+  .tab {
+    border: none; background: none; padding: 9px 14px; color: var(--dim); cursor: pointer; font-size: 13.5px; font-weight: 500;
+    border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--text); font-weight: 700; border-bottom-color: var(--accent); }
+  .tab .cnt { margin-left: 5px; }
+
+  .page-head { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .page-head h2 { font-size: 18px; letter-spacing: -.3px; }
+  .page-head .meta { color: var(--dim); font-size: 12.5px; }
+  .page-head .actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); }
+  .card + .card { margin-top: 14px; }
+  .card-h { display: flex; align-items: center; gap: 8px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .card-h h3 { font-size: 13.5px; }
+  .card-h .sub { color: var(--faint); font-size: 12px; }
+  .card-h .actions { margin-left: auto; display: flex; gap: 6px; }
+  .card-b { padding: 12px 14px; }
+  .empty { color: var(--faint); padding: 18px 14px; text-align: center; font-size: 12.5px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; cursor: pointer; box-shadow: var(--shadow); }
+  .kpi:hover { border-color: var(--line2); }
+  .kpi .l { font-size: 12px; color: var(--dim); }
+  .kpi .v { font-size: 24px; font-weight: 700; margin-top: 2px; letter-spacing: -.5px; }
+  .kpi .h { font-size: 11.5px; color: var(--faint); }
+  .kpi.danger .v { color: var(--danger); }
+  .kpi.warn .v { color: var(--warn); }
+  .kpi.ok .v { color: var(--ok); }
+
+  .grid2 { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 14px; }
+
+  /* Phase stepper */
+  .phases { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 6px; }
+  .ph { border-radius: 8px; padding: 9px 10px; color: #fff; position: relative; min-height: 76px; }
+  .ph .t { font-size: 11px; opacity: .85; font-weight: 600; }
+  .ph .n { font-size: 13px; font-weight: 700; }
+  .ph .p { font-size: 11.5px; margin-top: 6px; opacity: .95; }
+  .ph .bar { height: 4px; background: rgba(255,255,255,.3); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .ph .bar i { display: block; height: 100%; background: #fff; }
+  .ph.cur { outline: 3px solid var(--text); outline-offset: 1px; }
+  .ph.cur::after { content: "현재"; position: absolute; top: 7px; right: 8px; font-size: 10px; background: rgba(255,255,255,.25); padding: 0 5px; border-radius: 4px; }
+
+  /* Tables */
+  .tbl-wrap { overflow-x: auto; }
+  table.t { width: 100%; border-collapse: collapse; font-size: 12.8px; }
+  table.t th {
+    text-align: left; font-weight: 600; color: var(--dim); font-size: 11.5px; background: var(--sub);
+    padding: 7px 9px; border-bottom: 1px solid var(--line); white-space: nowrap; position: sticky; top: 0;
+  }
+  table.t td { padding: 7px 9px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  table.t tr:hover td { background: var(--hover); }
+  table.t tr:last-child td { border-bottom: none; }
+  table.t .link { cursor: pointer; font-weight: 600; }
+  table.t .link:hover { color: var(--accent); text-decoration: underline; }
+  td.nowrap, th.nowrap { white-space: nowrap; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .mono { font-family: Consolas, "D2Coding", monospace; font-size: 12px; }
+  .muted { color: var(--faint); }
+  .small { font-size: 11.5px; }
+
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+  .b-gray { background: var(--sub); color: var(--dim); }
+  .b-blue { background: var(--accentw); color: var(--accent); }
+  .b-violet { background: var(--violetw); color: var(--violet); }
+  .b-green { background: var(--okw); color: var(--ok); }
+  .b-amber { background: var(--warnw); color: var(--warn); }
+  .b-red { background: var(--dangerw); color: var(--danger); }
+  .b-muted { background: transparent; color: var(--faint); border: 1px dashed var(--line2); }
+  .chip-ref { display: inline-block; font-size: 11px; padding: 0 6px; border: 1px solid var(--line2); border-radius: 4px; color: var(--dim); margin: 2px 3px 0 0; }
+
+  select.inline {
+    width: auto; border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 5px; padding: 2px 4px; font-size: 12px; font-family: inherit;
+  }
+
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+  .chip { border: 1px solid var(--line2); background: var(--panel); color: var(--dim); border-radius: 14px; padding: 3px 11px; font-size: 12px; cursor: pointer; }
+  .chip.active { background: var(--text); border-color: var(--text); color: var(--panel); }
+  .search { border: 1px solid var(--line2); background: var(--panel); color: var(--text); border-radius: 6px; padding: 5px 9px; font-size: 12.5px; min-width: 200px; font-family: inherit; }
+
+  /* Alerts */
+  .alert { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  .alert:last-child { border-bottom: none; }
+  .alert .ic { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .alert.danger .ic { background: var(--danger); }
+  .alert.warn .ic { background: var(--warn); }
+  .alert.mine .ic { background: var(--accent); }
+  .alert .body { flex: 1; min-width: 0; }
+  .alert .k { font-size: 11.5px; font-weight: 700; }
+  .alert.danger .k { color: var(--danger); }
+  .alert.warn .k { color: var(--warn); }
+  .alert.mine .k { color: var(--accent); }
+  .alert .tt { font-weight: 600; cursor: pointer; }
+  .alert .tt:hover { color: var(--accent); }
+  .alert .d { color: var(--dim); font-size: 12px; }
+  .alert .acts { display: flex; gap: 4px; flex: none; }
+
+  /* Methodology matrix (산출물) */
+  .mx { display: grid; grid-template-columns: 210px 1fr; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+  .mx + .mx { margin-top: 10px; }
+  .mx-ph { color: #fff; padding: 12px 14px; }
+  .mx-ph .id { font-size: 12px; font-weight: 600; opacity: .85; }
+  .mx-ph .nm { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+  .mx-ph ul { list-style: none; font-size: 12px; opacity: .95; }
+  .mx-ph li::before { content: "▪ "; opacity: .7; }
+  .mx-ph .prog { margin-top: 10px; font-size: 11.5px; }
+  .mx-body { min-width: 0; }
+  .mx-body .foot { padding: 6px 9px; border-top: 1px solid var(--line); }
+
+  /* Timeline */
+  .tl { list-style: none; position: relative; margin-left: 6px; }
+  .tl li { position: relative; padding: 0 0 12px 18px; border-left: 2px solid var(--line); }
+  .tl li:last-child { border-left-color: transparent; }
+  .tl li::before { content: ""; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--panel); border: 2px solid var(--line2); }
+  .tl li.resp::before { border-color: var(--ok); background: var(--okw); }
+  .tl li.mine::before { border-color: var(--accent); background: var(--accentw); }
+  .tl li.bad::before { border-color: var(--danger); background: var(--dangerw); }
+  .tl .h { font-size: 12px; color: var(--dim); }
+  .tl .h b { color: var(--text); }
+  .tl .x { white-space: pre-wrap; word-break: break-word; font-size: 12.8px; margin-top: 2px; }
+
+  /* Gantt */
+  .gantt { position: relative; height: 16px; background: var(--sub); border-radius: 4px; min-width: 220px; }
+  .gantt .bar { position: absolute; top: 3px; height: 10px; border-radius: 3px; opacity: .85; }
+  .gantt .bar i { display: block; height: 100%; background: rgba(0,0,0,.28); border-radius: 3px 0 0 3px; }
+  .gantt .todayline { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--danger); }
+  input.progress { width: 58px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; padding: 2px 4px; text-align: right; background: var(--panel); color: var(--text); font-family: inherit; font-size: 12px; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(15,20,30,.38); display: none; align-items: flex-start; justify-content: center; z-index: 100; padding: 40px 16px; overflow-y: auto; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--panel); border-radius: 12px; width: 100%; max-width: 640px; box-shadow: 0 20px 50px rgba(0,0,0,.25); }
+  .modal.wide { max-width: 900px; }
+  .modal-h { display: flex; align-items: center; padding: 14px 18px; border-bottom: 1px solid var(--line); gap: 8px; }
+  .modal-h h2 { font-size: 15.5px; flex: 1; }
+  .modal-b { padding: 16px 18px; max-height: calc(100vh - 200px); overflow-y: auto; }
+  .modal-f { display: flex; gap: 6px; justify-content: flex-end; padding: 12px 18px; border-top: 1px solid var(--line); }
+  .modal-f .left { margin-right: auto; }
+
+  .form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .form .full { grid-column: 1 / -1; }
+  .form label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 4px; font-weight: 600; }
+  .form .hint { font-size: 11px; color: var(--faint); margin-top: 2px; font-weight: 400; }
+  input[type=text], input[type=date], input[type=number], input[type=email], select, textarea {
+    width: 100%; border: 1px solid var(--line2); background: var(--panel); color: var(--text);
+    border-radius: 6px; padding: 7px 9px; font-family: inherit; font-size: 13px;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accentw); border-color: var(--accent); }
+  textarea { min-height: 90px; resize: vertical; line-height: 1.55; }
+  select[multiple] { min-height: 110px; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .check input { width: auto; }
+
+  .info { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; font-size: 13px; }
+  .info .l { color: var(--dim); font-size: 12px; padding-top: 1px; }
+  .quick { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0 8px; }
+  .evform { display: grid; grid-template-columns: 140px 140px 1fr auto; gap: 6px; align-items: start; margin-bottom: 14px; }
+  .evform textarea { min-height: 38px; }
+  .sec-t { font-size: 12px; font-weight: 700; color: var(--dim); margin: 14px 0 8px; }
+
+  .banner { background: var(--warnw); color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 9px 14px; margin-bottom: 12px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .banner .btn { margin-left: auto; }
+  .note-box { background: var(--sub); border-radius: 8px; padding: 12px 14px; font-size: 12.5px; color: var(--dim); }
+  .note-box b { color: var(--text); }
+  .note-box ol, .note-box ul { margin: 6px 0 0 18px; }
+
+  .mailcand { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .mailcand .subj { font-weight: 700; }
+  .mailcand .from { font-size: 12px; color: var(--dim); }
+  .mailcand .snip { font-size: 12px; color: var(--dim); white-space: pre-wrap; max-height: 64px; overflow: hidden; margin: 6px 0; }
+  .mailcand .row { display: grid; grid-template-columns: 1fr 150px 140px auto auto; gap: 6px; align-items: center; }
+  .drop { border: 2px dashed var(--line2); border-radius: 8px; padding: 14px; text-align: center; color: var(--faint); font-size: 12.5px; margin-top: 8px; }
+  .drop.over { border-color: var(--accent); color: var(--accent); background: var(--accentw); }
+
+  .notes-wrap { display: grid; grid-template-columns: 280px 1fr; gap: 14px; }
+  .note-item { padding: 9px 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .note-item:hover { background: var(--hover); }
+  .note-item.active { background: var(--accentw); }
+  .note-item .t { font-weight: 600; font-size: 13px; }
+  .note-item .m { font-size: 11.5px; color: var(--faint); }
+  #noteContent { min-height: 52vh; font-size: 13.5px; }
+
+  #toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: #1b2230; color: #fff; padding: 9px 16px; border-radius: 8px; font-size: 13px; display: none; z-index: 200; box-shadow: 0 8px 24px rgba(0,0,0,.25); max-width: 90vw; }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { border-right: none; border-bottom: 1px solid var(--line); }
+    .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .grid2, .notes-wrap { grid-template-columns: 1fr; }
+    .phases { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .mx { grid-template-columns: 1fr; }
+    .form { grid-template-columns: 1fr; }
+    .evform, .mailcand .row { grid-template-columns: 1fr 1fr; }
+    main { padding: 14px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <div class="brand">Planner Desk <small>기획 · PMO 데스크</small></div>
+    <div class="today" id="todayLabel"></div>
+  </div>
+  <div class="spacer"></div>
+  <span class="save-ind" id="saveInd"></span>
+  <button class="btn primary" onclick="saveFile(false)" title="데이터를 내장한 HTML로 저장 (Ctrl+S). 저장 위치를 한 번 지정하면 이후 같은 파일에 자동 저장">💾 저장</button>
+  <button class="btn" onclick="saveFile(true)" title="새 파일로 저장 위치 지정">다른 이름으로</button>
+  <button class="btn" onclick="document.getElementById('importFile').click()" title="Planner Desk 백업 HTML/JSON, 또는 기존 사업관리 대시보드 백업 HTML 불러오기">불러오기</button>
+  <input type="file" id="importFile" accept=".html,.htm,.json,.txt" style="display:none" onchange="importFile(event)">
+  <button class="btn" onclick="openReport()">주간보고</button>
+  <button class="btn ghost" onclick="toggleTheme()" title="화이트/다크 전환" id="themeBtn">🌙</button>
+  <button class="btn ghost" onclick="openSettings()" title="설정">⚙</button>
+</header>
+
+<div class="shell">
+  <aside class="side" id="side"></aside>
+  <main>
+    <div id="bannerArea"></div>
+    <nav class="tabs" id="tabs"></nav>
+    <section id="view"></section>
+  </main>
+</div>
+
+<div class="modal-bg" id="modalBg" onmousedown="if(event.target===this) closeModal()">
+  <div class="modal" id="modal">
+    <div class="modal-h"><h2 id="modalTitle"></h2><button class="btn ghost" onclick="closeModal()">✕</button></div>
+    <div class="modal-b" id="modalBody"></div>
+    <div class="modal-f" id="modalFoot"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  Planner Desk — 단일 HTML. 데이터는 브라우저(localStorage)에 자동 저장되고,
+//  [저장]을 누르면 현재 데이터를 내장한 HTML 파일로 저장된다.
+// ─────────────────────────────────────────────────────────────
+var EMBEDDED_DATA = null; /*EMBEDDED_DATA_PLACEHOLDER*/
+const PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+const EMBED_RE = new RegExp("var EMBEDDED_DATA = [\\s\\S]*?/\\*EMBEDDED_DATA" + "_PLACEHOLDER\\*/");
+const STORE_KEY = "planner-desk-v1";
+
+// 수행방법론 > 추진 체계 (Phase / Activity / 산출물)
+const PHASES = [
+  { id: "P1", name: "Preparation", color: "#2f5d8a",
+    acts: ["프로젝트 계획수립"],
+    docs: ["착수보고서", "프로젝트 수행 계획서(WBS)"] },
+  { id: "P2", name: "Analysis", color: "#d9473f",
+    acts: ["현행 프로세스 분석", "현행 시스템 분석", "개발 요구 사항 수집"],
+    docs: ["As-Is 프로세스 분석서", "요구사항 정의서", "URS"] },
+  { id: "P3", name: "Design", color: "#d47414",
+    acts: ["아키텍처 설계", "To-Be 이미지 설계", "Fit-Gap 분석", "개발 설계서 작성"],
+    docs: ["To-Be 프로세스 정의서", "프로토타이핑", "화면설계서", "아키텍처 설계서"] },
+  { id: "P4", name: "Construction", color: "#3a97b0",
+    acts: ["개발 환경 구축", "어플리케이션 개발", "테스트 데이터 수집", "단위 테스트"],
+    docs: ["인터페이스 정의서", "단위테스트 결과서"] },
+  { id: "P5", name: "Integration Test", color: "#2e6b57",
+    acts: ["운영환경 구축", "통합 테스트", "FDS 작성"],
+    docs: ["통합 테스트 계획서", "통합 테스트 결과서", "FDS"] },
+  { id: "P6", name: "Stabilize", color: "#4a59a5",
+    acts: ["시스템 교육 실시", "프로젝트 완료 보고", "인수인계"],
+    docs: ["사용자 교육 계획서", "운영자 매뉴얼", "사용자 매뉴얼", "프로젝트 검수/완료보고서", "프로젝트 인수인계서"] },
+];
+const DOC_ST = ["미착수", "작성중", "검토요청", "승인", "보류", "해당없음"];
+const DOC_CLS = { "미착수": "gray", "작성중": "blue", "검토요청": "violet", "승인": "green", "보류": "amber", "해당없음": "muted" };
+const HO_ST = [["sent", "전달"], ["ack", "접수확인"], ["dev", "개발중"], ["done", "완료노티"], ["verified", "검수완료"], ["hold", "보류"]];
+const HO_CLS = { sent: "violet", ack: "blue", dev: "blue", done: "amber", verified: "green", hold: "muted" };
+const EV_TYPES = [
+  ["sent", "기획 전달"], ["ack", "접수 확인"], ["question", "질의 받음"], ["answer", "답변함"],
+  ["progress", "진행 공유"], ["done", "완료 노티"], ["reject", "반려/재작업"], ["verified", "검수 완료"],
+  ["nudge", "독촉/리마인드"], ["note", "메모"],
+];
+const EV_TO_ST = { ack: "ack", progress: "dev", done: "done", reject: "dev", verified: "verified" };
+const RESP_EV = ["ack", "question", "progress", "done"];   // 개발자 쪽에서 온 노티
+const MINE_EV = ["sent", "answer", "nudge", "verified", "reject"];
+const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
+const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
+const TABS = [["dash", "대시보드"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["screens", "화면 목록"], ["wbs", "WBS"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+
+let S;                 // 전체 상태
+let fileHandle = null; // 저장 위치(File System Access API)
+let fileTimer = null, lastFileSave = null, dirty = false;
+let modalOnClose = null;
+
+// ───────────── utils ─────────────
+const $ = (id) => document.getElementById(id);
+const uid = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+function pad(n) { return String(n).padStart(2, "0"); }
+function fmtD(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+function today() { return fmtD(new Date()); }
+function parseD(s) { const [y, m, d] = String(s).slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parseD(s); d.setDate(d.getDate() + n); return fmtD(d); }
+function calDays(a, b = today()) { return Math.round((parseD(b) - parseD(a)) / 864e5); }
+function bizDays(from, to = today()) {
+  if (!from) return 0;
+  const d = parseD(from), e = parseD(to); let n = 0;
+  while (d < e) { d.setDate(d.getDate() + 1); const w = d.getDay(); if (w !== 0 && w !== 6) n++; }
+  return n;
+}
+function wd(s) { return "일월화수목금토"[parseD(s).getDay()]; }
+function shortD(s) { return s ? s.slice(5).replace("-", "/") + `(${wd(s)})` : ""; }
+function stamp() { const d = new Date(); return `${String(d.getFullYear()).slice(2)}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`; }
+function dday(s) {
+  if (!s) return "";
+  const n = calDays(today(), s);
+  return n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), 2600); }
+async function copyText(text, msg = "클립보드에 복사됨") {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  toast(msg);
+}
+function download(name, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type: type + ";charset=utf-8" }));
+  const a = document.createElement("a"); a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function badge(text, cls) { return `<span class="badge b-${cls}">${esc(text)}</span>`; }
+function phase(id) { return PHASES.find((p) => p.id === id); }
+function phaseColor(id) { return phase(id)?.color || "#8b93a1"; }
+
+// ───────────── state ─────────────
+function emptyState() {
+  return {
+    v: 1, updatedAt: null,
+    settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO" },
+    ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null },
+    seq: { ho: 0 },
+    projects: [], docs: [], handoffs: [], screens: [], wbs: [], mails: [], notes: [],
+  };
+}
+function normalize(d) {
+  const e = emptyState();
+  const s = Object.assign(e, d || {});
+  s.settings = Object.assign(emptyState().settings, d?.settings || {});
+  s.ui = Object.assign(emptyState().ui, d?.ui || {});
+  s.seq = Object.assign({ ho: 0 }, d?.seq || {});
+  ["projects", "docs", "handoffs", "screens", "wbs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+  s.handoffs.forEach((h) => { h.events = h.events || []; h.docIds = h.docIds || []; h.screenIds = h.screenIds || []; });
+  s.docs.forEach((x) => { x.history = x.history || []; });
+  return s;
+}
+function load() {
+  let local = null;
+  try { const raw = localStorage.getItem(STORE_KEY); if (raw) local = JSON.parse(raw); } catch (e) {}
+  if (EMBEDDED_DATA && (!local || (EMBEDDED_DATA.updatedAt || "") > (local.updatedAt || ""))) {
+    S = normalize(EMBEDDED_DATA); writeLocal(); return;
+  }
+  if (local) {
+    S = normalize(local);
+    if (EMBEDDED_DATA && (EMBEDDED_DATA.updatedAt || "") < (local.updatedAt || "")) S._embeddedOlder = true;
+    return;
+  }
+  S = normalize(emptyState()); seedDemo(); writeLocal();
+}
+function writeLocal() {
+  const copy = Object.assign({}, S); delete copy._embeddedOlder;
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(copy)); } catch (e) { toast("브라우저 저장 실패: " + e.message); }
+}
+function persist() {
+  S.updatedAt = new Date().toISOString();
+  writeLocal(); dirty = true; updateSaveInd();
+  if (fileHandle) { clearTimeout(fileTimer); fileTimer = setTimeout(() => writeToHandle(true), 1500); }
+}
+function commit() { persist(); render(); }
+
+// ───────────── file save / load ─────────────
+function buildHtml() {
+  const copy = Object.assign({}, S); delete copy._embeddedOlder;
+  const json = JSON.stringify(copy).replace(/</g, "\\u003c");
+  return PRISTINE.replace(EMBED_RE, () => "var EMBEDDED_DATA = " + json + "; /*EMBEDDED_DATA" + "_PLACEHOLDER*/");
+}
+async function writeToHandle(silent) {
+  if (!fileHandle) return false;
+  try {
+    const w = await fileHandle.createWritable(); await w.write(buildHtml()); await w.close();
+    dirty = false; lastFileSave = new Date(); updateSaveInd();
+    if (!silent) toast("저장 완료 → " + fileHandle.name);
+    return true;
+  } catch (e) { fileHandle = null; updateSaveInd(); toast("파일 쓰기 실패 — 다시 저장 위치를 지정해줘"); return false; }
+}
+async function saveFile(pick) {
+  if (window.showSaveFilePicker && (pick || !fileHandle)) {
+    try {
+      fileHandle = await window.showSaveFilePicker({ suggestedName: `planner-desk_${stamp()}.html`, types: [{ description: "HTML", accept: { "text/html": [".html"] } }] });
+    } catch (e) { if (e.name === "AbortError") return; fileHandle = null; }
+  }
+  if (fileHandle && (await writeToHandle(false))) return;
+  download(`planner-desk_${stamp()}.html`, buildHtml(), "text/html");
+  dirty = false; lastFileSave = new Date(); updateSaveInd();
+  toast("백업 HTML 다운로드 — 그 파일을 열면 지금 데이터 그대로 열림");
+}
+function updateSaveInd() {
+  const el = $("saveInd"); if (!el) return;
+  const t = lastFileSave ? lastFileSave.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : null;
+  if (fileHandle) { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = `📄 ${fileHandle.name} · ${dirty ? "저장 대기…" : "자동저장 " + t}`; }
+  else { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = dirty ? "브라우저에 저장됨 · 파일 미저장" : t ? `파일 저장 ${t}` : "브라우저에 자동 저장 중"; }
+}
+function importFile(ev) {
+  const f = ev.target.files[0]; ev.target.value = "";
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const txt = r.result;
+      let m = txt.match(/var EMBEDDED_DATA = ([\s\S]+?); \/\*EMBEDDED_DATA_PLACEHOLDER\*\//);
+      if (m && m[1].trim() !== "null") {
+        const d = JSON.parse(m[1]);
+        if (!confirm(`Planner Desk 백업을 불러올까?\n프로젝트 ${d.projects?.length || 0}개 · 전달 ${d.handoffs?.length || 0}건 · 산출물 ${d.docs?.length || 0}건\n현재 데이터는 덮어씌워져.`)) return;
+        S = normalize(d); commit(); toast("불러오기 완료"); return;
+      }
+      m = txt.match(/var EMBEDDED_BACKUP_DATA = ([\s\S]+?); \/\*EMBEDDED_BACKUP_PLACEHOLDER\*\//);
+      if (m && m[1].trim() !== "null") { importLegacy(JSON.parse(m[1])); return; }
+      const d = JSON.parse(txt);
+      if (d.tasks && !d.handoffs) { importLegacy(d); return; }
+      if (!confirm("JSON 데이터를 불러올까? 현재 데이터는 덮어씌워져.")) return;
+      S = normalize(d); commit(); toast("불러오기 완료");
+    } catch (e) { alert("불러오기 실패: " + e.message); }
+  };
+  r.readAsText(f, "utf-8");
+}
+// 기존 '사업관리 대시보드' 백업 → 프로젝트/WBS(업무)/메모로 합치기
+function importLegacy(d) {
+  const ps = (d.projects || []).filter((p) => p.name);
+  const ts = Array.isArray(d) ? d : d.tasks || [];
+  const ns = d.notes || [];
+  if (!confirm(`기존 사업관리 대시보드 백업을 '추가'로 가져올까?\n프로젝트 ${ps.length}개 · 태스크 ${ts.length}개(→ WBS 일반업무) · 메모 ${ns.length}개\n현재 데이터는 유지돼.`)) return;
+  const byName = {};
+  S.projects.forEach((p) => (byName[p.name] = p.id));
+  const ensure = (name) => {
+    name = name || "기타";
+    if (!byName[name]) { const p = { id: uid("p"), name, client: "", start: "", end: "", memo: "기존 대시보드에서 가져옴", archived: false }; S.projects.push(p); byName[name] = p.id; }
+    return byName[name];
+  };
+  ps.forEach((p) => { const id = ensure(p.name); if (p.archived) S.projects.find((x) => x.id === id).archived = true; });
+  const stMap = { "완료": 100, "진행중": 50, "대기": 10, "예정": 0 };
+  ts.forEach((t) => S.wbs.push({
+    id: uid("w"), projectId: ensure(t.project), phase: "", title: t.title || "(제목 없음)", owner: t.owner || "",
+    start: t.awarenessDate || (t.createdAt || "").slice(0, 10), end: t.due || "", progress: stMap[t.status] ?? 0,
+    memo: t.notes || "", legacyStatus: t.status || "",
+  }));
+  ns.forEach((n) => S.notes.push({ id: uid("n"), projectId: ensure(n.project), title: n.title || "", date: n.date || today(), content: n.content || "", updatedAt: new Date().toISOString() }));
+  commit(); toast("기존 데이터 가져오기 완료");
+}
+
+// ───────────── domain helpers ─────────────
+function proj(id) { return S.projects.find((p) => p.id === id); }
+function projName(id) { return proj(id)?.name || "-"; }
+function activeProjects() { return S.projects.filter((p) => !p.archived); }
+function inScope(x) { return S.ui.pid === "all" ? !proj(x.projectId)?.archived : x.projectId === S.ui.pid; }
+function ackDaysOf(pid) { const p = proj(pid); return Number(p?.ackDays) || Number(S.settings.ackDays) || 2; }
+function hoStLabel(s) { return (HO_ST.find((x) => x[0] === s) || [s, s])[1]; }
+function evLabel(t) { return (EV_TYPES.find((x) => x[0] === t) || [t, t])[1]; }
+function lastEvent(h, types) { return [...h.events].filter((e) => !types || types.includes(e.type)).sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).pop(); }
+function isOpenHO(h) { return h.status !== "verified" && h.status !== "hold"; }
+
+function applyTemplate(p) {
+  PHASES.forEach((ph) => {
+    ph.docs.forEach((name, i) => S.docs.push({ id: uid("d"), projectId: p.id, phase: ph.id, name, status: "미착수", version: "v0.1", owner: "", plan: "", requestedAt: "", approvedAt: "", approver: "", path: "", memo: "", history: [], order: i }));
+    ph.acts.forEach((title) => S.wbs.push({ id: uid("w"), projectId: p.id, phase: ph.id, title, owner: "", start: "", end: "", progress: 0, memo: "" }));
+  });
+}
+
+// 확인 필요 항목(노티 미수신, 승인 회신 없음, 일정 지연 등)
+function computeAlerts(pid) {
+  const out = [], t = today(), st = S.settings;
+  const scope = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  S.handoffs.filter(scope).forEach((h) => {
+    if (!isOpenHO(h)) return;
+    const lastResp = lastEvent(h, RESP_EV);
+    const ackLimit = ackDaysOf(h.projectId);
+    if (h.status === "sent" && h.sentAt) {
+      const bd = bizDays(h.sentAt);
+      if (bd > ackLimit) out.push({ level: "danger", kind: "접수 노티 없음", ref: ["ho", h.id], pid: h.projectId, days: bd, title: `[${h.code}] ${h.title}`, desc: `${h.to || "수신자"}에게 ${shortD(h.sentAt)} 전달 후 영업일 ${bd}일째 회신 없음 (기준 ${ackLimit}일)` });
+    }
+    if (["sent", "ack", "dev"].includes(h.status) && h.dueDate && h.dueDate < t) {
+      out.push({ level: "danger", kind: "완료 노티 없음", ref: ["ho", h.id], pid: h.projectId, days: calDays(h.dueDate), title: `[${h.code}] ${h.title}`, desc: `완료 예정 ${shortD(h.dueDate)} 경과 (${dday(h.dueDate)}) · 현재 ${hoStLabel(h.status)}` });
+    } else if (["ack", "dev"].includes(h.status)) {
+      const base = lastResp?.at || h.sentAt;
+      const bd = bizDays(base);
+      if (bd > Number(st.quietDays)) out.push({ level: "warn", kind: "진행 공유 없음", ref: ["ho", h.id], pid: h.projectId, days: bd, title: `[${h.code}] ${h.title}`, desc: `마지막 응답 ${shortD(base)} 이후 영업일 ${bd}일 무소식` });
+    }
+    if (h.status === "done") {
+      const de = lastEvent(h, ["done"]);
+      const bd = bizDays(de?.at || t);
+      if (bd >= Number(st.verifyDays)) out.push({ level: "mine", kind: "내 검수 대기", ref: ["ho", h.id], pid: h.projectId, days: bd, title: `[${h.code}] ${h.title}`, desc: `완료 노티 ${shortD(de?.at)} 받음 → 기획 검수 필요 (${bd}일 경과)` });
+    }
+  });
+  S.docs.filter(scope).forEach((d) => {
+    if (d.status === "검토요청" && d.requestedAt) {
+      const bd = bizDays(d.requestedAt);
+      if (bd > Number(st.approvalDays)) out.push({ level: "danger", kind: "승인 회신 없음", ref: ["doc", d.id], pid: d.projectId, days: bd, title: d.name, desc: `${shortD(d.requestedAt)} 검토요청 후 영업일 ${bd}일 · 승인자 ${d.approver || "미지정"}` });
+    }
+    if (d.plan && d.plan < t && !["승인", "해당없음", "검토요청"].includes(d.status)) {
+      out.push({ level: "warn", kind: "산출물 일정 지연", ref: ["doc", d.id], pid: d.projectId, days: calDays(d.plan), title: `${d.phase} ${d.name}`, desc: `계획 ${shortD(d.plan)} (${dday(d.plan)}) · ${d.status}` });
+    }
+  });
+  S.wbs.filter(scope).forEach((w) => {
+    if (w.end && w.end < t && Number(w.progress) < 100) out.push({ level: "warn", kind: "WBS 지연", ref: ["wbs", w.id], pid: w.projectId, days: calDays(w.end), title: w.title, desc: `종료 ${shortD(w.end)} (${dday(w.end)}) · 진척 ${w.progress || 0}%` });
+  });
+  const rank = { danger: 0, mine: 1, warn: 2 };
+  return out.sort((a, b) => rank[a.level] - rank[b.level] || b.days - a.days);
+}
+
+function currentPhase(pid) {
+  const t = today();
+  const ws = S.wbs.filter((w) => w.projectId === pid && w.phase && w.start && w.end && w.start <= t && t <= w.end);
+  if (ws.length) return ws.map((w) => w.phase).sort()[0];
+  for (const ph of PHASES) {
+    const ds = S.docs.filter((d) => d.projectId === pid && d.phase === ph.id && d.status !== "해당없음");
+    if (ds.some((d) => d.status !== "승인")) return ph.id;
+  }
+  return null;
+}
+function docStats(pid, phId) {
+  const ds = S.docs.filter((d) => d.projectId === pid && (!phId || d.phase === phId) && d.status !== "해당없음");
+  return { total: ds.length, ok: ds.filter((d) => d.status === "승인").length, req: ds.filter((d) => d.status === "검토요청").length, wip: ds.filter((d) => d.status === "작성중").length };
+}
+
+// ───────────── render: shell ─────────────
+function render() {
+  if (S.ui.pid !== "all" && !proj(S.ui.pid)) S.ui.pid = "all";
+  document.documentElement.setAttribute("data-theme", S.settings.theme === "dark" ? "dark" : "light");
+  $("themeBtn").textContent = S.settings.theme === "dark" ? "☀" : "🌙";
+  $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
+  renderBanner(); renderSide(); renderTabs();
+  const v = { dash: renderDash, ho: renderHO, docs: renderDocs, screens: renderScreens, wbs: renderWBS, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  $("view").innerHTML = v();
+  if (S.ui.tab === "mail") bindDrop();
+  if (S.ui.tab === "notes") bindNoteEditor();
+  updateSaveInd();
+}
+function renderBanner() {
+  let h = "";
+  if (S._embeddedOlder) h += `<div class="banner">이 HTML 파일에 내장된 데이터(${(EMBEDDED_DATA.updatedAt || "").slice(0, 16).replace("T", " ")})보다 브라우저에 더 최근 데이터가 있어서 브라우저 데이터를 열었어.
+    <button class="btn sm" onclick="useEmbedded()">파일 데이터로 열기</button><button class="btn sm ghost" onclick="S._embeddedOlder=false;render()">닫기</button></div>`;
+  $("bannerArea").innerHTML = h;
+}
+function useEmbedded() { if (!confirm("브라우저의 현재 데이터를 이 파일 내장 데이터로 바꿀까?")) return; S = normalize(EMBEDDED_DATA); commit(); }
+function renderSide() {
+  const all = computeAlerts(null);
+  const cntOf = (pid) => all.filter((a) => a.pid === pid && a.level === "danger").length;
+  const item = (id, name, color, n) => `<div class="proj ${S.ui.pid === id ? "active" : ""}" onclick="selProject('${id}')">
+      <span class="dot" style="${color ? "background:" + color : ""}"></span><span class="nm">${esc(name)}</span>${n ? `<span class="cnt">${n}</span>` : ""}</div>`;
+  let h = `<h3>프로젝트</h3>` + item("all", "전체 보기 (PMO)", "", all.filter((a) => a.level === "danger").length);
+  activeProjects().forEach((p) => {
+    const ph = currentPhase(p.id);
+    h += item(p.id, p.name, ph ? phaseColor(ph) : "", cntOf(p.id));
+  });
+  h += `<button class="btn sm add" onclick="editProject()">＋ 프로젝트 추가</button>`;
+  const arch = S.projects.filter((p) => p.archived);
+  if (arch.length) {
+    h += `<div class="archived"><h3>보관됨</h3>` + arch.map((p) => `<div class="proj" onclick="editProject('${p.id}')"><span class="dot"></span><span class="nm">${esc(p.name)}</span></div>`).join("") + `</div>`;
+  }
+  $("side").innerHTML = h;
+}
+function renderTabs() {
+  const pid = S.ui.pid === "all" ? null : S.ui.pid;
+  const hoAlerts = computeAlerts(pid).filter((a) => a.ref[0] === "ho" && a.level === "danger").length;
+  const pendingMail = S.mails.filter((m) => m.state === "pending").length;
+  $("tabs").innerHTML = TABS.map(([k, l]) => {
+    const n = k === "ho" ? hoAlerts : k === "mail" ? pendingMail : 0;
+    return `<button class="tab ${S.ui.tab === k ? "active" : ""}" onclick="selTab('${k}')">${l}${n ? `<span class="cnt">${n}</span>` : ""}</button>`;
+  }).join("");
+}
+function selProject(id) { S.ui.pid = id; persistUI(); render(); }
+function selTab(k) { S.ui.tab = k; persistUI(); render(); }
+function persistUI() { writeLocal(); }
+function pageHead(title, meta, actions = "") {
+  return `<div class="page-head"><div><h2>${title}</h2>${meta ? `<div class="meta">${meta}</div>` : ""}</div><div class="actions">${actions}</div></div>`;
+}
+function needProject(what) {
+  const rows = activeProjects().map((p) => `<div class="proj" onclick="selProject('${p.id}')"><span class="dot" style="background:${phaseColor(currentPhase(p.id))}"></span><span class="nm">${esc(p.name)}</span></div>`).join("");
+  return `<div class="card"><div class="card-h"><h3>${what}은(는) 프로젝트별로 관리해</h3><span class="sub">왼쪽에서 프로젝트를 고르거나 아래에서 선택</span></div><div class="card-b">${rows || `<div class="empty">프로젝트가 없어. ＋ 프로젝트 추가부터.</div>`}</div></div>`;
+}
+
+// ───────────── 대시보드 ─────────────
+function renderDash() {
+  const pid = S.ui.pid === "all" ? null : S.ui.pid;
+  const alerts = computeAlerts(pid);
+  const hos = S.handoffs.filter(inScope);
+  const docs = S.docs.filter(inScope);
+  const noNoti = alerts.filter((a) => a.kind === "접수 노티 없음" || a.kind === "완료 노티 없음").length;
+  const openHo = hos.filter(isOpenHO).length;
+  const reqDocs = docs.filter((d) => d.status === "검토요청").length;
+  const mine = alerts.filter((a) => a.level === "mine").length;
+  let h = "";
+  if (pid) {
+    const p = proj(pid);
+    const span = p.start || p.end ? `${p.start || "?"} ~ ${p.end || "?"}${p.end ? ` · 종료 ${dday(p.end)}` : ""}` : "기간 미입력";
+    h += pageHead(esc(p.name), `${esc(p.client || "고객사 미입력")} · ${span}${p.pm ? " · PM " + esc(p.pm) : ""}${p.devLead ? " · 개발 PL " + esc(p.devLead) : ""}`,
+      `<button class="btn" onclick="editProject('${pid}')">프로젝트 정보</button><button class="btn primary" onclick="editHO()">＋ 개발 전달 등록</button>`);
+  } else {
+    h += pageHead("전체 프로젝트 현황", `진행 프로젝트 ${activeProjects().length}개`, `<button class="btn primary" onclick="editProject()">＋ 프로젝트</button>`);
+  }
+  h += `<div class="kpis">
+    <div class="kpi danger" onclick="S.ui.hoFilter='alert';selTab('ho')"><div class="l">노티 미수신</div><div class="v">${noNoti}</div><div class="h">접수/완료 회신 기준 초과</div></div>
+    <div class="kpi" onclick="S.ui.hoFilter='open';selTab('ho')"><div class="l">진행 중 개발 전달</div><div class="v">${openHo}</div><div class="h">검수완료 전 건</div></div>
+    <div class="kpi warn" onclick="selTab('docs')"><div class="l">승인 대기 산출물</div><div class="v">${reqDocs}</div><div class="h">검토요청 상태</div></div>
+    <div class="kpi ok" onclick="S.ui.hoFilter='done';selTab('ho')"><div class="l">내 검수 대기</div><div class="v">${mine}</div><div class="h">완료 노티 받은 건</div></div>
+  </div>`;
+
+  if (pid) {
+    const cur = currentPhase(pid);
+    h += `<div class="card"><div class="card-h"><h3>수행방법론 진척</h3><span class="sub">단계별 산출물 승인 현황</span><div class="actions"><button class="btn sm" onclick="selTab('docs')">산출물 관리 →</button></div></div><div class="card-b"><div class="phases">` +
+      PHASES.map((ph) => {
+        const s = docStats(pid, ph.id); const pct = s.total ? Math.round((s.ok / s.total) * 100) : 0;
+        return `<div class="ph ${cur === ph.id ? "cur" : ""}" style="background:${ph.color}"><div class="t">P.${ph.id.slice(1)}</div><div class="n">${ph.name}</div>
+          <div class="p">승인 ${s.ok}/${s.total}${s.req ? ` · 검토 ${s.req}` : ""}</div><div class="bar"><i style="width:${pct}%"></i></div></div>`;
+      }).join("") + `</div></div></div>`;
+  } else {
+    h += `<div class="card"><div class="card-h"><h3>프로젝트별 현황</h3></div><div class="tbl-wrap"><table class="t"><thead><tr>
+      <th>프로젝트</th><th>현재 단계</th><th>산출물 승인</th><th class="nowrap">진행 전달</th><th class="nowrap">노티 미수신</th><th>지연</th><th>종료</th></tr></thead><tbody>` +
+      (activeProjects().map((p) => {
+        const a = computeAlerts(p.id); const s = docStats(p.id); const ph = currentPhase(p.id);
+        const pct = s.total ? Math.round((s.ok / s.total) * 100) : 0;
+        return `<tr><td class="link" onclick="selProject('${p.id}')">${esc(p.name)}</td>
+          <td>${ph ? `<span class="badge" style="background:${phaseColor(ph)};color:#fff">${ph} ${phase(ph).name}</span>` : `<span class="muted">-</span>`}</td>
+          <td class="nowrap">${s.ok}/${s.total} <span class="muted">(${pct}%)</span></td>
+          <td class="num">${S.handoffs.filter((x) => x.projectId === p.id && isOpenHO(x)).length}</td>
+          <td class="num">${(() => { const n = a.filter((x) => x.level === "danger").length; return n ? badge(n, "red") : "0"; })()}</td>
+          <td class="num">${a.filter((x) => x.level === "warn").length}</td>
+          <td class="nowrap">${p.end ? `${p.end} <span class="muted">${dday(p.end)}</span>` : "-"}</td></tr>`;
+      }).join("") || `<tr><td colspan="7" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
+  }
+
+  h += `<div class="grid2" style="margin-top:14px">
+    <div class="card"><div class="card-h"><h3>확인 필요</h3><span class="sub">${alerts.length}건 · 노티가 안 온 건 / 내가 처리할 건</span></div>
+      ${alerts.length ? alerts.slice(0, 30).map(alertRow).join("") : `<div class="empty">지금은 확인할 게 없어 👍</div>`}</div>
+    <div class="card"><div class="card-h"><h3>최근 활동</h3></div><div class="card-b">${recentActivity(pid)}</div></div>
+  </div>`;
+  return h;
+}
+function alertRow(a) {
+  const [type, id] = a.ref;
+  const open = type === "ho" ? `openHO('${id}')` : type === "doc" ? `editDoc('${id}')` : `editWBS('${id}')`;
+  let acts = "";
+  if (type === "ho" && a.level !== "mine") acts = `<button class="btn sm" onclick="copyNudge('${id}')" title="독촉 문구 복사">문구</button><button class="btn sm" onclick="mailNudge('${id}')" title="메일 작성창 열기">메일</button><button class="btn sm" onclick="openHO('${id}','ack')">회신 기록</button>`;
+  if (type === "ho" && a.level === "mine") acts = `<button class="btn sm" onclick="quickEvent('${id}','verified')">검수 완료</button><button class="btn sm" onclick="openHO('${id}','reject')">반려</button>`;
+  if (type === "doc" && a.kind === "승인 회신 없음") acts = `<button class="btn sm" onclick="setDocStatus('${id}','승인')">승인 받음</button>`;
+  return `<div class="alert ${a.level}"><span class="ic"></span><div class="body">
+    <div class="k">${a.kind}${S.ui.pid === "all" ? ` · <span class="muted">${esc(projName(a.pid))}</span>` : ""}</div>
+    <div class="tt" onclick="${open}">${esc(a.title)}</div><div class="d">${esc(a.desc)}</div></div><div class="acts">${acts}</div></div>`;
+}
+function recentActivity(pid) {
+  const items = [];
+  S.handoffs.filter((h) => !pid || h.projectId === pid).forEach((h) => h.events.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>[${esc(h.code)}]</b> ${evLabel(e.type)}${e.text ? " — " + esc(e.text.split("\n")[0].slice(0, 60)) : ""}`, cls: RESP_EV.includes(e.type) ? "resp" : MINE_EV.includes(e.type) ? "mine" : "", click: `openHO('${h.id}')` })));
+  S.docs.filter((d) => !pid || d.projectId === pid).forEach((d) => d.history.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>${esc(d.name)}</b> ${esc(e.text)}`, cls: e.text.includes("승인") ? "resp" : "", click: `editDoc('${d.id}')` })));
+  items.sort((a, b) => (b.at + b.ts).localeCompare(a.at + a.ts));
+  if (!items.length) return `<div class="empty">아직 기록이 없어</div>`;
+  return `<ul class="tl">` + items.slice(0, 14).map((i) => `<li class="${i.cls}"><div class="h">${shortD(i.at)}${pid ? "" : ""}</div><div class="x" style="cursor:pointer" onclick="${i.click}">${i.html}</div></li>`).join("") + `</ul>`;
+}
+
+// ───────────── 개발 전달 · 노티 ─────────────
+function renderHO() {
+  const pid = S.ui.pid === "all" ? null : S.ui.pid;
+  const alerts = computeAlerts(pid);
+  const alertIds = new Set(alerts.filter((a) => a.ref[0] === "ho" && a.level === "danger").map((a) => a.ref[1]));
+  const f = S.ui.hoFilter || "open";
+  const q = (S.ui.hoQ || "").toLowerCase();
+  let list = S.handoffs.filter(inScope);
+  const counts = { open: list.filter(isOpenHO).length, alert: list.filter((h) => alertIds.has(h.id)).length, done: list.filter((h) => h.status === "done").length, verified: list.filter((h) => h.status === "verified").length, all: list.length };
+  list = list.filter((h) => f === "all" ? true : f === "open" ? isOpenHO(h) : f === "alert" ? alertIds.has(h.id) : h.status === f);
+  if (q) list = list.filter((h) => (h.code + h.title + (h.to || "") + (h.memo || "")).toLowerCase().includes(q));
+  list.sort((a, b) => (alertIds.has(b.id) - alertIds.has(a.id)) || (b.sentAt || "").localeCompare(a.sentAt || ""));
+  const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.hoFilter='${k}';render()">${l} ${counts[k]}</button>`;
+  let h = pageHead("개발 전달 · 노티 관리", `기획을 언제 개발에 넘겼고, 언제 회신·완료 노티를 받았는지. 접수 회신 기준 영업일 ${S.settings.ackDays}일 (프로젝트별 변경 가능)`,
+    `<button class="btn primary" onclick="editHO()">＋ 개발 전달 등록</button>`);
+  h += `<div class="filters">${chip("open", "진행중")}${chip("alert", "⚠ 노티 미수신")}${chip("done", "검수 대기")}${chip("verified", "검수완료")}${chip("all", "전체")}
+    <input class="search" placeholder="코드·제목·수신자 검색" value="${esc(S.ui.hoQ || "")}" oninput="S.ui.hoQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>
+    <th>코드</th><th>기획 전달 건</th>${pid ? "" : "<th>프로젝트</th>"}<th>수신(개발)</th><th>전달일</th><th>완료 예정</th><th>상태</th><th>마지막 응답</th><th></th></tr></thead><tbody>`;
+  h += list.map((x) => {
+    const lr = lastEvent(x, RESP_EV);
+    const refs = x.docIds.map((id) => S.docs.find((d) => d.id === id)).filter(Boolean).map((d) => `<span class="chip-ref">📄 ${esc(d.name)}</span>`).join("") +
+      x.screenIds.map((id) => S.screens.find((s) => s.id === id)).filter(Boolean).map((s) => `<span class="chip-ref">🖥 ${esc(s.code)}</span>`).join("");
+    const al = alerts.filter((a) => a.ref[1] === x.id);
+    const resp = lr ? `${shortD(lr.at)} <span class="muted small">${evLabel(lr.type)}</span>` : x.status === "sent" ? `<span style="color:var(--danger);font-weight:600">응답 없음</span> <span class="muted small">영업일 ${bizDays(x.sentAt)}일</span>` : "-";
+    const due = x.dueDate ? `${shortD(x.dueDate)} <span class="${x.dueDate < today() && isOpenHO(x) && x.status !== "done" ? "" : "muted"} small" style="${x.dueDate < today() && isOpenHO(x) && x.status !== "done" ? "color:var(--danger);font-weight:700" : ""}">${dday(x.dueDate)}</span>` : `<span class="muted">-</span>`;
+    return `<tr>
+      <td class="mono nowrap">${esc(x.code)}</td>
+      <td><div class="link" onclick="openHO('${x.id}')">${esc(x.title)}</div>${refs}${al.length ? `<div>${al.map((a) => badge(a.kind, a.level === "danger" ? "red" : a.level === "mine" ? "blue" : "amber")).join(" ")}</div>` : ""}</td>
+      ${pid ? "" : `<td class="small nowrap">${esc(projName(x.projectId))}</td>`}
+      <td class="nowrap">${esc(x.to || "-")}</td>
+      <td class="nowrap">${shortD(x.sentAt)}</td>
+      <td class="nowrap">${due}</td>
+      <td>${badge(hoStLabel(x.status), HO_CLS[x.status])}</td>
+      <td class="nowrap">${resp}</td>
+      <td class="nowrap"><button class="btn sm" onclick="openHO('${x.id}')">기록</button></td></tr>`;
+  }).join("") || `<tr><td colspan="9" class="empty">해당하는 전달 건이 없어</td></tr>`;
+  h += `</tbody></table></div></div>`;
+  h += `<div class="note-box" style="margin-top:12px"><b>운영 규칙</b> — 전달할 때 메일 제목에 <b>[코드]</b>를 붙이고(전달 메일 작성 버튼이 자동으로 붙여줌) 회신에도 유지해달라고 하면, [메일 수신] 탭에서 회신 메일을 붙여넣을 때 자동으로 해당 건에 연결돼.</div>`;
+  return h;
+}
+function nextHOCode() { S.seq.ho = (S.seq.ho || 0) + 1; return `${S.settings.hoPrefix || "HO"}-${String(S.seq.ho).padStart(3, "0")}`; }
+function hoFields(x) {
+  const pid = x.projectId || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id);
+  const docOpts = S.docs.filter((d) => d.projectId === pid).map((d) => [d.id, `${d.phase} · ${d.name}`]);
+  const scOpts = S.screens.filter((s) => s.projectId === pid).map((s) => [s.id, `${s.code} ${s.name}`]);
+  return [
+    { k: "title", l: "기획 전달 건 (제목)", t: "text", full: true, req: true, ph: "예: 회원가입 화면설계서 v1.2 개발 전달" },
+    { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]), v: pid },
+    { k: "priority", l: "우선순위", t: "select", opts: [["high", "높음"], ["mid", "보통"], ["low", "낮음"]], v: x.priority || "mid" },
+    { k: "to", l: "수신 (개발 담당자)", t: "text", ph: "예: 김개발 선임" },
+    { k: "toEmail", l: "수신 메일", t: "text", ph: "dev@company.com — 회신 자동 매칭에 사용" },
+    { k: "cc", l: "참조", t: "text", full: true, ph: "PM, PL 등 (메일 작성 시 CC)" },
+    { k: "sentAt", l: "전달일", t: "date", v: x.sentAt || today() },
+    { k: "dueDate", l: "완료 예정일", t: "date", hint: "지나도 완료 노티 없으면 '완료 노티 없음' 표시" },
+    { k: "docIds", l: "연결 산출물", t: "multi", opts: docOpts, hint: "Ctrl+클릭으로 여러 개" },
+    { k: "screenIds", l: "연결 화면", t: "multi", opts: scOpts, hint: "화면 목록에 등록된 화면" },
+    { k: "link", l: "문서 경로 / 링크", t: "text", full: true, ph: "\\\\server\\기획\\화면설계서_v1.2.pptx 또는 URL" },
+    { k: "memo", l: "전달 내용 / 요청사항", t: "textarea", full: true },
+  ];
+}
+function editHO(id, preset) {
+  const x = id ? S.handoffs.find((h) => h.id === id) : Object.assign({ docIds: [], screenIds: [] }, preset || {});
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  openForm(id ? `전달 건 편집 · ${x.code}` : "개발 전달 등록", hoFields(x), x, (v) => {
+    if (id) { Object.assign(x, v); }
+    else {
+      const h = Object.assign({ id: uid("h"), code: nextHOCode(), status: "sent", events: [] }, v);
+      h.events.push({ id: uid("e"), at: h.sentAt || today(), ts: new Date().toISOString(), type: "sent", text: "기획 전달" + (h.to ? ` → ${h.to}` : "") });
+      S.handoffs.push(h);
+      h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) s.hoId = h.id; });
+      setTimeout(() => openHO(h.id), 0);
+    }
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); commit(); closeModal(); } } }] : []);
+}
+function openHO(id, presetType) {
+  const x = S.handoffs.find((h) => h.id === id); if (!x) return;
+  const refs = x.docIds.map((i) => S.docs.find((d) => d.id === i)).filter(Boolean).map((d) => `<span class="chip-ref" style="cursor:pointer" onclick="editDoc('${d.id}')">📄 ${esc(d.name)} ${esc(d.version || "")}</span>`).join("") +
+    x.screenIds.map((i) => S.screens.find((s) => s.id === i)).filter(Boolean).map((s) => `<span class="chip-ref">🖥 ${esc(s.code)} ${esc(s.name)}</span>`).join("");
+  const lr = lastEvent(x, RESP_EV);
+  const al = computeAlerts(x.projectId).filter((a) => a.ref[1] === x.id);
+  const defType = presetType || { sent: "ack", ack: "progress", dev: "done", done: "verified" }[x.status] || "note";
+  const evs = [...x.events].sort((a, b) => (b.at + (b.ts || "")).localeCompare(a.at + (a.ts || "")));
+  const body = `
+    ${al.map((a) => `<div class="banner" style="${a.level === "mine" ? "background:var(--accentw);color:var(--accent);border-color:var(--accent)" : a.level === "danger" ? "background:var(--dangerw);color:var(--danger);border-color:var(--danger)" : ""}"><b>${a.kind}</b> ${esc(a.desc)}</div>`).join("")}
+    <div class="info">
+      <div class="l">상태</div><div>${badge(hoStLabel(x.status), HO_CLS[x.status])} <select class="inline" onchange="setHOStatus('${x.id}',this.value)">${HO_ST.map(([k, l]) => `<option value="${k}" ${x.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="l">프로젝트</div><div>${esc(projName(x.projectId))}</div>
+      <div class="l">수신</div><div>${esc(x.to || "-")} ${x.toEmail ? `<span class="muted">&lt;${esc(x.toEmail)}&gt;</span>` : ""}${x.cc ? `<div class="small muted">CC ${esc(x.cc)}</div>` : ""}</div>
+      <div class="l">전달 / 완료예정</div><div>${x.sentAt || "-"} → ${x.dueDate ? `${x.dueDate} <b>${dday(x.dueDate)}</b>` : "미정"}</div>
+      <div class="l">마지막 응답</div><div>${lr ? `${lr.at} · ${evLabel(lr.type)} (${calDays(lr.at)}일 전)` : `<span style="color:var(--danger)">아직 없음</span> · 전달 후 영업일 ${bizDays(x.sentAt)}일`}</div>
+      ${refs ? `<div class="l">연결</div><div>${refs}</div>` : ""}
+      ${x.link ? `<div class="l">문서</div><div class="mono small" style="word-break:break-all">${esc(x.link)} <button class="btn sm ghost" onclick="copyText(${esc(JSON.stringify(x.link))})">복사</button></div>` : ""}
+      ${x.memo ? `<div class="l">요청사항</div><div style="white-space:pre-wrap">${esc(x.memo)}</div>` : ""}
+    </div>
+    <div class="quick">
+      ${[["ack", "✔ 접수 확인 받음"], ["question", "? 질의 받음"], ["answer", "↩ 답변함"], ["progress", "… 진행 공유 받음"], ["done", "★ 완료 노티 받음"], ["verified", "✓ 검수 완료"], ["reject", "✕ 반려/재작업"], ["nudge", "📣 독촉함"], ["note", "메모"]]
+        .map(([k, l]) => `<button class="btn sm" onclick="document.getElementById('evType').value='${k}';document.getElementById('evText').focus()">${l}</button>`).join("")}
+    </div>
+    <div class="evform">
+      <select id="evType">${EV_TYPES.map(([k, l]) => `<option value="${k}" ${defType === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <input type="date" id="evAt" value="${today()}">
+      <textarea id="evText" placeholder="내용 (예: 메일로 접수 확인, 10/20 완료 예정이라고 함)"></textarea>
+      <button class="btn primary" onclick="addEvent('${x.id}')">기록</button>
+    </div>
+    <div class="sec-t">타임라인</div>
+    <ul class="tl">${evs.map((e) => `<li class="${RESP_EV.includes(e.type) ? "resp" : e.type === "reject" ? "bad" : "mine"}">
+      <div class="h"><b>${evLabel(e.type)}</b> · ${e.at} (${wd(e.at)})${e.via === "mail" ? " · 📧 메일" : ""}
+      <button class="btn sm ghost" style="padding:0 4px" onclick="delEvent('${x.id}','${e.id}')" title="삭제">✕</button></div>
+      ${e.text ? `<div class="x">${esc(e.text)}</div>` : ""}</li>`).join("")}</ul>`;
+  openModal(`[${x.code}] ${x.title}`, body, [
+    { l: "편집", cls: "left", fn: () => editHO(x.id) },
+    { l: "독촉 문구 복사", fn: () => copyNudge(x.id) },
+    { l: "독촉 메일", fn: () => mailNudge(x.id) },
+    { l: "전달 메일 작성", fn: () => mailSend(x.id) },
+    { l: "닫기", cls: "primary", fn: closeModal },
+  ], true);
+  if (presetType) setTimeout(() => $("evText")?.focus(), 30);
+}
+function addEvent(hid) {
+  const x = S.handoffs.find((h) => h.id === hid);
+  const type = $("evType").value, at = $("evAt").value || today(), text = $("evText").value.trim();
+  pushEvent(x, { type, at, text });
+  commit(); openHO(hid); toast(`${evLabel(type)} 기록됨`);
+}
+function pushEvent(x, e) {
+  x.events.push(Object.assign({ id: uid("e"), ts: new Date().toISOString() }, e));
+  if (EV_TO_ST[e.type]) x.status = EV_TO_ST[e.type];
+  if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
+}
+function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
+function delEvent(hid, eid) { const x = S.handoffs.find((h) => h.id === hid); if (!confirm("이 기록을 지울까?")) return; x.events = x.events.filter((e) => e.id !== eid); commit(); openHO(hid); }
+function setHOStatus(hid, st) { const x = S.handoffs.find((h) => h.id === hid); x.status = st; commit(); openHO(hid); }
+function me() { return S.settings.me || "기획 담당"; }
+function nudgeText(x) {
+  const reason = x.status === "sent" ? `아직 접수 확인 회신을 받지 못해 다시 연락드립니다.`
+    : x.dueDate && x.dueDate < today() ? `완료 예정일(${x.dueDate})이 지나 진행 상황 확인차 연락드립니다.`
+    : `진행 상황 확인차 연락드립니다.`;
+  return `[${x.code}] ${x.title} — 진행 확인 요청
+
+${x.to || "담당자"}님, 안녕하세요. ${me()}입니다.
+${x.sentAt}에 전달드린 「${x.title}」 건 관련하여 ${reason}
+현재 진행 상황과 완료 예정 일정 공유 부탁드립니다.
+회신 시 메일 제목의 [${x.code}]는 그대로 유지해 주세요.
+
+감사합니다.
+${S.settings.sign || me()}`;
+}
+function sendText(x) {
+  const docs = x.docIds.map((i) => S.docs.find((d) => d.id === i)).filter(Boolean).map((d) => `- ${d.name} ${d.version || ""}`.trim());
+  const scs = x.screenIds.map((i) => S.screens.find((s) => s.id === i)).filter(Boolean).map((s) => `- ${s.code} ${s.name}`);
+  return `${x.to || "담당자"}님, 안녕하세요. ${me()}입니다.
+
+「${x.title}」 기획 전달드립니다.
+${docs.length ? "\n[산출물]\n" + docs.join("\n") + "\n" : ""}${scs.length ? "\n[대상 화면]\n" + scs.join("\n") + "\n" : ""}${x.link ? "\n[문서 위치] " + x.link + "\n" : ""}${x.memo ? "\n[요청사항]\n" + x.memo + "\n" : ""}
+${x.dueDate ? `완료 예정일은 ${x.dueDate}(${wd(x.dueDate)})로 생각하고 있습니다.\n` : ""}확인하시면 접수 회신 부탁드리고, 완료 시에도 회신 부탁드립니다.
+(회신 시 메일 제목의 [${x.code}] 유지 부탁드립니다.)
+
+감사합니다.
+${S.settings.sign || me()}`;
+}
+function mailto(x, subject, body) {
+  const q = [`subject=${encodeURIComponent(subject)}`, `body=${encodeURIComponent(body)}`];
+  if (x.cc) q.push(`cc=${encodeURIComponent(x.cc)}`);
+  location.href = `mailto:${encodeURIComponent(x.toEmail || "")}?${q.join("&")}`;
+}
+function copyNudge(hid) {
+  const x = S.handoffs.find((h) => h.id === hid);
+  copyText(nudgeText(x), "독촉 문구 복사됨 — 보낸 뒤 '독촉함' 기록 추천");
+}
+function mailNudge(hid) {
+  const x = S.handoffs.find((h) => h.id === hid);
+  const t = nudgeText(x); const [subj, ...rest] = t.split("\n");
+  mailto(x, subj, rest.join("\n").trim());
+  pushEvent(x, { type: "nudge", at: today(), text: "독촉 메일 작성" }); commit();
+}
+function mailSend(hid) { const x = S.handoffs.find((h) => h.id === hid); mailto(x, `[${x.code}] ${x.title}`, sendText(x)); }
+
+// ───────────── 산출물 ─────────────
+function renderDocs() {
+  if (S.ui.pid === "all") return renderDocsMatrix();
+  const pid = S.ui.pid, s = docStats(pid);
+  let h = pageHead("산출물 관리", `수행방법론 단계별 산출물 · 작성 → 공유(검토요청) → 승인 · 전체 승인 ${s.ok}/${s.total} (${s.total ? Math.round((s.ok / s.total) * 100) : 0}%)`,
+    `<button class="btn" onclick="exportDocsCsv()">CSV 내보내기</button>${S.docs.some((d) => d.projectId === pid) ? "" : `<button class="btn primary" onclick="applyTemplate(proj('${pid}'));commit()">방법론 템플릿 적용</button>`}`);
+  const cur = currentPhase(pid);
+  PHASES.forEach((ph) => {
+    const ds = S.docs.filter((d) => d.projectId === pid && d.phase === ph.id).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+    const st = docStats(pid, ph.id);
+    h += `<div class="mx"><div class="mx-ph" style="background:${ph.color}">
+      <div class="id">P.${ph.id.slice(1)}${cur === ph.id ? " · 현재 단계" : ""}</div><div class="nm">${ph.name}</div>
+      <ul>${ph.acts.map((a) => `<li>${esc(a)}</li>`).join("")}</ul><div class="prog">승인 ${st.ok}/${st.total}</div></div>
+      <div class="mx-body"><div class="tbl-wrap"><table class="t"><thead><tr><th>산출물</th><th>상태</th><th>버전</th><th>담당</th><th>계획일</th><th>공유(검토요청)</th><th>승인</th><th>파일</th><th></th></tr></thead><tbody>` +
+      (ds.map((d) => {
+        const late = d.plan && d.plan < today() && !["승인", "해당없음", "검토요청"].includes(d.status);
+        const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
+        const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
+        return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
+          <td><span class="link" onclick="editDoc('${d.id}')">${esc(d.name)}</span>${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">↗ 전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">📝</span>` : ""}</td>
+          <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
+          <td class="mono nowrap">${esc(d.version || "")}</td>
+          <td class="nowrap">${esc(d.owner || "")}</td>
+          <td class="nowrap" style="${late ? "color:var(--danger);font-weight:600" : ""}">${d.plan ? shortD(d.plan) : '<span class="muted">-</span>'}</td>
+          <td class="nowrap">${d.requestedAt ? shortD(d.requestedAt) + (waiting !== null ? ` <span class="small" style="color:${waiting > S.settings.approvalDays ? "var(--danger)" : "var(--faint)"}">${waiting}일째</span>` : "") : '<span class="muted">-</span>'}</td>
+          <td class="nowrap">${d.approvedAt ? `${shortD(d.approvedAt)} <span class="muted small">${esc(d.approver || "")}</span>` : d.approver ? `<span class="muted small">${esc(d.approver)}</span>` : '<span class="muted">-</span>'}</td>
+          <td>${d.path ? `<button class="btn sm ghost" title="${esc(d.path)}" onclick="copyText(${esc(JSON.stringify(d.path))},'경로 복사됨')">📁 경로</button>` : ""}</td>
+          <td class="nowrap"><button class="btn sm ghost" onclick="reviseDoc('${d.id}')" title="개정(버전업)">개정</button><button class="btn sm ghost" onclick="editHO(null,{docIds:['${d.id}'],projectId:'${pid}',title:${esc(JSON.stringify(d.name + " " + (d.version || "") + " 개발 전달"))}})" title="이 산출물로 개발 전달 등록">전달</button></td></tr>`;
+      }).join("") || `<tr><td colspan="9" class="empty">산출물 없음</td></tr>`) +
+      `</tbody></table></div><div class="foot"><button class="btn sm ghost" onclick="editDoc(null,'${ph.id}')">＋ 산출물 추가</button></div></div></div>`;
+  });
+  h += `<p class="muted small" style="margin-top:8px">※ 프로젝트 산출물은 일정과 범위에 따라 고객사와 협의 후 변경 가능 — 불필요한 산출물은 '해당없음'으로 테일러링.</p>`;
+  return h;
+}
+function renderDocsMatrix() {
+  let h = pageHead("산출물 현황 (전체)", "프로젝트 × 단계별 승인 현황 · 셀을 누르면 해당 프로젝트로 이동");
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>프로젝트</th>${PHASES.map((p) => `<th style="color:${p.color}">P.${p.id.slice(1)} ${p.name}</th>`).join("")}<th>합계</th></tr></thead><tbody>` +
+    (activeProjects().map((p) => {
+      const tot = docStats(p.id);
+      return `<tr><td class="link" onclick="S.ui.pid='${p.id}';render()">${esc(p.name)}</td>` + PHASES.map((ph) => {
+        const s = docStats(p.id, ph.id);
+        if (!s.total) return `<td class="muted">-</td>`;
+        const cls = s.ok === s.total ? "green" : s.req ? "violet" : s.ok || s.wip ? "blue" : "gray";
+        return `<td style="cursor:pointer" onclick="S.ui.pid='${p.id}';render()">${badge(`${s.ok}/${s.total}`, cls)}${s.req ? ` <span class="small muted">검토 ${s.req}</span>` : ""}</td>`;
+      }).join("") + `<td class="nowrap"><b>${tot.ok}/${tot.total}</b></td></tr>`;
+    }).join("") || `<tr><td colspan="8" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
+function setDocStatus(id, st) {
+  const d = S.docs.find((x) => x.id === id); if (!d || d.status === st) return;
+  const prev = d.status; d.status = st;
+  if (st === "검토요청" && !d.requestedAt) d.requestedAt = today();
+  if (st === "승인") { d.approvedAt = d.approvedAt || today(); if (!d.approver) { const a = prompt("승인자 (선택)", ""); if (a) d.approver = a; } }
+  if (st === "작성중" && prev === "승인") { d.approvedAt = ""; d.requestedAt = ""; }
+  d.history.push({ at: today(), ts: new Date().toISOString(), text: `${prev} → ${st}` });
+  commit();
+}
+function reviseDoc(id) {
+  const d = S.docs.find((x) => x.id === id);
+  const why = prompt(`「${d.name}」 개정 내용 (버전이 올라가고 '작성중'으로 돌아가)`, "");
+  if (why === null) return;
+  const m = String(d.version || "v0.0").match(/(\d+)\.(\d+)/);
+  const nv = m ? `v${m[1]}.${Number(m[2]) + 1}` : "v0.1";
+  d.history.push({ at: today(), ts: new Date().toISOString(), text: `개정 ${d.version || ""} → ${nv}${why ? " · " + why : ""}` });
+  d.version = nv; d.status = "작성중"; d.requestedAt = ""; d.approvedAt = "";
+  commit(); toast(`${d.name} ${nv}`);
+}
+function editDoc(id, phaseId) {
+  const pid = S.ui.pid !== "all" ? S.ui.pid : null;
+  const d = id ? S.docs.find((x) => x.id === id) : { phase: phaseId || "P1", status: "미착수", version: "v0.1", projectId: pid, history: [] };
+  const fields = [
+    { k: "name", l: "산출물명", t: "text", full: true, req: true },
+    { k: "phase", l: "단계", t: "select", opts: PHASES.map((p) => [p.id, `${p.id} ${p.name}`]) },
+    { k: "status", l: "상태", t: "select", opts: DOC_ST },
+    { k: "version", l: "버전", t: "text" },
+    { k: "owner", l: "작성 담당", t: "text" },
+    { k: "plan", l: "계획(완료 목표)일", t: "date" },
+    { k: "requestedAt", l: "공유(검토요청)일", t: "date" },
+    { k: "approver", l: "승인자", t: "text", ph: "고객사 PM 등" },
+    { k: "approvedAt", l: "승인일", t: "date" },
+    { k: "path", l: "파일 경로 / 링크", t: "text", full: true },
+    { k: "memo", l: "메모", t: "textarea", full: true },
+  ];
+  const hist = id && d.history.length ? `<div class="sec-t">이력</div><ul class="tl">${[...d.history].reverse().map((e) => `<li><div class="h">${e.at}</div><div class="x">${esc(e.text)}</div></li>`).join("")}</ul>` : "";
+  openForm(id ? `산출물 · ${d.name}` : "산출물 추가", fields, d, (v) => {
+    if (id) { if (v.status !== d.status) d.history.push({ at: today(), ts: new Date().toISOString(), text: `${d.status} → ${v.status}` }); Object.assign(d, v); }
+    else { if (!pid) { toast("프로젝트를 선택해줘"); return false; } S.docs.push(Object.assign({ id: uid("d"), projectId: pid, history: [], order: 99 }, v)); }
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("산출물을 삭제할까?")) { S.docs = S.docs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : [], hist);
+}
+function exportDocsCsv() {
+  const pid = S.ui.pid;
+  const rows = [["단계", "산출물", "상태", "버전", "담당", "계획일", "검토요청일", "승인자", "승인일", "경로", "메모"]];
+  S.docs.filter((d) => d.projectId === pid).forEach((d) => rows.push([d.phase, d.name, d.status, d.version, d.owner, d.plan, d.requestedAt, d.approver, d.approvedAt, d.path, d.memo]));
+  download(`산출물_${projName(pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+}
+
+// ───────────── 화면 목록 (화면설계서) ─────────────
+function renderScreens() {
+  if (S.ui.pid === "all") return pageHead("화면 목록", "") + needProject("화면 목록");
+  const pid = S.ui.pid;
+  const q = (S.ui.scQ || "").toLowerCase();
+  let list = S.screens.filter((s) => s.projectId === pid);
+  const total = list.length;
+  if (q) list = list.filter((s) => (s.code + s.name + (s.menu || "")).toLowerCase().includes(q));
+  list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
+  const by = (st) => S.screens.filter((s) => s.projectId === pid && s.status === st).length;
+  const sent = S.screens.filter((s) => s.projectId === pid && s.hoId).length;
+  let h = pageHead("화면 목록 (화면설계서)", `총 ${total}개 · 확정 ${by("확정")} · 검토중 ${by("검토중")} · 작성중 ${by("작성중")} · 변경중 ${by("변경중")} · 개발 전달 ${sent}`,
+    `<button class="btn" onclick="bulkScreens()">엑셀 붙여넣기</button><button class="btn" onclick="sendScreens()">선택 화면 개발 전달</button><button class="btn primary" onclick="editScreen()">＋ 화면 추가</button>`);
+  h += `<div class="filters"><input class="search" placeholder="화면ID·화면명·메뉴 검색" value="${esc(S.ui.scQ || "")}" oninput="S.ui.scQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.scchk').forEach(c=>c.checked=this.checked)"></th><th>화면ID</th><th>화면명</th><th>메뉴 경로</th><th>설계 상태</th><th>버전</th><th>기획</th><th>개발 전달</th><th>개발 담당</th><th>비고</th></tr></thead><tbody>` +
+    (list.map((s) => {
+      const ho = s.hoId && S.handoffs.find((x) => x.id === s.hoId);
+      return `<tr><td><input type="checkbox" class="scchk" value="${s.id}"></td>
+        <td class="mono nowrap">${esc(s.code)}</td>
+        <td><span class="link" onclick="editScreen('${s.id}')">${esc(s.name)}</span></td>
+        <td class="small muted">${esc(s.menu || "")}</td>
+        <td><select class="inline" onchange="setScreen('${s.id}','status',this.value)">${SCREEN_ST.map((x) => `<option ${x === s.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
+        <td class="mono">${esc(s.version || "")}</td>
+        <td class="nowrap">${esc(s.owner || "")}</td>
+        <td class="nowrap">${ho ? `<span class="link mono small" onclick="openHO('${ho.id}')">${esc(ho.code)}</span> ${badge(hoStLabel(ho.status), HO_CLS[ho.status])}` : `<button class="btn sm ghost" onclick="editHO(null,{screenIds:['${s.id}'],projectId:'${pid}',title:${esc(JSON.stringify(`${s.code} ${s.name} 화면 개발 전달`))}})">전달 등록</button>`}</td>
+        <td class="nowrap">${esc(s.dev || (ho && ho.to) || "")}</td>
+        <td class="small">${esc(s.memo || "")}</td></tr>`;
+    }).join("") || `<tr><td colspan="10" class="empty">화면이 없어. 엑셀의 화면 목록을 [엑셀 붙여넣기]로 한 번에 넣을 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
+function setScreen(id, k, v) { const s = S.screens.find((x) => x.id === id); s[k] = v; commit(); }
+function editScreen(id) {
+  const pid = S.ui.pid;
+  const s = id ? S.screens.find((x) => x.id === id) : { status: "작성중", version: "v0.1", owner: S.settings.me };
+  openForm(id ? `화면 · ${s.code}` : "화면 추가", [
+    { k: "code", l: "화면ID", t: "text", req: true, ph: "예: SCR-MBR-001" },
+    { k: "name", l: "화면명", t: "text", req: true },
+    { k: "menu", l: "메뉴 경로", t: "text", full: true, ph: "회원 > 가입 > 약관동의" },
+    { k: "status", l: "설계 상태", t: "select", opts: SCREEN_ST },
+    { k: "version", l: "버전", t: "text" },
+    { k: "owner", l: "기획 담당", t: "text" },
+    { k: "dev", l: "개발 담당", t: "text" },
+    { k: "path", l: "설계서 경로 / 페이지", t: "text", full: true, ph: "화면설계서 p.12 또는 파일 경로" },
+    { k: "memo", l: "비고", t: "textarea", full: true },
+  ], s, (v) => {
+    if (id) Object.assign(s, v); else S.screens.push(Object.assign({ id: uid("s"), projectId: pid }, v));
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+}
+function bulkScreens() {
+  openModal("화면 목록 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사해 붙여넣기 (탭 구분): <b>화면ID · 화면명 · 메뉴경로 · 기획담당 · 개발담당</b> — 뒤쪽 열은 생략 가능. 같은 화면ID는 갱신.</p>
+    <textarea id="bulkText" style="min-height:240px" class="mono" placeholder="SCR-001\t로그인\t공통 > 로그인\nSCR-002\t회원가입\t회원 > 가입"></textarea>`, [
+    { l: "취소", fn: closeModal },
+    { l: "추가", cls: "primary", fn: () => {
+      const pid = S.ui.pid; let add = 0, upd = 0;
+      $("bulkText").value.split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((r) => r[0] && r[1]).forEach(([code, name, menu, owner, dev]) => {
+        const ex = S.screens.find((s) => s.projectId === pid && s.code === code);
+        if (ex) { Object.assign(ex, { name, menu: menu || ex.menu, owner: owner || ex.owner, dev: dev || ex.dev }); upd++; }
+        else { S.screens.push({ id: uid("s"), projectId: pid, code, name, menu: menu || "", owner: owner || S.settings.me, dev: dev || "", status: "작성중", version: "v0.1" }); add++; }
+      });
+      commit(); closeModal(); toast(`추가 ${add} · 갱신 ${upd}`);
+    } },
+  ]);
+}
+function sendScreens() {
+  const ids = [...document.querySelectorAll(".scchk:checked")].map((c) => c.value);
+  if (!ids.length) { toast("전달할 화면을 체크해줘"); return; }
+  const names = ids.map((i) => S.screens.find((s) => s.id === i)).map((s) => s.name);
+  editHO(null, { screenIds: ids, projectId: S.ui.pid, title: `${names[0]}${names.length > 1 ? ` 외 ${names.length - 1}건` : ""} 화면 개발 전달` });
+}
+
+// ───────────── WBS ─────────────
+function renderWBS() {
+  if (S.ui.pid === "all") return pageHead("WBS", "") + needProject("WBS");
+  const pid = S.ui.pid, p = proj(pid);
+  const ws = S.wbs.filter((w) => w.projectId === pid);
+  const ds = ws.flatMap((w) => [w.start, w.end]).concat([p.start, p.end]).filter(Boolean).sort();
+  const r0 = ds[0], r1 = ds[ds.length - 1];
+  const span = r0 && r1 ? Math.max(1, calDays(r0, r1) + 1) : 0;
+  const pos = (s) => ((calDays(r0, s)) / span) * 100;
+  const avg = ws.length ? Math.round(ws.reduce((a, w) => a + Number(w.progress || 0), 0) / ws.length) : 0;
+  const late = ws.filter((w) => w.end && w.end < today() && Number(w.progress) < 100).length;
+  let h = pageHead("WBS", `${ws.length}개 작업 · 평균 진척 ${avg}% · 지연 ${late}${r0 ? ` · ${r0} ~ ${r1}` : ""}`,
+    `<button class="btn" onclick="bulkWBS()">엑셀 붙여넣기</button><button class="btn" onclick="exportWbsCsv()">CSV</button><button class="btn primary" onclick="editWBS()">＋ 작업 추가</button>`);
+  const groups = [...PHASES.map((ph) => [ph.id, `P.${ph.id.slice(1)} ${ph.name}`, ph.color]), ["", "일반 업무 / 미분류", "#8b93a1"]];
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>작업</th><th>담당</th><th>시작</th><th>종료</th><th>진척</th><th style="min-width:240px">일정 ${r0 ? `<span class="muted small">(${shortD(r0)} ~ ${shortD(r1)}, 빨간 선=오늘)</span>` : ""}</th></tr></thead><tbody>`;
+  groups.forEach(([gid, gname, color]) => {
+    const rows = ws.filter((w) => (w.phase || "") === gid).sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
+    if (!rows.length && !gid) return;
+    h += `<tr><td colspan="6" style="background:var(--sub);font-weight:700;color:${color}">${gname} <span class="muted small">${rows.length}</span> <button class="btn sm ghost" onclick="editWBS(null,'${gid}')">＋</button></td></tr>`;
+    rows.forEach((w) => {
+      const isLate = w.end && w.end < today() && Number(w.progress) < 100;
+      const bar = r0 && w.start && w.end ? `<div class="bar" style="left:${pos(w.start)}%;width:${Math.max(0.8, ((calDays(w.start, w.end) + 1) / span) * 100)}%;background:${isLate ? "var(--danger)" : color}"><i style="width:${Math.min(100, Number(w.progress) || 0)}%"></i></div>` : "";
+      const tl = r0 && today() >= r0 && today() <= r1 ? `<div class="todayline" style="left:${pos(today())}%"></div>` : "";
+      h += `<tr><td><span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.legacyStatus ? ` <span class="chip-ref">${esc(w.legacyStatus)}</span>` : ""}${w.memo ? ` <span class="muted small" title="${esc(w.memo)}">📝</span>` : ""}</td>
+        <td class="nowrap">${esc(w.owner || "")}</td>
+        <td class="nowrap">${w.start ? shortD(w.start) : '<span class="muted">-</span>'}</td>
+        <td class="nowrap" style="${isLate ? "color:var(--danger);font-weight:600" : ""}">${w.end ? shortD(w.end) : '<span class="muted">-</span>'}</td>
+        <td class="nowrap"><input class="progress" type="number" min="0" max="100" step="10" value="${Number(w.progress) || 0}" onchange="setWBS('${w.id}','progress',Math.max(0,Math.min(100,Number(this.value)||0)))">%</td>
+        <td><div class="gantt">${bar}${tl}</div></td></tr>`;
+    });
+  });
+  h += `</tbody></table></div></div>`;
+  return h;
+}
+function setWBS(id, k, v) { const w = S.wbs.find((x) => x.id === id); w[k] = v; commit(); }
+function editWBS(id, phaseId) {
+  const w = id ? S.wbs.find((x) => x.id === id) : { phase: phaseId ?? "", progress: 0 };
+  openForm(id ? "WBS 작업" : "WBS 작업 추가", [
+    { k: "title", l: "작업", t: "text", full: true, req: true },
+    { k: "phase", l: "단계", t: "select", opts: [["", "일반 업무 / 미분류"], ...PHASES.map((p) => [p.id, `${p.id} ${p.name}`])] },
+    { k: "owner", l: "담당", t: "text" },
+    { k: "start", l: "시작", t: "date" },
+    { k: "end", l: "종료", t: "date" },
+    { k: "progress", l: "진척률(%)", t: "number" },
+    { k: "memo", l: "메모", t: "textarea", full: true },
+  ], w, (v) => {
+    v.progress = Math.max(0, Math.min(100, Number(v.progress) || 0));
+    if (id) Object.assign(w, v); else S.wbs.push(Object.assign({ id: uid("w"), projectId: S.ui.pid }, v));
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("작업을 삭제할까?")) { S.wbs = S.wbs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+}
+function bulkWBS() {
+  openModal("WBS 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀 WBS에서 복사 (탭 구분): <b>단계(P1~P6 또는 빈칸) · 작업 · 담당 · 시작 · 종료 · 진척률</b>. 날짜는 2026-10-15 / 2026.10.15 / 10/15 형식 가능.</p>
+    <textarea id="bulkText" style="min-height:240px" class="mono"></textarea>`, [
+    { l: "취소", fn: closeModal },
+    { l: "추가", cls: "primary", fn: () => {
+      let n = 0;
+      $("bulkText").value.split(/\r?\n/).map((l) => l.split("\t").map((c) => c.trim())).filter((r) => r[1]).forEach(([ph, title, owner, st, en, pr]) => {
+        const pm = String(ph || "").toUpperCase().match(/P\.?\s*([1-6])/);
+        S.wbs.push({ id: uid("w"), projectId: S.ui.pid, phase: pm ? "P" + pm[1] : "", title, owner: owner || "", start: normDate(st), end: normDate(en), progress: Math.max(0, Math.min(100, parseFloat(pr) || 0)), memo: "" });
+        n++;
+      });
+      commit(); closeModal(); toast(`${n}개 추가`);
+    } },
+  ]);
+}
+function normDate(s) {
+  if (!s) return "";
+  let m = String(s).match(/(\d{4})[.\-/년\s]+(\d{1,2})[.\-/월\s]+(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  m = String(s).match(/^(\d{1,2})[./-](\d{1,2})$/);
+  if (m) return `${new Date().getFullYear()}-${pad(m[1])}-${pad(m[2])}`;
+  return "";
+}
+function exportWbsCsv() {
+  const rows = [["단계", "작업", "담당", "시작", "종료", "진척률", "메모"]];
+  S.wbs.filter((w) => w.projectId === S.ui.pid).forEach((w) => rows.push([w.phase, w.title, w.owner, w.start, w.end, w.progress, w.memo]));
+  download(`WBS_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+}
+
+// ───────────── 메일 수신 (붙여넣기 / .eml) ─────────────
+function renderMail() {
+  const pending = S.mails.filter((m) => m.state === "pending");
+  const done = S.mails.filter((m) => m.state !== "pending").sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const hoOpts = (sel) => `<option value="">— 연결 안 함 —</option>` + S.handoffs.filter((h) => !proj(h.projectId)?.archived).sort((a, b) => isOpenHO(b) - isOpenHO(a)).map((h) => `<option value="${h.id}" ${sel === h.id ? "selected" : ""}>${esc(h.code)} ${esc(h.title.slice(0, 34))}${isOpenHO(h) ? "" : " (종료)"}</option>`).join("");
+  let h = pageHead("메일 수신", "개발자 회신 메일을 붙여넣거나 .eml 파일을 끌어다 놓으면, [코드]·보낸 사람·제목으로 전달 건을 찾아 타임라인에 반영해.");
+  h += `<div class="grid2"><div>
+    <div class="card"><div class="card-h"><h3>메일 붙여넣기</h3><span class="sub">Outlook 등에서 본문 전체 복사(Ctrl+A, Ctrl+C) → 붙여넣기</span></div><div class="card-b">
+      <textarea id="mailPaste" style="min-height:150px" placeholder="보낸 사람: 김개발 <dev@company.com>&#10;보낸 날짜: 2026년 10월 15일 수요일 오후 3:20&#10;받는 사람: ...&#10;제목: RE: [HO-003] 회원가입 화면설계서 개발 전달&#10;&#10;확인했습니다. 10/20까지 반영 예정입니다."></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px"><button class="btn primary" onclick="parseMailPaste()">분석</button><span class="muted small" style="align-self:center">여러 통은 하나씩 넣어줘 (스레드면 맨 위 최신 메일만 읽음)</span></div>
+      <div class="drop" id="dropZone">.eml 파일을 여기로 끌어다 놓기 (여러 개 가능) · 또는 <a href="#" onclick="document.getElementById('emlFile').click();return false">파일 선택</a></div>
+      <input type="file" id="emlFile" accept=".eml,.txt" multiple style="display:none" onchange="readEmlFiles(this.files);this.value=''">
+    </div></div>
+    <div class="card"><div class="card-h"><h3>반영 대기</h3><span class="sub">${pending.length}통 · 확인 후 [반영]</span></div><div class="card-b">` +
+      (pending.map((m) => `<div class="mailcand">
+        <div class="subj">${esc(m.subject || "(제목 없음)")}</div>
+        <div class="from">${esc(m.from || "")} · ${esc(m.date || "")}${m.why ? ` · <span style="color:var(--ok)">자동 매칭: ${esc(m.why)}</span>` : ` · <span style="color:var(--warn)">매칭 못함 — 직접 선택</span>`}</div>
+        <div class="snip">${esc((m.body || "").slice(0, 400))}</div>
+        <div class="row">
+          <select id="mh_${m.id}">${hoOpts(m.hoId)}</select>
+          <select id="mt_${m.id}">${EV_TYPES.filter(([k]) => k !== "sent").map(([k, l]) => `<option value="${k}" ${m.type === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+          <input type="date" id="md_${m.id}" value="${esc(m.date || today())}">
+          <button class="btn primary sm" onclick="applyMail('${m.id}')">반영</button>
+          <button class="btn sm ghost" onclick="dropMail('${m.id}')">무시</button>
+        </div></div>`).join("") || `<div class="empty">대기 중인 메일 없음</div>`) +
+    `</div></div></div>
+    <div>
+    <div class="card"><div class="card-h"><h3>수신 로그</h3><span class="sub">${done.length}통</span></div>` +
+      (done.slice(0, 40).map((m) => { const ho = S.handoffs.find((x) => x.id === m.hoId);
+        return `<div class="alert"><span class="ic" style="background:${m.state === "applied" ? "var(--ok)" : "var(--line2)"}"></span><div class="body"><div class="tt" ${ho ? `onclick="openHO('${ho.id}')"` : ""}>${esc(m.subject || "(제목 없음)")}</div><div class="d">${esc(m.date || "")} · ${esc((m.from || "").replace(/<.*>/, ""))} ${ho ? `→ <b>${esc(ho.code)}</b> ${evLabel(m.type)}` : "· 무시됨"}</div></div></div>`; }).join("") || `<div class="empty">아직 없음</div>`) +
+    `</div>
+    <div class="note-box" style="margin-top:14px"><b>자동 연동 로드맵</b> (메일 시스템 알려주면 맞춰서 붙일게)
+      <ol>
+        <li><b>지금</b>: 붙여넣기 / .eml 끌어다 놓기 → 자동 매칭 → 반영</li>
+        <li><b>Outlook(회사 Exchange/M365)</b>: Microsoft Graph API 또는 Outlook 규칙으로 [HO-] 제목 메일을 폴더에 모으고, 작은 스크립트가 JSON으로 내보내면 여기서 한 번에 불러오기</li>
+        <li><b>IMAP 지원 메일(Gmail·네이버웍스·하이웍스 등)</b>: Python/Node 스크립트가 주기적으로 IMAP 조회 → JSON 생성 → 이 화면에서 가져오기</li>
+      </ol>
+      브라우저에서 메일 사이트를 직접 크롤링하는 건 로그인·보안 정책 때문에 깨지기 쉬워서, 2·3번(공식 API/IMAP)을 추천해.</div>
+    </div></div>`;
+  return h;
+}
+function bindDrop() {
+  const z = $("dropZone"); if (!z) return;
+  z.ondragover = (e) => { e.preventDefault(); z.classList.add("over"); };
+  z.ondragleave = () => z.classList.remove("over");
+  z.ondrop = (e) => { e.preventDefault(); z.classList.remove("over"); readEmlFiles(e.dataTransfer.files); };
+}
+function readEmlFiles(files) {
+  const arr = [...files]; if (!arr.length) return;
+  let n = 0;
+  arr.forEach((f) => {
+    if (/\.msg$/i.test(f.name)) { toast(".msg(Outlook 형식)는 아직 못 읽어 — 본문 복사 붙여넣기로 해줘"); return; }
+    const r = new FileReader();
+    r.onload = () => { queueMail(parseEml(r.result)); if (++n === arr.length) { commit(); toast(`${n}통 분석됨`); } };
+    r.readAsText(f);
+  });
+}
+function parseMailPaste() {
+  const t = $("mailPaste").value.trim(); if (!t) return;
+  const m = /^(Received|Return-Path|MIME-Version|Message-ID):/im.test(t) ? parseEml(t) : parseOutlookText(t);
+  queueMail(m); commit(); toast("분석 완료 — 반영 대기 확인");
+}
+function queueMail(m) {
+  const match = matchHandoff(m);
+  S.mails.push(Object.assign({ id: uid("m"), state: "pending", hoId: match?.h.id || "", why: match?.why || "", type: guessType(m.subject + "\n" + m.body) }, m, { body: (m.body || "").slice(0, 4000) }));
+}
+function applyMail(mid) {
+  const m = S.mails.find((x) => x.id === mid);
+  const hid = $("mh_" + mid).value, type = $("mt_" + mid).value, at = $("md_" + mid).value || today();
+  if (!hid) { toast("연결할 전달 건을 골라줘"); return; }
+  const h = S.handoffs.find((x) => x.id === hid);
+  const body = (m.body || "").trim().split(/\n/).filter((l) => l.trim()).slice(0, 6).join("\n");
+  pushEvent(h, { type, at, via: "mail", mailId: m.id, text: `${m.subject}\n${(m.from || "").replace(/<.*>/, "").trim()}: ${body}`.slice(0, 600) });
+  Object.assign(m, { state: "applied", hoId: hid, type, date: at });
+  commit(); toast(`[${h.code}] ${evLabel(type)} 반영`);
+}
+function dropMail(mid) { const m = S.mails.find((x) => x.id === mid); m.state = "ignored"; commit(); }
+
+function guessType(t) {
+  const s = t.replace(/(완료|배포|반영|적용|처리)\s*(예정|목표|일정|요청|부탁)/g, "");   // "완료 예정"은 완료가 아님
+  if (/완료|배포(했|하였|됐|되었)|반영(했|하였|됐|되었)|적용(했|하였|됐|되었)|처리(했|하였|됐|되었)|개발 ?끝/.test(s)) return "done";
+  if (/\?|문의|질문|궁금|확인 ?부탁|어떻게|맞나요|인지요/.test(s)) return "question";
+  if (/접수|확인했|확인하였|확인 ?했습니다|검토하겠|확인하겠|받았습니다|수신했/.test(s)) return "ack";
+  if (/진행 ?중|작업 ?중|개발 ?중|예정입니다|까지/.test(s)) return "progress";
+  return "note";
+}
+function matchHandoff(m) {
+  const text = `${m.subject}\n${m.body}`;
+  const prefix = (S.settings.hoPrefix || "HO").replace(/[^A-Za-z]/g, "");
+  const cm = text.match(new RegExp(`\\b(${prefix}-\\d{2,4})\\b`, "i"));
+  if (cm) { const h = S.handoffs.find((x) => x.code.toUpperCase() === cm[1].toUpperCase()); if (h) return { h, why: "코드 " + h.code }; }
+  const em = ((m.from || "").match(/[\w.+-]+@[\w.-]+/) || [""])[0].toLowerCase();
+  const subj = (m.subject || "").replace(/^(re|fw|fwd|회신|전달|답장)\s*:\s*/gi, "").toLowerCase();
+  let best = null, score = 0;
+  S.handoffs.filter(isOpenHO).forEach((h) => {
+    let s = 0;
+    if (em && (h.toEmail || "").toLowerCase().includes(em)) s += 2;
+    const toks = h.title.toLowerCase().split(/[\s,·/()\[\]-]+/).filter((w) => w.length >= 2);
+    const hit = toks.filter((w) => subj.includes(w)).length;
+    s += Math.min(3, hit);
+    if (s > score) { score = s; best = h; }
+  });
+  return score >= 2 ? { h: best, why: em && (best.toEmail || "").toLowerCase().includes(em) ? "보낸 사람·제목" : "제목 유사" } : null;
+}
+function parseKDate(s) {
+  if (!s) return today();
+  let m = s.match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/);
+  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
+  const d = new Date(s); return isNaN(d) ? today() : fmtD(d);
+}
+function parseOutlookText(t) {
+  const lines = t.replace(/\r/g, "").split("\n");
+  const hd = {}; let i = 0, sawHeader = false;
+  const keys = { from: /^(보낸 ?사람|From|발신자?)\s*:\s*(.*)$/i, date: /^(보낸 ?날짜|날짜|Sent|Date|발신일시?)\s*:\s*(.*)$/i, subject: /^(제목|Subject)\s*:\s*(.*)$/i, to: /^(받는 ?사람|To|수신자?|참조|Cc)\s*:\s*(.*)$/i };
+  for (; i < Math.min(lines.length, 14); i++) {
+    const l = lines[i].trim(); if (!l) { if (sawHeader && hd.subject !== undefined) { i++; break; } continue; }
+    let hit = false;
+    for (const [k, re] of Object.entries(keys)) { const m = l.match(re); if (m) { if (hd[k] === undefined) hd[k] = m[2].trim(); hit = sawHeader = true; break; } }
+    if (!hit && sawHeader) break;
+    if (!hit && !sawHeader) { if (hd.subject === undefined) hd.subject = l; sawHeader = true; i++; break; }
+  }
+  let body = lines.slice(i).join("\n");
+  const cut = body.search(/\n\s*(-{2,}\s*(Original Message|원본 메시지)\s*-{2,}|보낸 ?사람\s*:|From\s*:)/i);
+  if (cut > 0) body = body.slice(0, cut);
+  return { from: hd.from || "", subject: hd.subject || "", date: parseKDate(hd.date), body: body.trim() };
+}
+// ── 최소 .eml 파서 (헤더 디코딩 + text/plain 우선, multipart 재귀) ──
+function decodeWords(s) {
+  return String(s || "").replace(/\?=\s+=\?/g, "?==?").replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (m, cs, enc, txt) => {
+    try {
+      let bin = enc.toUpperCase() === "B" ? atob(txt) : txt.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
+      return new TextDecoder(cs).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+    } catch (e) { return m; }
+  });
+}
+function splitMsg(raw) {
+  const idx = raw.search(/\r?\n\r?\n/);
+  const head = idx < 0 ? raw : raw.slice(0, idx), body = idx < 0 ? "" : raw.slice(idx).replace(/^\r?\n\r?\n/, "");
+  const h = {};
+  head.replace(/\r?\n[ \t]+/g, " ").split(/\r?\n/).forEach((l) => { const m = l.match(/^([\w-]+):\s*(.*)$/); if (m) { const k = m[1].toLowerCase(); if (!(k in h)) h[k] = m[2]; } });
+  return { h, body };
+}
+function decodeBody(body, cte, charset) {
+  cte = (cte || "").toLowerCase(); charset = charset || "utf-8";
+  let bin;
+  if (cte.includes("base64")) { try { bin = atob(body.replace(/\s+/g, "")); } catch (e) { return body; } }
+  else if (cte.includes("quoted-printable")) bin = body.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
+  else return body;
+  try { return new TextDecoder(charset).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))); } catch (e) { return bin; }
+}
+function partText(h, body) {
+  const ct = h["content-type"] || "text/plain";
+  const bm = ct.match(/boundary="?([^";]+)"?/i);
+  if (/multipart\//i.test(ct) && bm) {
+    const parts = body.split("--" + bm[1]).slice(1).filter((p) => !p.startsWith("--")).map((p) => splitMsg(p.replace(/^\r?\n/, "")));
+    const pick = parts.find((p) => /text\/plain/i.test(p.h["content-type"] || "")) || parts.find((p) => /multipart/i.test(p.h["content-type"] || "")) || parts.find((p) => /text\/html/i.test(p.h["content-type"] || ""));
+    return pick ? partText(pick.h, pick.body) : "";
+  }
+  const cs = (ct.match(/charset="?([^";]+)"?/i) || [])[1];
+  let txt = decodeBody(body, h["content-transfer-encoding"], cs);
+  if (/text\/html/i.test(ct)) txt = txt.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+  return txt;
+}
+function parseEml(raw) {
+  const { h, body } = splitMsg(raw);
+  let text = partText(h, body).replace(/\r/g, "");
+  const cut = text.search(/\n\s*(-{2,}\s*(Original Message|원본 메시지)\s*-{2,}|보낸 ?사람\s*:|From\s*:|.*wrote:\s*\n|>)/i);
+  if (cut > 0) text = text.slice(0, cut);
+  return { from: decodeWords(h.from), subject: decodeWords(h.subject), date: parseKDate(h.date), body: text.trim() };
+}
+
+// ───────────── 메모·회의록 ─────────────
+function renderNotes() {
+  const list = S.notes.filter((n) => S.ui.pid === "all" ? !proj(n.projectId)?.archived : n.projectId === S.ui.pid).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  let cur = S.notes.find((n) => n.id === S.ui.noteId && list.includes(n)) || list[0];
+  let h = pageHead("메모 · 회의록", "자동 저장 · 결정사항/액션아이템은 전달 건이나 WBS로 바로 옮겨 관리", `<button class="btn primary" onclick="newNote()">＋ 새 메모</button>`);
+  h += `<div class="notes-wrap"><div class="card" style="max-height:72vh;overflow-y:auto">` +
+    (list.map((n) => `<div class="note-item ${cur && n.id === cur.id ? "active" : ""}" onclick="S.ui.noteId='${n.id}';render()"><div class="t">${esc(n.title || "(제목 없음)")}</div><div class="m">${n.date || ""} · ${esc(projName(n.projectId))}</div></div>`).join("") || `<div class="empty">메모 없음</div>`) +
+    `</div><div class="card"><div class="card-b">` +
+    (cur ? `<div class="form" style="margin-bottom:10px">
+      <div class="full"><input type="text" id="noteTitle" value="${esc(cur.title)}" placeholder="제목 (예: 1015 화면설계 리뷰 회의)" style="font-size:15px;font-weight:600"></div>
+      <div><select id="noteProj">${S.projects.map((p) => `<option value="${p.id}" ${p.id === cur.projectId ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+      <div><input type="date" id="noteDate" value="${esc(cur.date || "")}"></div></div>
+      <textarea id="noteContent" placeholder="회의 내용, 결정사항, 액션아이템…">${esc(cur.content || "")}</textarea>
+      <div style="display:flex;gap:6px;margin-top:8px;align-items:center"><span class="muted small" id="noteSaved">자동 저장됨</span>
+      <button class="btn sm" style="margin-left:auto" onclick="copyText(document.getElementById('noteContent').value)">복사</button>
+      <button class="btn sm danger" onclick="delNote('${cur.id}')">삭제</button></div>` : `<div class="empty">왼쪽에서 메모를 고르거나 새로 만들어</div>`) +
+    `</div></div></div>`;
+  return h;
+}
+function bindNoteEditor() {
+  const ids = ["noteTitle", "noteProj", "noteDate", "noteContent"];
+  if (!$("noteContent")) return;
+  const list = S.notes.filter((n) => S.ui.pid === "all" ? !proj(n.projectId)?.archived : n.projectId === S.ui.pid).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
+  const cur = S.notes.find((n) => n.id === S.ui.noteId && list.includes(n)) || list[0];
+  let t;
+  ids.forEach((i) => $(i).addEventListener("input", () => {
+    clearTimeout(t); $("noteSaved").textContent = "입력 중…";
+    t = setTimeout(() => {
+      Object.assign(cur, { title: $("noteTitle").value, projectId: $("noteProj").value, date: $("noteDate").value, content: $("noteContent").value, updatedAt: new Date().toISOString() });
+      persist(); $("noteSaved").textContent = "자동 저장됨 " + new Date().toLocaleTimeString("ko-KR");
+    }, 500);
+  }));
+}
+function newNote() {
+  const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id;
+  if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const n = { id: uid("n"), projectId: pid, title: "", date: today(), content: "", updatedAt: new Date().toISOString() };
+  S.notes.push(n); S.ui.noteId = n.id; commit(); setTimeout(() => $("noteTitle")?.focus(), 0);
+}
+function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); }
+
+// ───────────── 프로젝트 / 설정 / 보고 ─────────────
+function editProject(id) {
+  const p = id ? proj(id) : { archived: false };
+  const fields = [
+    { k: "name", l: "프로젝트명", t: "text", full: true, req: true },
+    { k: "client", l: "고객사 / 발주처", t: "text" },
+    { k: "pm", l: "PM", t: "text" },
+    { k: "devLead", l: "개발 PL / 업체", t: "text" },
+    { k: "ackDays", l: "접수 노티 기준(영업일)", t: "number", hint: `비우면 기본 ${S.settings.ackDays}일` },
+    { k: "start", l: "시작일", t: "date" },
+    { k: "end", l: "종료일", t: "date" },
+    { k: "memo", l: "메모", t: "textarea", full: true },
+  ];
+  if (id) fields.push({ k: "archived", l: "보관(종료된 프로젝트)", t: "check" });
+  else fields.push({ k: "_tpl", l: "수행방법론 템플릿 적용 (단계별 산출물 19종 + WBS 활동 자동 생성)", t: "check", v: true });
+  openForm(id ? "프로젝트 정보" : "프로젝트 추가", fields, p, (v) => {
+    if (id) Object.assign(p, v);
+    else {
+      const tpl = v._tpl; delete v._tpl;
+      const np = Object.assign({ id: uid("p") }, v);
+      S.projects.push(np); if (tpl) applyTemplate(np);
+      S.ui.pid = np.id;
+    }
+    commit();
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => {
+    if (!confirm(`「${p.name}」와 관련 데이터(산출물·전달·화면·WBS·메모)를 모두 삭제할까? 되돌릴 수 없어. (보관 처리를 추천)`)) return;
+    ["docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => (S[k] = S[k].filter((x) => x.projectId !== id)));
+    S.projects = S.projects.filter((x) => x.id !== id); commit(); closeModal();
+  } }] : []);
+}
+function openSettings() {
+  openForm("설정", [
+    { k: "me", l: "내 이름 (메일 문구에 사용)", t: "text", ph: "예: 정건호 매니저" },
+    { k: "hoPrefix", l: "전달 코드 접두어", t: "text", hint: "HO-001 형식. 메일 제목 매칭에 사용" },
+    { k: "sign", l: "메일 서명", t: "textarea", full: true, ph: "정건호 | RMS PMO\n010-0000-0000" },
+    { k: "ackDays", l: "접수 노티 기준 (영업일)", t: "number", hint: "전달 후 이 기간 넘게 접수 회신 없으면 경고" },
+    { k: "approvalDays", l: "산출물 승인 회신 기준 (영업일)", t: "number" },
+    { k: "quietDays", l: "진행 공유 없음 기준 (영업일)", t: "number" },
+    { k: "verifyDays", l: "내 검수 알림 (완료 노티 후 일)", t: "number" },
+  ], S.settings, (v) => { ["ackDays", "approvalDays", "quietDays", "verifyDays"].forEach((k) => (v[k] = Number(v[k]) || emptyState().settings[k])); Object.assign(S.settings, v); commit(); },
+  [{ l: "JSON 내보내기", cls: "left", fn: () => download(`planner-desk_${stamp()}.json`, JSON.stringify(S, null, 1), "application/json") }]);
+}
+function toggleTheme() { S.settings.theme = S.settings.theme === "dark" ? "light" : "dark"; persist(); render(); }
+function openReport() {
+  const pids = S.ui.pid === "all" ? activeProjects().map((p) => p.id) : [S.ui.pid];
+  const t = today(), ws = addDays(t, -6), nx = addDays(t, 7);
+  const out = pids.map((pid) => {
+    const p = proj(pid); const s = docStats(pid);
+    const hos = S.handoffs.filter((h) => h.projectId === pid);
+    const sentW = hos.filter((h) => h.sentAt >= ws && h.sentAt <= t);
+    const doneW = hos.filter((h) => h.events.some((e) => e.type === "done" && e.at >= ws));
+    const verW = hos.filter((h) => h.events.some((e) => e.type === "verified" && e.at >= ws));
+    const apprW = S.docs.filter((d) => d.projectId === pid && d.approvedAt && d.approvedAt >= ws);
+    const al = computeAlerts(pid);
+    const nextW = S.wbs.filter((w) => w.projectId === pid && Number(w.progress) < 100 && ((w.start && w.start <= nx && w.start > t) || (w.end && w.end <= nx && w.end >= t)));
+    const ph = currentPhase(pid);
+    const L = [];
+    L.push(`■ ${p.name}${ph ? ` (현재 ${ph} ${phase(ph).name})` : ""}`);
+    L.push(`1. 산출물: 승인 ${s.ok}/${s.total} · 검토요청 ${s.req} · 작성중 ${s.wip}`);
+    apprW.forEach((d) => L.push(`   - 승인: ${d.name} ${d.version || ""} (${shortD(d.approvedAt)})`));
+    L.push(`2. 개발 전달: 금주 전달 ${sentW.length}건 · 완료 노티 ${doneW.length}건 · 검수완료 ${verW.length}건 · 진행 중 ${hos.filter(isOpenHO).length}건`);
+    sentW.forEach((h) => L.push(`   - 전달: [${h.code}] ${h.title} → ${h.to || "-"}`));
+    const issues = al.filter((a) => a.level === "danger");
+    L.push(`3. 이슈 / 회신 지연: ${issues.length}건`);
+    issues.forEach((a) => L.push(`   - ${a.kind}: ${a.title} — ${a.desc}`));
+    al.filter((a) => a.kind === "WBS 지연" || a.kind === "산출물 일정 지연").forEach((a) => L.push(`   - ${a.kind}: ${a.title} (${a.desc})`));
+    L.push(`4. 차주 계획`);
+    (nextW.length ? nextW : [{ title: "(WBS 일정 입력 필요)" }]).forEach((w) => L.push(`   - ${w.title}${w.end ? ` ~${shortD(w.end)}` : ""}${w.owner ? ` / ${w.owner}` : ""}`));
+    return L.join("\n");
+  }).join("\n\n");
+  const txt = `주간 보고 (${ws} ~ ${t})\n\n` + out;
+  openModal("주간보고 초안", `<textarea id="rep" class="mono" style="min-height:380px">${esc(txt)}</textarea>`, [
+    { l: ".txt 저장", cls: "left", fn: () => download(`주간보고_${stamp()}.txt`, $("rep").value, "text/plain") },
+    { l: "복사", cls: "primary", fn: () => copyText($("rep").value) },
+  ], true);
+}
+
+// ───────────── modal / form ─────────────
+function openModal(title, body, buttons = [], wide = false) {
+  $("modalTitle").textContent = title;
+  $("modalBody").innerHTML = body;
+  $("modal").className = "modal" + (wide ? " wide" : "");
+  const f = $("modalFoot"); f.innerHTML = "";
+  buttons.forEach((b) => { const el = document.createElement("button"); el.className = "btn " + (b.cls || ""); el.textContent = b.l; el.onclick = b.fn; f.appendChild(el); });
+  f.style.display = buttons.length ? "flex" : "none";
+  $("modalBg").classList.add("open");
+}
+function closeModal() { $("modalBg").classList.remove("open"); }
+function openForm(title, fields, obj, onSave, extraBtns = [], extraHtml = "") {
+  const body = `<div class="form" id="fForm">` + fields.map((f) => {
+    const v = obj[f.k] !== undefined && obj[f.k] !== null && obj[f.k] !== "" ? obj[f.k] : f.v ?? "";
+    let input;
+    if (f.t === "textarea") input = `<textarea data-k="${f.k}" placeholder="${esc(f.ph || "")}">${esc(v)}</textarea>`;
+    else if (f.t === "select") input = `<select data-k="${f.k}">${f.opts.map((o) => { const [ov, ol] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(ov)}" ${String(ov) === String(v) ? "selected" : ""}>${esc(ol)}</option>`; }).join("")}</select>`;
+    else if (f.t === "multi") input = f.opts.length ? `<select multiple data-k="${f.k}" data-multi="1">${f.opts.map(([ov, ol]) => `<option value="${ov}" ${(v || []).includes(ov) ? "selected" : ""}>${esc(ol)}</option>`).join("")}</select>` : `<div class="muted small">(등록된 항목 없음)</div>`;
+    else if (f.t === "check") return `<div class="full"><label class="check"><input type="checkbox" data-k="${f.k}" data-check="1" ${v ? "checked" : ""}> ${esc(f.l)}</label></div>`;
+    else input = `<input type="${f.t}" data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || "")}">`;
+    return `<div class="${f.full ? "full" : ""}"><label>${esc(f.l)}${f.req ? " *" : ""}</label>${input}${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""}</div>`;
+  }).join("") + `</div>` + extraHtml;
+  openModal(title, body, [...extraBtns, { l: "취소", fn: closeModal }, { l: "저장", cls: "primary", fn: () => {
+    const v = {};
+    fields.filter((f) => f.t === "multi").forEach((f) => (v[f.k] = []));
+    document.querySelectorAll("#fForm [data-k]").forEach((el) => {
+      v[el.dataset.k] = el.dataset.multi ? [...el.selectedOptions].map((o) => o.value) : el.dataset.check ? el.checked : el.value.trim();
+    });
+    const miss = fields.find((f) => f.req && !v[f.k]);
+    if (miss) { toast(`${miss.l} 입력 필요`); return; }
+    if (onSave(v) !== false) { if ($("modalTitle").textContent === title) closeModal(); }
+  } }], fields.length > 9);
+  setTimeout(() => document.querySelector("#fForm [data-k]")?.focus(), 30);
+}
+
+// ───────────── demo seed ─────────────
+function seedDemo() {
+  const t = today();
+  const p = { id: uid("p"), name: "샘플 · 고객포털 고도화", client: "샘플 고객사", pm: "", devLead: "개발사 A", start: addDays(t, -45), end: addDays(t, 75), memo: "둘러보기용 샘플 — 프로젝트 정보에서 삭제 가능", archived: false };
+  S.projects.push(p); applyTemplate(p);
+  const D = (name) => S.docs.find((d) => d.projectId === p.id && d.name === name);
+  const setD = (name, o) => Object.assign(D(name), o);
+  setD("착수보고서", { status: "승인", version: "v1.0", approvedAt: addDays(t, -40), requestedAt: addDays(t, -43), approver: "고객 PM" });
+  setD("프로젝트 수행 계획서(WBS)", { status: "승인", version: "v1.0", approvedAt: addDays(t, -38), requestedAt: addDays(t, -41), approver: "고객 PM" });
+  setD("As-Is 프로세스 분석서", { status: "승인", version: "v1.0", approvedAt: addDays(t, -25), requestedAt: addDays(t, -28), approver: "고객 PM" });
+  setD("요구사항 정의서", { status: "승인", version: "v1.1", approvedAt: addDays(t, -20), requestedAt: addDays(t, -23), approver: "고객 PM" });
+  setD("URS", { status: "해당없음" });
+  setD("To-Be 프로세스 정의서", { status: "검토요청", version: "v0.9", requestedAt: addDays(t, -7), approver: "고객 PM", plan: addDays(t, -3) });
+  setD("화면설계서", { status: "작성중", version: "v0.6", plan: addDays(t, 10), owner: "기획" });
+  setD("프로토타이핑", { status: "작성중", version: "v0.3", plan: addDays(t, -2) });
+  const wb = (title) => S.wbs.find((w) => w.projectId === p.id && w.title === title);
+  const ph = [["프로젝트 계획수립", -45, -38, 100], ["현행 프로세스 분석", -37, -25, 100], ["현행 시스템 분석", -37, -25, 100], ["개발 요구 사항 수집", -30, -20, 100],
+    ["아키텍처 설계", -19, 0, 80], ["To-Be 이미지 설계", -19, 5, 60], ["Fit-Gap 분석", -15, -3, 70], ["개발 설계서 작성", -10, 14, 30],
+    ["개발 환경 구축", -5, 5, 40], ["어플리케이션 개발", 0, 45, 5], ["테스트 데이터 수집", 20, 40, 0], ["단위 테스트", 30, 50, 0],
+    ["운영환경 구축", 45, 55, 0], ["통합 테스트", 50, 62, 0], ["FDS 작성", 55, 65, 0], ["시스템 교육 실시", 63, 68, 0], ["프로젝트 완료 보고", 70, 74, 0], ["인수인계", 70, 75, 0]];
+  ph.forEach(([n, a, b, pr]) => { const w = wb(n); if (w) Object.assign(w, { start: addDays(t, a), end: addDays(t, b), progress: pr }); });
+  const sc = [["SCR-CMN-001", "로그인", "공통 > 로그인", "확정"], ["SCR-MBR-001", "회원가입 약관동의", "회원 > 가입", "확정"], ["SCR-MBR-002", "회원정보 입력", "회원 > 가입", "검토중"], ["SCR-MYP-001", "마이페이지 메인", "마이페이지", "작성중"], ["SCR-ORD-001", "주문 내역", "마이페이지 > 주문", "작성중"]];
+  sc.forEach(([code, name, menu, status]) => S.screens.push({ id: uid("s"), projectId: p.id, code, name, menu, status, version: status === "확정" ? "v1.0" : "v0.5", owner: "기획", dev: "" }));
+  const scr = (c) => S.screens.find((s) => s.code === c);
+  const mk = (o, evs) => {
+    const h = Object.assign({ id: uid("h"), code: nextHOCode(), projectId: p.id, status: "sent", events: [], docIds: [], screenIds: [], cc: "", link: "", memo: "", priority: "mid" }, o);
+    evs.forEach(([type, d, text]) => pushEvent(h, { type, at: addDays(t, d), text }));
+    h.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s) s.hoId = h.id; });
+    S.handoffs.push(h);
+  };
+  mk({ title: "로그인 화면 설계 개발 전달", to: "김개발 선임", toEmail: "dev.kim@example.com", sentAt: addDays(t, -20), dueDate: addDays(t, -6), screenIds: [scr("SCR-CMN-001").id] },
+    [["sent", -20, "화면설계서 v1.0 p.3~6"], ["ack", -19, "메일로 접수 확인"], ["done", -7, "개발계 반영 완료 노티"], ["verified", -5, "기획 검수 OK"]]);
+  mk({ title: "회원가입 약관동의 화면 개발 전달", to: "이개발 책임", toEmail: "dev.lee@example.com", sentAt: addDays(t, -14), dueDate: addDays(t, -2), screenIds: [scr("SCR-MBR-001").id] },
+    [["sent", -14, "약관 3종 문구 포함"], ["ack", -13, "접수, 10일 소요 예상"], ["progress", -9, "API 연동 중"]]);
+  mk({ title: "회원정보 입력 화면 개발 전달", to: "이개발 책임", toEmail: "dev.lee@example.com", sentAt: addDays(t, -6), dueDate: addDays(t, 8), screenIds: [scr("SCR-MBR-002").id], memo: "필수/선택 항목 정의 확인 필요" },
+    [["sent", -6, ""]]);
+  mk({ title: "요구사항 정의서 v1.1 공유 (개발 범위 확인)", to: "개발사 A PL", sentAt: addDays(t, -18), dueDate: addDays(t, -12), docIds: [D("요구사항 정의서").id] },
+    [["sent", -18, ""], ["ack", -17, ""], ["question", -16, "REQ-012 범위 문의"], ["answer", -15, "회의로 답변"], ["done", -3, "개발 범위 확정 회신"]]);
+  S.notes.push({ id: uid("n"), projectId: p.id, title: "샘플 · 화면설계 리뷰 회의", date: addDays(t, -2), content: "참석: 고객 PM, 개발 PL, 기획\n\n[결정]\n- 회원가입 2단계 → 1단계 통합 검토\n\n[액션]\n- 기획: 회원정보 입력 화면 v0.6 수정 (~금)\n- 개발: 본인인증 모듈 일정 회신", updatedAt: new Date().toISOString() });
+  S.ui.pid = p.id;
+}
+
+// ───────────── boot ─────────────
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveFile(false); }
+  if (e.key === "Escape" && $("modalBg").classList.contains("open")) closeModal();
+});
+window.addEventListener("beforeunload", (e) => { if (fileHandle && dirty) { e.preventDefault(); e.returnValue = ""; } });
+load();
+render();
+</script>
+</body>
+</html>

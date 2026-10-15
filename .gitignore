@@ -1,0 +1,10 @@
+# 데이터가 들어간 저장본/백업은 커밋하지 않기 (업무 데이터 보호)
+planner-desk_*.html
+planner-desk_*.json
+*.eml
+산출물_*.csv
+WBS_*.csv
+주간보고_*.txt
+node_modules/
+.DS_Store
+Thumbs.db
