@@ -249,6 +249,8 @@
   .ti { width: 16px; height: 16px; flex: none; vertical-align: -3px; display: inline-block; }
   .ti + .tlabel { margin-left: 6px; }
   .pill .ti { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+  .epic-lz { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 6px; border-radius: 3px; border: 1px solid; white-space: nowrap; margin-right: 4px; }
+  [data-theme="dark"] .epic-lz { filter: brightness(1.6) saturate(.8); background: transparent !important; }
   .ptag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
   .ptag i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
@@ -538,6 +540,14 @@ function typeIcon(kind) {
   const t = TYPE_ICON[kind]; if (!t) return "";
   return `<svg class="ti" viewBox="0 0 16 16" aria-label="${t[1]}"><title>${t[1]}</title><rect width="16" height="16" rx="3" fill="${t[0]}"/>${t[2]}</svg>`;
 }
+const EPIC_COLORS = [["#5e4db2", "#f3f0ff"], ["#0055cc", "#e9f2ff"], ["#216e4e", "#dcfff1"], ["#206a83", "#e7f9ff"], ["#a54800", "#fff3eb"], ["#943d73", "#ffecf8"]];
+function epicTag(name) {
+  if (!name) return "";
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const [fg, bg] = EPIC_COLORS[h % EPIC_COLORS.length];
+  return `<span class="epic-lz" style="color:${fg};background:${bg};border-color:${fg}33">${esc(name)}</span>`;
+}
+function epicsOf(pid) { return [...new Set(S.tasks.filter((x) => (!pid || x.projectId === pid) && x.epic).map((x) => x.epic))].sort((a, b) => a.localeCompare(b, "ko")); }
 function hoKind(h) { return /^\[결함\]/.test(h.title || "") ? "bug" : "ho"; }
 function priIcon(p) {
   const d = { high: ["#e2483d", "높음", "M3 10.5l5-4.5 5 4.5"], mid: ["#f18d13", "보통", "M3 6.5h10M3 10h10"], low: ["#1d7afc", "낮음", "M3 6l5 4.5 5-4.5"] }[p];
@@ -1049,10 +1059,13 @@ function renderBoard() {
     `<button class="btn primary" onclick="boardAdd('${B.cols[0][0]}')">+ 만들기</button>`);
   h += `<div class="board-bar"><div class="seg">${Object.entries(BOARDS).map(([k, v]) => `<button class="${k === bk ? "on" : ""}" onclick="S.ui.board='${k}';persistUI();render()">${v.l}</button>`).join("")}</div>
     <input class="search" placeholder="카드 검색" value="${esc(S.ui.boardQ || "")}" oninput="S.ui.boardQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)">
-    ${pid ? "" : `<span class="small muted" style="margin-left:auto">그룹</span><div class="seg"><button class="${S.ui.boardGroup !== "project" ? "on" : ""}" onclick="S.ui.boardGroup='none';persistUI();render()">없음</button><button class="${S.ui.boardGroup === "project" ? "on" : ""}" onclick="S.ui.boardGroup='project';persistUI();render()">프로젝트</button></div>`}</div>`;
-  const lanes = !pid && S.ui.boardGroup === "project" ? activeProjects().map((p) => [p.id, items.filter((x) => x.projectId === p.id)]) : [[null, items]];
+    <span class="small muted" style="margin-left:auto">그룹</span><div class="seg">${[["none", "없음"], ...(pid ? [] : [["project", "프로젝트"]]), ...(bk === "tasks" ? [["epic", "분류"]] : [])].map(([k, l]) => `<button class="${(S.ui.boardGroup || "none") === k ? "on" : ""}" onclick="S.ui.boardGroup='${k}';persistUI();render()">${l}</button>`).join("")}</div></div>`;
+  const grp = S.ui.boardGroup === "project" && pid ? "none" : S.ui.boardGroup === "epic" && bk !== "tasks" ? "none" : S.ui.boardGroup || "none";
+  const lanes = grp === "project" ? activeProjects().map((p) => [projTag(p.id), items.filter((x) => x.projectId === p.id)])
+    : grp === "epic" ? [...epicsOf(pid).map((e) => [epicTag(e), items.filter((x) => x.epic === e)]), ["<span class=\"muted\">분류 없음</span>", items.filter((x) => !x.epic)]].filter(([, l]) => l.length)
+    : [[null, items]];
   lanes.forEach(([lp, list]) => {
-    if (lp) h += `<div class="lane-h">${projTag(lp)} <span class="muted small">${list.length}</span></div>`;
+    if (lp) h += `<div class="lane-h">${lp} <span class="muted small">${list.length}</span></div>`;
     h += `<div class="board">` + B.cols.map(([ck, cl], ci) => {
       const isDoneCol = B.done.includes(ck);
       const all = list.filter((x) => B.st(x) === ck).sort((a, b) => isDoneCol ? (B.due(b) || "").localeCompare(B.due(a) || "") : (B.due(a) || "9999").localeCompare(B.due(b) || "9999"));
@@ -1066,7 +1079,7 @@ function renderBoard() {
           const dcls = !due || isDone ? "" : due < t ? "late" : calDays(t, due) <= 3 ? "soon" : "";
           const al = alertOf(x.id);
           return `<div class="kcard" draggable="true" data-id="${x.id}" style="border-left-color:${projColor(x.projectId)}" ondragstart="event.dataTransfer.setData('text/plain','${x.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')">
-            <div class="tt" onclick="${B.open(x)}">${esc(boardTitle(bk, x))}</div>
+            <div class="tt" onclick="${B.open(x)}">${esc(boardTitle(bk, x))}</div>${bk === "tasks" && x.epic ? `<div style="margin-top:6px">${epicTag(x.epic)}</div>` : ""}
             ${al ? `<div class="warnline">${esc(al.kind)}</div>` : ""}
             <div class="meta">${typeIcon(B.icon(x))}<span class="key">${esc(B.key(x) || "")}</span>${B.pri ? priIcon(B.pri(x)) : ""}${due ? `<span class="due ${dcls}">${shortD(due)}${isDone ? "" : " " + dday(due)}</span>` : ""}
               ${bk === "tc" && ck === "미수행" ? `<button class="next" onclick="boardMove('${x.id}','Pass')">Pass</button><button class="next" style="color:var(--danger)" onclick="boardMove('${x.id}','Fail')">Fail</button>` : next ? `<button class="next" onclick="boardMove('${x.id}','${esc(next[0])}')" title="${esc(next[1])}(으)로 넘기기">다음 →</button>` : ""}${avatar(B.who(x))}</div></div>`;
@@ -1454,19 +1467,22 @@ function renderTasks() {
   const cnt = { open: list.filter((x) => x.status !== "완료").length, all: list.length };
   TASK_ST.forEach((st) => (cnt[st] = list.filter((x) => x.status === st).length));
   list = list.filter((x) => (f === "all" ? true : f === "open" ? x.status !== "완료" : x.status === f));
-  if (q) list = list.filter((x) => (x.title + (x.owner || "") + (x.memo || "")).toLowerCase().includes(q));
+  if (S.ui.taskEpic) list = list.filter((x) => (x.epic || "") === (S.ui.taskEpic === "(없음)" ? "" : S.ui.taskEpic));
+  if (q) list = list.filter((x) => (x.title + (x.owner || "") + (x.memo || "") + (x.epic || "")).toLowerCase().includes(q));
   const pr = { high: 0, mid: 1, low: 2 };
   list.sort((a, b) => (a.status === "완료") - (b.status === "완료") || (a.due || "9999").localeCompare(b.due || "9999") || (pr[a.priority] ?? 1) - (pr[b.priority] ?? 1));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.taskFilter='${k}';render()">${l} ${cnt[k]}</button>`;
   let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `<button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
   h += `<div class="filters">${chip("open", "진행 전체")}${chip("진행중", "진행중")}${chip("대기", "대기")}${chip("예정", "예정")}${chip("완료", "완료")}${chip("all", "전체")}
     <input class="search" placeholder="업무·담당·메모 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
+  const eps = epicsOf(pid);
+  if (eps.length) h += `<div class="filters"><span class="small muted">분류</span><button class="chip ${!S.ui.taskEpic ? "active" : ""}" onclick="S.ui.taskEpic='';render()">전체</button>${eps.map((e) => `<button class="chip ${S.ui.taskEpic === e ? "active" : ""}" onclick="S.ui.taskEpic=${esc(JSON.stringify(e))};render()">${esc(e)}</button>`).join("")}<button class="chip ${S.ui.taskEpic === "(없음)" ? "active" : ""}" onclick="S.ui.taskEpic='(없음)';render()">분류 없음</button></div>`;
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>업무</th><th>상태</th><th>우선</th><th>인지일</th><th>마감</th><th>담당 / 관계자</th></tr></thead><tbody>` +
     (list.map((x) => {
       const late = x.status !== "완료" && x.due && x.due < t;
       const memo = (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
       return `<tr style="${x.status === "완료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
-        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${esc(x.title)}</span></div>${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
+        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
         <td><select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td class="nowrap small">${priIcon(x.priority)} ${{ high: "높음", mid: "보통", low: "낮음" }[x.priority] || "보통"}</td>
         <td class="nowrap">${x.start ? `${shortD(x.start)}${x.status !== "완료" ? ` <span class="muted small">${calDays(x.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
@@ -1494,6 +1510,7 @@ function editTask(id, preset) {
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "status", l: "상태", t: "select", opts: TASK_ST },
     { k: "priority", l: "우선순위", t: "select", opts: PRI },
+    { k: "epic", l: "분류 (에픽)", t: "text", ph: "예: RE100 교육, 통합관제", list: epicsOf(null), hint: "같은 분류끼리 묶어서 보고 걸러볼 수 있어" },
     { k: "owner", l: "담당 / 관계자", t: "text", ph: "예: 본인 / 홍길동 대리" },
     { k: "start", l: "인지일", t: "date" },
     { k: "due", l: "마감일", t: "date", hint: "캘린더에 표시됨" },
@@ -2586,7 +2603,7 @@ function openForm(title, fields, obj, onSave, extraBtns = [], extraHtml = "") {
     else if (f.t === "select") input = `<select data-k="${f.k}">${f.opts.map((o) => { const [ov, ol] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(ov)}" ${String(ov) === String(v) ? "selected" : ""}>${esc(ol)}</option>`; }).join("")}</select>`;
     else if (f.t === "multi") input = f.opts.length ? `<select multiple data-k="${f.k}" data-multi="1">${f.opts.map(([ov, ol]) => `<option value="${ov}" ${(v || []).includes(ov) ? "selected" : ""}>${esc(ol)}</option>`).join("")}</select>` : `<div class="muted small">(등록된 항목 없음)</div>`;
     else if (f.t === "check") return `<div class="full"><label class="check"><input type="checkbox" data-k="${f.k}" data-check="1" ${v ? "checked" : ""}> ${esc(f.l)}</label></div>`;
-    else input = `<input type="${f.t}" data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || "")}">`;
+    else input = `<input type="${f.t}" data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || "")}"${f.list ? ` list="dl_${f.k}"` : ""}>${f.list ? `<datalist id="dl_${f.k}">${f.list.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : ""}`;
     return `<div class="${f.full ? "full" : ""}"><label>${esc(f.l)}${f.req ? " *" : ""}</label>${input}${f.hint ? `<div class="hint">${esc(f.hint)}</div>` : ""}</div>`;
   }).join("") + `</div>` + extraHtml;
   openModal(title, body, [...extraBtns, { l: "취소", fn: closeModal }, { l: "저장", cls: "primary", fn: () => {

@@ -284,6 +284,19 @@ function tests(w, errors) {
     assert(r.includes("업무:") && r.includes("개발 전달:"), "업무/개발 전달 줄 없음");
     assert(last.includes(w.addDays(t, -13)), "지난 주 기간이 아님");
   });
+  check("업무 분류(에픽): 라벨 표시, 분류 필터, 보드 분류 묶음", () => {
+    S().ui.pid = pid();
+    S().tasks.push({ id: "t_ep1", projectId: pid(), title: "에픽 업무 1", status: "진행중", priority: "mid", epic: "점검 분류", start: t, due: "" },
+                   { id: "t_ep2", projectId: pid(), title: "에픽 업무 2", status: "예정", priority: "mid", epic: "", start: t, due: "" });
+    S().ui.tab = "tasks"; S().ui.taskFilter = "all"; S().ui.taskEpic = "점검 분류"; w.render();
+    const html = w.document.getElementById("view").innerHTML;
+    assert(html.includes("에픽 업무 1") && !html.includes("에픽 업무 2"), "분류 필터가 안 먹음");
+    assert(w.document.querySelector(".epic-lz"), "라벨 없음");
+    S().ui.taskEpic = ""; S().ui.tab = "board"; S().ui.board = "tasks"; S().ui.boardGroup = "epic"; w.render();
+    const lanes = [...w.document.querySelectorAll(".lane-h")].map((e) => e.textContent);
+    assert(lanes.some((l) => l.includes("점검 분류")) && lanes.some((l) => l.includes("분류 없음")), "분류 묶음: " + lanes.join("/"));
+    S().ui.boardGroup = "none";
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
