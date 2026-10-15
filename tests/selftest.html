@@ -205,6 +205,66 @@ function tests(w, errors) {
     w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape" }));
     assert(!w.document.getElementById("modalBg").classList.contains("open"), "Esc로 안 닫힘");
   });
+  // ── 점검 세션 리뷰(2026-10-15)에서 찾은 버그 재현 ──
+  check("메모 입력 직후 다른 메모를 눌러도 덮어쓰지 않음", () => {
+    S().ui.pid = pid(); S().ui.tab = "notes";
+    const a = { id: "nA", projectId: pid(), title: "메모A", date: t, content: "A 내용" }, b = { id: "nB", projectId: pid(), title: "메모B", date: t, content: "B 내용" };
+    S().notes.push(a, b); S().ui.noteId = "nA"; w.render();
+    const c = w.document.getElementById("noteContent"); c.value = "A 수정"; c.dispatchEvent(new w.Event("input"));
+    S().ui.noteId = "nB"; w.render();
+    assert(a.content === "A 수정" && a.title === "메모A", `A: ${a.title}/${a.content}`);
+    assert(b.content === "B 내용", "B가 바뀜: " + b.content);
+  });
+  check("질의 받음도 회신으로 보고 '접수 노티 없음' 해제", () => {
+    const h = { id: "hq", code: "HO-901", projectId: pid(), title: "질의 점검", status: "sent", sentAt: w.addDays(t, -10), events: [], docIds: [], screenIds: [] };
+    S().handoffs.push(h);
+    assert(w.computeAlerts(null).some((a) => a.ref[1] === "hq" && a.kind === "접수 노티 없음"), "경고가 처음부터 없음");
+    w.pushEvent(h, { type: "question", at: t, text: "" });
+    assert(!w.computeAlerts(null).some((a) => a.ref[1] === "hq" && a.kind === "접수 노티 없음"), "질의 후에도 경고");
+  });
+  check("기록 삭제 시 상태를 다시 계산", () => {
+    const h = S().handoffs.find((x) => x.id === "hq");
+    w.pushEvent(h, { type: "done", at: t, text: "" });
+    const ev = h.events.find((e) => e.type === "done");
+    h.events = h.events.filter((e) => e !== ev); w.recomputeHOStatus(h);
+    assert(h.status === "ack", "상태: " + h.status);
+  });
+  check("결함 처리 후 재테스트 Fail이면 재발로 다시 결함 전달 가능", () => {
+    const c = S().tcs.find((x) => x.hoId && S().handoffs.find((h) => h.id === x.hoId)?.status === "done");
+    assert(c, "앞 단계의 결함 TC가 없음");
+    w.setTC(c.id, "result", "Fail");
+    assert(!c.hoId && (c.prevHoIds || []).length === 1, "연결이 안 풀림");
+    assert(w.computeAlerts(null).some((a) => a.ref[1] === c.id && a.kind === "결함 미전달"), "결함 미전달 경고 없음");
+    assert(!w.computeAlerts(null).some((a) => a.ref[1] === c.id && a.kind === "재테스트 필요"), "재테스트 필요가 남음");
+  });
+  check("보드 '다음 →'은 완료 칸에서 예외 칸으로 넘기지 않음", () => {
+    S().ui.pid = pid(); S().ui.tab = "board"; S().ui.board = "docs"; w.render();
+    const col = w.document.querySelector('.col[data-col="승인"]');
+    assert(col && !col.querySelector(".next"), "승인 칸에 다음 버튼이 있음");
+    S().ui.board = "tc"; w.render();
+    const tcCol = w.document.querySelector('.col[data-col="Pass"]');
+    assert(!tcCol || !tcCol.querySelector(".next"), "Pass 칸에 다음 버튼이 있음");
+  });
+  check("산출물 폼에서 상태를 바꿔도 검토요청일·승인일이 채워짐", () => {
+    const d = S().docs.find((x) => x.projectId === pid() && x.status === "미착수");
+    w.editDoc(d.id);
+    w.document.querySelector('#fForm [data-k="status"]').value = "검토요청";
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "저장").click();
+    assert(d.requestedAt === t, "검토요청일: " + d.requestedAt);
+  });
+  check("전체 보기 보드에서 산출물 추가 시 프로젝트를 고를 수 있음", () => {
+    S().ui.pid = "all"; S().ui.board = "docs"; w.render(); w.boardAdd("작성중");
+    assert(w.document.querySelector('#fForm [data-k="projectId"]'), "프로젝트 선택이 없음");
+    assert(w.document.querySelector('#fForm [data-k="status"]').value === "작성중", "칸 상태가 안 들어감");
+    w.closeModal();
+  });
+  check("하이픈·한글이 들어간 전달 코드 접두어도 메일 매칭", () => {
+    const keep = S().settings.hoPrefix; S().settings.hoPrefix = "UL-HO";
+    S().handoffs.push({ id: "hp", code: "UL-HO-008", projectId: pid(), title: "접두어 점검", status: "sent", sentAt: t, events: [], docIds: [], screenIds: [] });
+    const r = w.matchHandoff({ subject: "RE: [UL-HO-008] 확인", body: "", from: "" });
+    S().settings.hoPrefix = keep;
+    assert(r?.h.id === "hp", "매칭 실패");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);

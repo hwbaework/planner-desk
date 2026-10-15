@@ -19,6 +19,7 @@
     --violet: #5e4db2; --violetw: #f3f0ff;
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
   }
+  [data-theme="dark"] .btn.primary { color: #1d2125; font-weight: 700; }
   [data-theme="dark"] {
     color-scheme: dark;
     --bg: #1d2125; --panel: #22272b; --sub: #2c333a; --hover: #282e33;
@@ -795,6 +796,7 @@ function docStats(pid, phId) {
 
 // ───────────── render: shell ─────────────
 function render() {
+  if (noteFlush) noteFlush();   // 메모 입력 중 화면을 바꾸면 먼저 저장
   if (S.ui.pid !== "all" && !proj(S.ui.pid)) S.ui.pid = "all";
   document.documentElement.setAttribute("data-theme", S.settings.theme === "dark" ? "dark" : "light");
   document.body.style.zoom = Number(S.settings.fontScale) || 1;
@@ -870,7 +872,7 @@ function renderDash() {
   const noNoti = alerts.filter((a) => a.kind === "접수 노티 없음" || a.kind === "완료 노티 없음").length;
   const openHo = hos.filter(isOpenHO).length;
   const reqDocs = docs.filter((d) => d.status === "검토요청").length;
-  const mine = alerts.filter((a) => a.level === "mine").length;
+  const mine = alerts.filter((a) => a.kind === "내 검수 대기").length;
   const openTasks = S.tasks.filter((x) => inScope(x) && x.status !== "완료").length;
   let h = "";
   if (pid) {
@@ -1027,7 +1029,8 @@ function renderBoard() {
       const isDoneCol = B.done.includes(ck);
       const all = list.filter((x) => B.st(x) === ck).sort((a, b) => isDoneCol ? (B.due(b) || "").localeCompare(B.due(a) || "") : (B.due(a) || "9999").localeCompare(B.due(b) || "9999"));
       const cards = isDoneCol && !S.ui.boardAllDone ? all.slice(0, 8) : all;
-      const next = B.cols[ci + 1];
+      const firstDone = B.cols.findIndex(([k]) => B.done.includes(k));
+      const next = ci < firstDone ? B.cols[ci + 1] : null;
       return `<div class="col" data-col="${esc(ck)}" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="boardDrop(event,'${esc(ck)}')">
         <div class="col-h">${esc(cl)} <span class="n">${all.length}</span></div>` +
         cards.map((x) => {
@@ -1038,7 +1041,7 @@ function renderBoard() {
             <div class="tt" onclick="${B.open(x)}">${esc(boardTitle(bk, x))}</div>
             ${al ? `<div class="warnline">${esc(al.kind)}</div>` : ""}
             <div class="meta">${typeIcon(B.icon(x))}<span class="key">${esc(B.key(x) || "")}</span>${B.pri ? priIcon(B.pri(x)) : ""}${due ? `<span class="due ${dcls}">${shortD(due)}${isDone ? "" : " " + dday(due)}</span>` : ""}
-              ${next ? `<button class="next" onclick="boardMove('${x.id}','${esc(next[0])}')" title="${esc(next[1])}(으)로 넘기기">다음 →</button>` : ""}${avatar(B.who(x))}</div></div>`;
+              ${bk === "tc" && ck === "미수행" ? `<button class="next" onclick="boardMove('${x.id}','Pass')">Pass</button><button class="next" style="color:var(--danger)" onclick="boardMove('${x.id}','Fail')">Fail</button>` : next ? `<button class="next" onclick="boardMove('${x.id}','${esc(next[0])}')" title="${esc(next[1])}(으)로 넘기기">다음 →</button>` : ""}${avatar(B.who(x))}</div></div>`;
         }).join("") +
         (all.length > cards.length ? `<button class="add" onclick="S.ui.boardAllDone=1;render()">최근 ${cards.length}개만 표시 · ${all.length - cards.length}개 더 보기</button>` : isDoneCol && S.ui.boardAllDone && all.length > 8 ? `<button class="add" onclick="S.ui.boardAllDone=0;render()">접기</button>` : "") +
         `<button class="add" onclick="boardAdd('${esc(ck)}')">+ 만들기</button></div>`;
@@ -1074,7 +1077,7 @@ function boardAdd(col) {
       commit();
     } else editHO(null, { projectId: pid });
   } else if (bk === "tasks") editTask(null, { status: col, projectId: pid });
-  else if (bk === "docs") editDoc(null, "P1");
+  else if (bk === "docs") editDoc(null, "P1", col);
   else if (bk === "data") editData(null, { status: col, projectId: pid });
   else if (bk === "tc") editTC(null, { projectId: pid });
 }
@@ -1545,11 +1548,29 @@ function addEvent(hid) {
 function pushEvent(x, e) {
   x.events.push(Object.assign({ id: uid("e"), ts: new Date().toISOString() }, e));
   if (EV_TO_ST[e.type]) x.status = EV_TO_ST[e.type];
+  else if (e.type === "question" && ["plan", "sent"].includes(x.status)) x.status = "ack";
+  if (e.type === "sent" && !x.sentAt) x.sentAt = e.at;
   if (e.type === "verified") x.screenIds.forEach((sid) => { const s = S.screens.find((z) => z.id === sid); if (s && s.status !== "변경중") s.status = "확정"; });
 }
 function quickEvent(hid, type) { const x = S.handoffs.find((h) => h.id === hid); pushEvent(x, { type, at: today(), text: "" }); commit(); toast(`${evLabel(type)} 처리`); }
-function delEvent(hid, eid) { const x = S.handoffs.find((h) => h.id === hid); if (!confirm("이 기록을 지울까?")) return; x.events = x.events.filter((e) => e.id !== eid); commit(); openHO(hid); }
-function setHOStatus(hid, st) { const x = S.handoffs.find((h) => h.id === hid); x.status = st; commit(); openHO(hid); }
+// 남은 기록으로 상태를 다시 계산 (보류는 그대로 둔다)
+function recomputeHOStatus(x) {
+  if (x.status === "hold") return;
+  let st = "plan";
+  [...x.events].sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).forEach((e) => {
+    if (e.type === "sent") st = st === "plan" ? "sent" : st;
+    else if (EV_TO_ST[e.type]) st = EV_TO_ST[e.type];
+    else if (e.type === "question" && ["plan", "sent"].includes(st)) st = "ack";
+  });
+  x.status = st;
+}
+function delEvent(hid, eid) { const x = S.handoffs.find((h) => h.id === hid); if (!confirm("이 기록을 지울까?")) return; x.events = x.events.filter((e) => e.id !== eid); recomputeHOStatus(x); commit(); openHO(hid); }
+function setHOStatus(hid, st) {
+  const x = S.handoffs.find((h) => h.id === hid);
+  if (st === "sent" && !x.sentAt) x.sentAt = today();
+  x.events.push({ id: uid("e"), at: today(), ts: new Date().toISOString(), type: "note", text: `상태 직접 변경 → ${hoStLabel(st)}` });
+  x.status = st; commit(); openHO(hid);
+}
 function me() { return S.settings.me || "기획 담당"; }
 function nudgeText(x) {
   const reason = x.status === "sent" ? `아직 접수 확인 회신을 받지 못해 다시 연락드립니다.`
@@ -1631,7 +1652,7 @@ function renderDocs() {
 }
 function renderDocsMatrix() {
   let h = pageHead("산출물 현황 (전체)", "프로젝트 × 단계별 승인 현황 · 셀을 누르면 해당 프로젝트로 이동");
-  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>프로젝트</th>${PHASES.map((p) => `<th style="color:${p.color}">P.${p.id.slice(1)} ${p.name}</th>`).join("")}<th>합계</th></tr></thead><tbody>` +
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>프로젝트</th>${PHASES.map((p) => `<th style="box-shadow:inset 0 -3px 0 ${p.color}">P.${p.id.slice(1)} ${p.name}</th>`).join("")}<th>합계</th></tr></thead><tbody>` +
     (activeProjects().map((p) => {
       const tot = docStats(p.id);
       return `<tr><td class="link" onclick="S.ui.pid='${p.id}';render()">${esc(p.name)}</td>` + PHASES.map((ph) => {
@@ -1662,11 +1683,13 @@ function reviseDoc(id) {
   d.version = nv; d.status = "작성중"; d.requestedAt = ""; d.approvedAt = "";
   commit(); toast(`${d.name} ${nv}`);
 }
-function editDoc(id, phaseId) {
-  const pid = S.ui.pid !== "all" ? S.ui.pid : null;
-  const d = id ? S.docs.find((x) => x.id === id) : { phase: phaseId || "P1", status: "미착수", version: "v0.1", projectId: pid, history: [] };
+function editDoc(id, phaseId, status) {
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
+  const d = id ? S.docs.find((x) => x.id === id) : { phase: phaseId || "P1", status: status || "미착수", version: "v0.1", projectId: pid, history: [] };
   const fields = [
     { k: "name", l: "산출물명", t: "text", full: true, req: true },
+    { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "phase", l: "단계", t: "select", opts: PHASES.map((p) => [p.id, `${p.id} ${p.name}`]) },
     { k: "status", l: "상태", t: "select", opts: DOC_ST },
     { k: "version", l: "버전", t: "text" },
@@ -1680,8 +1703,10 @@ function editDoc(id, phaseId) {
   ];
   const hist = id && d.history.length ? `<div class="sec-t">이력</div><ul class="tl">${[...d.history].reverse().map((e) => `<li><div class="h">${e.at}</div><div class="x">${esc(e.text)}</div></li>`).join("")}</ul>` : "";
   openForm(id ? `산출물 · ${d.name}` : "산출물 추가", fields, d, (v) => {
+    if (v.status === "검토요청" && !v.requestedAt) v.requestedAt = today();
+    if (v.status === "승인" && !v.approvedAt) v.approvedAt = today();
     if (id) { if (v.status !== d.status) d.history.push({ at: today(), ts: new Date().toISOString(), text: `${d.status} → ${v.status}` }); Object.assign(d, v); }
-    else { if (!pid) { toast("프로젝트를 선택해줘"); return false; } S.docs.push(Object.assign({ id: uid("d"), projectId: pid, history: [], order: 99 }, v)); }
+    else S.docs.push(Object.assign({ id: uid("d"), history: [{ at: today(), ts: new Date().toISOString(), text: `추가 (${v.status})` }], order: 99 }, v));
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("산출물을 삭제할까?")) { S.docs = S.docs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : [], hist);
 }
@@ -1781,7 +1806,7 @@ function renderWBS() {
   groups.forEach(([gid, gname, color]) => {
     const rows = ws.filter((w) => (w.phase || "") === gid).sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
     if (!rows.length && !gid) return;
-    h += `<tr><td colspan="6" style="background:var(--sub);font-weight:700;color:${color}">${gname} <span class="muted small">${rows.length}</span> <button class="btn sm ghost" onclick="editWBS(null,'${gid}')">＋</button></td></tr>`;
+    h += `<tr><td colspan="6" style="background:var(--sub);font-weight:700;box-shadow:inset 4px 0 0 ${color}">${gname} <span class="muted small">${rows.length}</span> <button class="btn sm ghost" onclick="editWBS(null,'${gid}')">＋</button></td></tr>`;
     rows.forEach((w) => {
       const isLate = w.end && w.end < today() && Number(w.progress) < 100;
       const bar = r0 && w.start && w.end ? `<div class="bar" style="left:${pos(w.start)}%;width:${Math.max(0.8, ((calDays(w.start, w.end) + 1) / span) * 100)}%;background:${isLate ? "var(--danger)" : color}"><i style="width:${Math.min(100, Number(w.progress) || 0)}%"></i></div>` : "";
@@ -1879,7 +1904,7 @@ function renderTC() {
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>TC ID</th><th>화면</th><th>시나리오</th><th>예상 결과</th><th>결과</th><th>수행일</th><th>결함 전달</th></tr></thead><tbody>` +
     (list.map((c) => {
       const sc = S.screens.find((x) => x.id === c.screenId), ho = c.hoId && S.handoffs.find((x) => x.id === c.hoId);
-      return `<tr><td class="mono nowrap">${typeIcon(c.result === "Fail" ? "bug" : "tc")} ${esc(c.code)}</td>
+      return `<tr><td class="mono nowrap">${typeIcon(c.result === "Fail" ? "bug" : "tc")} ${esc(c.code)}${(c.prevHoIds || []).length ? ` <span class="chip-ref" title="이전 결함 전달 이력">재발 ${c.prevHoIds.length}</span>` : ""}</td>
         <td class="nowrap small">${sc ? `${esc(sc.code)}<div class="muted">${esc(sc.name)}</div>` : '<span class="muted">-</span>'}</td>
         <td><span class="link" onclick="editTC('${c.id}')">${esc(c.scenario)}</span>${c.steps ? `<div class="small muted clamp1">${esc(c.steps)}</div>` : ""}</td>
         <td class="small">${esc(c.expected || "")}</td>
@@ -1889,9 +1914,17 @@ function renderTC() {
     }).join("") || `<tr><td colspan="7" class="empty">테스트 케이스가 없어. 화면 목록이 있으면 [화면 목록에서 기본 TC 생성]으로 바로 만들 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
   return h;
 }
+function tcResultChanged(c) {
+  c.testedAt = c.result === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || "";
+  const ho = c.hoId && S.handoffs.find((h) => h.id === c.hoId);
+  if (ho && ["done", "verified"].includes(ho.status) && ["Fail", "Block"].includes(c.result)) {
+    c.prevHoIds = [...(c.prevHoIds || []), c.hoId]; c.hoId = "";   // 재발: 이전 결함은 이력으로
+    toast(`이전 결함 ${ho.code}이 처리됐는데 다시 ${c.result} — 결함을 다시 전달해줘`);
+  }
+}
 function setTC(id, k, v) {
   const c = S.tcs.find((x) => x.id === id); c[k] = v;
-  if (k === "result") { c.testedAt = v === "미수행" ? "" : today(); c.tester = c.tester || S.settings.me || ""; }
+  if (k === "result") tcResultChanged(c);
   commit();
   if (k === "result" && v === "Fail" && !c.hoId) toast("Fail — [결함 전달]로 개발에 넘길 수 있어");
 }
@@ -1900,6 +1933,7 @@ function editTC(id, preset) {
   const c = id ? S.tcs.find((x) => x.id === id) : Object.assign({ result: "미수행", projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
   openForm(id ? `테스트 케이스 · ${c.code}` : "테스트 케이스 추가", [
     { k: "scenario", l: "시나리오", t: "text", full: true, req: true, ph: "예: 회원가입 필수값 미입력 시 안내" },
+    { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "screenId", l: "화면", t: "select", opts: [["", "(화면 없음)"], ...S.screens.filter((x) => x.projectId === c.projectId).map((x) => [x.id, `${x.code} ${x.name}`])] },
     { k: "result", l: "결과", t: "select", opts: TC_RES },
     { k: "pre", l: "사전 조건", t: "text", full: true, ph: "예: 일반 회원으로 로그인" },
@@ -1909,7 +1943,9 @@ function editTC(id, preset) {
     { k: "tester", l: "수행자", t: "text" },
     { k: "testedAt", l: "수행일", t: "date" },
   ], c, (v) => {
-    if (id) Object.assign(c, v); else S.tcs.push(Object.assign({ id: uid("tc"), code: nextTCCode() }, c, v));
+    const sc = S.screens.find((x) => x.id === v.screenId); if (sc && sc.projectId !== v.projectId) v.screenId = "";
+    if (id) { const prev = c.result; Object.assign(c, v); if (v.result !== prev) tcResultChanged(c); }
+    else { const n = Object.assign({ id: uid("tc"), code: nextTCCode() }, c, v); if (n.result !== "미수행") n.testedAt = n.testedAt || today(); S.tcs.push(n); }
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("테스트 케이스를 삭제할까?")) { S.tcs = S.tcs.filter((x) => x.id !== id); commit(); closeModal(); } } },
           ...(["Fail", "Block"].includes(c.result) && !c.hoId ? [{ l: "결함 전달", cls: "left", fn: () => { closeModal(); tcDefect(c.id); } }] : [])] : []);
@@ -2153,9 +2189,10 @@ function guessType(t) {
 }
 function matchHandoff(m) {
   const text = `${m.subject}\n${m.body}`;
-  const prefix = (S.settings.hoPrefix || "HO").replace(/[^A-Za-z]/g, "");
-  const cm = text.match(new RegExp(`\\b(${prefix}-\\d{2,4})\\b`, "i"));
-  if (cm) { const h = S.handoffs.find((x) => x.code.toUpperCase() === cm[1].toUpperCase()); if (h) return { h, why: "코드 " + h.code }; }
+  const prefix = (S.settings.hoPrefix || "HO").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  for (const cm of text.matchAll(new RegExp(`${prefix}-\\d{2,4}`, "gi"))) {
+    const h = S.handoffs.find((x) => x.code.toUpperCase() === cm[0].toUpperCase()); if (h) return { h, why: "코드 " + h.code };
+  }
   const em = ((m.from || "").match(/[\w.+-]+@[\w.-]+/) || [""])[0].toLowerCase();
   const subj = (m.subject || "").replace(/^(re|fw|fwd|회신|전달|답장)\s*:\s*/gi, "").toLowerCase();
   let best = null, score = 0;
@@ -2260,15 +2297,19 @@ function bindNoteEditor() {
   if (!$("noteContent")) return;
   const list = S.notes.filter((n) => S.ui.pid === "all" ? !proj(n.projectId)?.archived : n.projectId === S.ui.pid).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
   const cur = S.notes.find((n) => n.id === S.ui.noteId && list.includes(n)) || list[0];
-  let t;
   ids.forEach((i) => $(i).addEventListener("input", () => {
-    clearTimeout(t); $("noteSaved").textContent = "입력 중…";
-    t = setTimeout(() => {
-      Object.assign(cur, { title: $("noteTitle").value, projectId: $("noteProj").value, date: $("noteDate").value, content: $("noteContent").value, updatedAt: new Date().toISOString() });
-      persist(); $("noteSaved").textContent = "자동 저장됨 " + new Date().toLocaleTimeString("ko-KR");
-    }, 500);
+    const vals = { title: $("noteTitle").value, projectId: $("noteProj").value, date: $("noteDate").value, content: $("noteContent").value };
+    clearTimeout(noteTimer); $("noteSaved").textContent = "입력 중…";
+    noteFlush = () => {
+      noteFlush = null; clearTimeout(noteTimer);
+      const n = S.notes.find((x) => x.id === cur.id); if (!n) return;
+      Object.assign(n, vals, { updatedAt: new Date().toISOString() }); persist();
+      if ($("noteSaved")) $("noteSaved").textContent = "자동 저장됨 " + new Date().toLocaleTimeString("ko-KR");
+    };
+    noteTimer = setTimeout(() => noteFlush && noteFlush(), 500);
   }));
 }
+let noteTimer = null, noteFlush = null;
 function newNote() {
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id;
   if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
