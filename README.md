@@ -61,6 +61,10 @@ schtasks /Create /SC MINUTE /MO 30 /TN "PlannerDesk 메일 동기화" /TR "\"C:\
 
 `mail_config.json`, `.mail_state.json`, `mail_inbox.json`, 데이터가 든 저장본(`planner-desk_*.html`)은 `.gitignore`로 커밋하지 않는다.
 
+## 자동 점검
+
+로컬 서버를 띄우고 `http://localhost:5178/tests/selftest.html`을 열면 화면·보드·알림·메일 매칭·저장/불러오기 왕복 등 18개 항목을 확인한다. 점검은 분리된 저장 공간(`?selftest`)에서 돌아서 실제 데이터를 건드리지 않는다.
+
 ## 개발
 
 ```bash

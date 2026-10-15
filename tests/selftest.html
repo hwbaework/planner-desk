@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planner Desk 자동 점검</title>
+<style>
+  :root { --bg: #f7f8f9; --panel: #fff; --line: #dcdfe4; --text: #172b4d; --dim: #44546f; --ok: #216e4e; --okw: #dcfff1; --bad: #ae2e24; --badw: #ffeceb; --accent: #0c66e4; }
+  body { font-family: "Pretendard Variable", Pretendard, "Malgun Gothic", sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px 16px; font-size: 15px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sum { margin: 10px 0 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .pill { padding: 4px 10px; border-radius: 3px; font-weight: 700; }
+  .pill.ok { background: var(--okw); color: var(--ok); }
+  .pill.bad { background: var(--badw); color: var(--bad); }
+  button { border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 4px; padding: 7px 14px; font: inherit; cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); font-size: 14px; vertical-align: top; }
+  th { background: #f1f2f4; color: var(--dim); font-size: 12.5px; }
+  td.r { font-weight: 700; white-space: nowrap; }
+  td.r.ok { color: var(--ok); }
+  td.r.bad { color: var(--bad); }
+  .muted { color: var(--dim); font-size: 13px; }
+  iframe { width: 1280px; height: 800px; border: 1px solid var(--line); margin-top: 16px; display: none; }
+</style>
+</head>
+<body>
+<h1>Planner Desk 자동 점검</h1>
+<div class="muted">index.html을 분리된 저장 공간(?selftest)으로 열어 화면·알림·저장/불러오기를 확인한다. 실제 데이터는 건드리지 않는다.</div>
+<div class="sum"><button onclick="run()">다시 점검</button><span id="sum"></span><label class="muted"><input type="checkbox" onchange="document.querySelector('iframe').style.display=this.checked?'block':'none'"> 앱 화면 보기</label></div>
+<table><thead><tr><th style="width:60px">결과</th><th style="width:34%">점검 항목</th><th>상세</th></tr></thead><tbody id="rows"></tbody></table>
+<iframe id="app"></iframe>
+<script>
+const results = [];
+function check(name, fn) {
+  try {
+    const detail = fn();
+    results.push({ ok: true, name, detail: detail === undefined ? "" : String(detail) });
+  } catch (e) {
+    results.push({ ok: false, name, detail: e.message });
+  }
+}
+function assert(cond, msg) { if (!cond) throw new Error(msg || "조건 불일치"); }
+function show() {
+  const fail = results.filter((r) => !r.ok).length;
+  document.getElementById("sum").innerHTML = `<span class="pill ${fail ? "bad" : "ok"}">${results.length - fail} / ${results.length} 통과</span>${fail ? `<span class="pill bad">실패 ${fail}</span>` : ""}`;
+  document.getElementById("rows").innerHTML = results.map((r) => `<tr><td class="r ${r.ok ? "ok" : "bad"}">${r.ok ? "통과" : "실패"}</td><td>${r.name}</td><td class="muted">${String(r.detail).replace(/</g, "&lt;")}</td></tr>`).join("");
+  document.title = `${fail ? "실패 " + fail : "통과"} · Planner Desk 자동 점검`;
+  window.SELFTEST = { total: results.length, fail, results };
+}
+
+function run() {
+  results.length = 0;
+  try { localStorage.removeItem("planner-desk-selftest"); } catch (e) {}
+  const f = document.getElementById("app");
+  f.onload = () => {
+    const w = f.contentWindow, errors = [];
+    w.addEventListener("error", (e) => errors.push(e.message));
+    w.confirm = () => true;
+    w.prompt = () => "자동 점검 입력";
+    w.alert = () => {};
+    w.open = () => null;
+    try { tests(w, errors); } catch (e) { results.push({ ok: false, name: "점검 실행", detail: e.message }); }
+    show();
+  };
+  f.src = "../index.html?selftest=" + Date.now();
+}
+
+function tests(w, errors) {
+  // let/const 최상위 값은 window 속성이 아니라서 eval로 읽는다
+  const S = () => w.eval("S"), t = w.today();
+  const C = (name) => w.eval(name);
+  const pid = () => S().projects[0].id;
+
+  check("앱이 열리고 샘플 데이터가 들어감", () => {
+    assert(S() && S().projects.length >= 1, "프로젝트 없음");
+    assert(S().handoffs.length >= 1 && S().docs.length >= 19, "샘플 전달/산출물 없음");
+    return `프로젝트 ${S().projects.length} · 전달 ${S().handoffs.length} · 산출물 ${S().docs.length}`;
+  });
+  check("실제 데이터와 분리된 저장 공간 사용", () => {
+    assert(C("STORE_KEY") === "planner-desk-selftest", "STORE_KEY = " + C("STORE_KEY"));
+  });
+  check("모든 탭이 전체·프로젝트 보기에서 오류 없이 그려짐", () => {
+    const bad = [];
+    for (const p of ["all", pid()]) for (const [k] of C("TABS")) {
+      try { S().ui.pid = p; S().ui.tab = k; w.render(); if (!w.document.getElementById("view").innerHTML.trim()) bad.push(k + " 빈 화면"); } catch (e) { bad.push(`${k}(${p === "all" ? "전체" : "프로젝트"}): ${e.message}`); }
+    }
+    assert(!bad.length, bad.join(" / "));
+    return `${C("TABS").length}개 탭 × 2`;
+  });
+  check("보드 전체 · 프로젝트 그룹 보기", () => {
+    const bad = [];
+    for (const b of Object.keys(C("BOARDS"))) for (const g of ["none", "project"]) {
+      try { S().ui.pid = "all"; S().ui.tab = "board"; S().ui.board = b; S().ui.boardGroup = g; w.render(); } catch (e) { bad.push(b + ": " + e.message); }
+    }
+    assert(!bad.length, bad.join(" / "));
+    return Object.keys(C("BOARDS")).join(", ");
+  });
+  check("보드에서 기획중 → 전달 → 접수 → 완료노티로 넘기면 기록이 남음", () => {
+    S().ui.pid = pid(); S().ui.board = "ho"; S().ui.tab = "board"; w.render();
+    w.boardAdd("plan");
+    const h = S().handoffs.find((x) => x.title === "자동 점검 입력");
+    assert(h && h.status === "plan", "기획중 카드 생성 실패");
+    w.boardMove(h.id, "sent"); assert(h.status === "sent" && h.sentAt === t, "전달 처리 실패");
+    w.boardMove(h.id, "ack"); w.boardMove(h.id, "done");
+    assert(h.status === "done", "완료노티 이동 실패: " + h.status);
+    const types = h.events.map((e) => e.type).join(",");
+    assert(types === "sent,ack,done", "이벤트: " + types);
+    return types;
+  });
+  check("접수 노티 없음 → 접수 확인 기록 시 경고 해제", () => {
+    const h = S().handoffs.find((x) => x.status === "sent" && w.bizDays(x.sentAt) > w.ackDaysOf(x.projectId));
+    assert(h, "샘플에 접수 노티 없음 건이 없음");
+    assert(w.computeAlerts(null).some((a) => a.kind === "접수 노티 없음" && a.ref[1] === h.id), "경고가 안 뜸");
+    w.pushEvent(h, { type: "ack", at: t, text: "" });
+    assert(!w.computeAlerts(null).some((a) => a.kind === "접수 노티 없음" && a.ref[1] === h.id), "경고가 안 사라짐");
+    return h.code;
+  });
+  check("업무 마감이 캘린더에 표시되고 마감 지나면 경고", () => {
+    S().tasks.push({ id: "t_test", projectId: pid(), title: "점검 업무", status: "진행중", priority: "high", start: w.addDays(t, -5), due: w.addDays(t, -1), owner: "", memo: "" });
+    assert(w.calItems(w.addDays(t, -3), t, null).some((i) => i.kind === "task" && i.title === "점검 업무"), "캘린더에 없음");
+    assert(w.computeAlerts(null).some((a) => a.kind === "업무 마감 지남" && a.ref[1] === "t_test"), "경고 없음");
+    w.setTask("t_test", "status", "완료");
+    assert(!w.computeAlerts(null).some((a) => a.ref[1] === "t_test"), "완료 후에도 경고");
+  });
+  check("정기 업무 완료 시 다음 회차가 오늘 이후로 이동", () => {
+    S().recurring.push({ id: "r_test", projectId: pid(), title: "점검 주간보고", freq: "weekly", day: 3, nextDue: w.addDays(t, -10), history: [] });
+    w.completeRecur("r_test");
+    const r = S().recurring.find((x) => x.id === "r_test");
+    assert(r.nextDue > t && w.parseD(r.nextDue).getDay() === 3, "다음 회차: " + r.nextDue);
+    return r.nextDue;
+  });
+  check("데이터 협의: 합의 후 수신 예정 지나면 '데이터 미수신', 수신 기록 시 해제", () => {
+    S().datas.push({ id: "d_test", projectId: pid(), name: "점검 데이터", org: "점검기관", status: "합의", dueDate: w.addDays(t, -2), log: [] });
+    assert(w.computeAlerts(null).some((a) => a.kind === "데이터 미수신" && a.ref[1] === "d_test"), "경고 없음");
+    w.openData("d_test");
+    w.document.getElementById("dlType").value = "수신";
+    w.document.getElementById("dlText").value = "수신 확인";
+    w.addDataLog("d_test"); w.closeModal();
+    assert(!w.computeAlerts(null).some((a) => a.ref[1] === "d_test"), "수신 후에도 경고");
+  });
+  check("테스트 케이스: 화면별 기본 TC 생성 → Fail → 결함 전달 → 재테스트 필요", () => {
+    S().ui.pid = pid();
+    const sc = S().screens.find((x) => x.projectId === pid());
+    assert(sc, "샘플 화면 없음");
+    const before = S().tcs.length; w.genTCs();
+    const made = S().tcs.length - before;
+    assert(made === S().screens.filter((x) => x.projectId === pid()).length * C("TC_TEMPLATES").length, "생성 수: " + made);
+    const c = S().tcs.find((x) => x.screenId === sc.id);
+    w.setTC(c.id, "result", "Fail");
+    assert(w.computeAlerts(null).some((a) => a.kind === "결함 미전달" && a.ref[1] === c.id), "결함 미전달 없음");
+    w.tcDefect(c.id); w.closeModal();
+    const h = S().handoffs.find((x) => x.id === c.hoId);
+    assert(h && /^\[결함\]/.test(h.title) && h.screenIds.includes(sc.id), "결함 전달 생성 실패");
+    w.pushEvent(h, { type: "done", at: t, text: "" });
+    assert(w.computeAlerts(null).some((a) => a.kind === "재테스트 필요" && a.ref[1] === c.id), "재테스트 필요 없음");
+    return `TC ${made}개 · 결함 ${h.code}`;
+  });
+  check("메일 붙여넣기: 코드로 전달 건 매칭 · 회신 종류 판별", () => {
+    const h = S().handoffs[0];
+    const m = w.parseOutlookText(`보낸 사람: 홍길동 <dev@example.com>\n보낸 날짜: 2026년 10월 14일 화요일 오후 3:20\n제목: RE: [${h.code}] 확인 요청\n\n확인했습니다. 금요일까지 반영 예정입니다.\n\n-----Original Message-----\nFrom: 기획`);
+    assert(m.date === "2026-10-14", "날짜: " + m.date);
+    assert(!m.body.includes("Original"), "인용문이 안 잘림");
+    assert(w.matchHandoff(m)?.h.id === h.id, "매칭 실패");
+    const cases = [["확인했습니다. 금요일까지 반영 예정입니다.", "ack"], ["배포 완료했습니다", "done"], ["필수값이 맞나요?", "question"], ["현재 개발 중입니다", "progress"], ["10/20 완료 예정입니다", "note"]];
+    const bad = cases.filter(([txt, want]) => w.guessType(txt) !== want).map(([txt, want]) => `${txt} → ${w.guessType(txt)} (기대 ${want})`);
+    assert(!bad.length, bad.join(" / "));
+    return `${h.code} · 판별 ${cases.length}건`;
+  });
+  check("메일 동기화 파일 불러오기: 같은 메일 두 번 들어오지 않음", () => {
+    const h = S().handoffs[0], n0 = S().mails.length;
+    const d = { exportedAt: new Date().toISOString(), account: "me@example.com", mails: [{ messageId: "<st@x>", from: "dev@example.com", subject: `[${h.code}] 완료`, date: t, body: "배포 완료했습니다" }] };
+    w.importMailJson(d); w.importMailJson(d);
+    assert(S().mails.length === n0 + 1, "중복 추가됨");
+    assert(S().settings.mail.last?.account === "me@example.com", "마지막 동기화 기록 없음");
+  });
+  check("저장 HTML 왕복: 데이터가 그대로 들어가고 다시 읽힘", () => {
+    const html = w.buildHtml();
+    const m = html.match(/var EMBEDDED_DATA = ([\s\S]+?); \/\*EMBEDDED_DATA_PLACEHOLDER\*\//);
+    assert(m, "데이터 표시를 못 찾음");
+    assert((html.match(/EMBEDDED_DATA_PLACEHOLDER\*\//g) || []).length === 1, "표시가 여러 개");
+    const d = JSON.parse(m[1]);
+    for (const k of ["projects", "tasks", "handoffs", "docs", "datas", "tcs", "notes"]) assert(d[k].length === S()[k].length, k + " 개수 불일치");
+    assert(!/<\/script>/i.test(m[1]), "스크립트 종료 태그가 데이터에 섞임");
+    return `${Math.round(html.length / 1024)}KB`;
+  });
+  check("예전 사업관리 대시보드 백업 가져오기", () => {
+    const n = S().tasks.length, e = S().events.length;
+    w.importLegacy({ projects: [{ name: "점검 레거시" }], tasks: [{ project: "점검 레거시", title: "레거시 업무", status: "대기", due: t, calendarEventId: "ev1" }],
+      events: [{ id: "ev1", project: "점검 레거시", title: "업무 연동 일정", startDate: t }, { id: "ev2", project: "점검 레거시", title: "출장", type: "출장", startDate: t }],
+      recurring: [{ project: "점검 레거시", title: "주간보고", recurType: "weekly", recurDay: 3, nextDue: t }], notes: [{ project: "점검 레거시", title: "회의", date: t, content: "x" }] });
+    assert(S().tasks.length === n + 1, "업무");
+    assert(S().events.length === e + 1, "업무 연동 일정이 중복으로 들어옴");
+    assert(S().projects.some((p) => p.name === "점검 레거시" && p.color), "프로젝트/색상");
+  });
+  check("화이트/다크 · 글자 크기 설정 반영", () => {
+    S().settings.theme = "dark"; S().settings.fontScale = "1.2"; w.render();
+    assert(w.document.documentElement.getAttribute("data-theme") === "dark", "다크 미적용");
+    assert(String(w.document.body.style.zoom) === "1.2", "글자 크기 미적용");
+    S().settings.theme = "light"; S().settings.fontScale = "1"; w.render();
+    assert(w.document.documentElement.getAttribute("data-theme") === "light", "화이트 미적용");
+  });
+  check("창 열기·닫기(X)·Esc", () => {
+    w.openSettings();
+    assert(w.document.getElementById("modalBg").classList.contains("open"), "안 열림");
+    w.document.dispatchEvent(new w.KeyboardEvent("keydown", { key: "Escape" }));
+    assert(!w.document.getElementById("modalBg").classList.contains("open"), "Esc로 안 닫힘");
+  });
+  check("이모지 아이콘 없음", () => {
+    const src = w.document.documentElement.outerHTML;
+    const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
+    assert(!m, "발견: " + (m && m[0]));
+  });
+  check("점검 중 스크립트 오류 없음", () => {
+    assert(!errors.length, errors.join(" / "));
+  });
+}
+run();
+</script>
+</body>
+</html>

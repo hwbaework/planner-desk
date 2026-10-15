@@ -385,7 +385,8 @@
 var EMBEDDED_DATA = null; /*EMBEDDED_DATA_PLACEHOLDER*/
 const PRISTINE = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
 const EMBED_RE = new RegExp("var EMBEDDED_DATA = [\\s\\S]*?/\\*EMBEDDED_DATA" + "_PLACEHOLDER\\*/");
-const STORE_KEY = "planner-desk-v1";
+// ?selftest 로 열면 실제 데이터와 분리된 저장 공간을 쓴다 (tests/selftest.html)
+const STORE_KEY = new URLSearchParams(location.search).has("selftest") ? "planner-desk-selftest" : "planner-desk-v1";
 
 // 수행방법론 > 추진 체계 (Phase / Activity / 산출물)
 const PHASES = [
@@ -1274,7 +1275,9 @@ function recurStep(r, d) {
     n.setDate(Math.min(Number(r.day) || 1, new Date(n.getFullYear(), n.getMonth() + 1, 0).getDate()));
     return fmtD(n);
   }
-  return addDays(d, 7);
+  // 매주: d 다음 날부터 설정한 요일이 되는 첫 날 (다음 예정일이 다른 요일로 들어가 있어도 요일을 맞춘다)
+  const n = addDays(d, 1);
+  return addDays(n, ((Number(r.day) || 0) - parseD(n).getDay() + 7) % 7);
 }
 function recurFirst(r) {
   const t = today();
