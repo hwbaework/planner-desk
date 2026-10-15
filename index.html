@@ -420,6 +420,9 @@
     .cal .day { min-height: 70px; padding: 3px; }
     .pill { font-size: 11px; padding: 1px 3px; }
     .side-nav { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; width: 100%; }
+    .tlw { grid-template-columns: 140px 1fr; }
+    .tl-left .tl-r .who, .tl-left .tl-h span { display: none; }
+    .tl-left .tl-r { padding-left: 6px !important; font-size: 12.5px; }
     .side-nav h3 { display: none; }
     .navi { border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; }
     .navi.active { box-shadow: none; border-color: var(--accent); }
@@ -948,7 +951,7 @@ function renderDash() {
     [openTasks, "", "S.ui.taskFilter='open';selTab('tasks')", "진행 중 업무", "완료 전 업무"],
   ];
   const shown = kpis.filter((k) => k[0]), zero = kpis.filter((k) => !k[0]);
-  if (shown.length) h += `<div class="kpis" style="grid-template-columns:repeat(${Math.max(shown.length, 2)},minmax(0,1fr))">` + shown.map(([v, c, on, l, hh]) => `<div class="kpi ${c}" onclick="${on}"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${hh}</div></div>`).join("") + `</div>`;
+  if (shown.length) h += `<div class="kpis" style="grid-template-columns:repeat(auto-fill,minmax(210px,1fr))">` + shown.map(([v, c, on, l, hh]) => `<div class="kpi ${c}" onclick="${on}"><div class="l">${l}</div><div class="v">${v}</div><div class="h">${hh}</div></div>`).join("") + `</div>`;
   if (zero.length) h += `<div class="small muted" style="margin:-6px 0 12px">없음: ${zero.map((k) => k[3]).join(" · ")}</div>`;
   const wk = weekSummary(pid);
   h += `<div class="week">
