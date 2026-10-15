@@ -3346,6 +3346,7 @@ function openSettings() {
     { k: "approvalDays", l: "산출물 승인 회신 기준 (영업일)", t: "number" },
     { k: "quietDays", l: "진행 공유 없음 기준 (영업일)", t: "number" },
     { k: "verifyDays", l: "내 검수 알림 (완료 노티 후 일)", t: "number" },
+    { k: "reportWeek", l: "주간보고 기간", t: "select", opts: [["rolling", "오늘 기준 최근 7일"], ["mon", "월요일~일요일 (이번 주)"]] },
     { k: "fontScale", l: "글자 크기", t: "select", opts: [["1", "보통"], ["1.1", "크게"], ["1.2", "아주 크게"]] },
     { k: "theme", l: "화면 테마", t: "select", opts: [["light", "화이트"], ["dark", "다크"]] },
     { k: "desktopNotify", l: "바탕화면 알림", t: "select", opts: [["off", "끄기"], ["on", "켜기 — 노티 미수신·기한 지남을 윈도우 알림으로"]] },
@@ -3384,7 +3385,10 @@ function openHelp() {
 function toggleTheme() { S.settings.theme = S.settings.theme === "dark" ? "light" : "dark"; persist(); render(); }
 // 주간보고: 금주 실적 → 이슈 → 차주 계획 (개조식). wk=0 이번 주, -1 지난 주
 function buildReport(pids, wk) {
-  const t = addDays(today(), 7 * wk), ws = addDays(t, -6), nx = addDays(t, 7);
+  // 기간: 최근 7일(기본) 또는 월~일. 차주 계획은 오늘(지난 주 보고면 그 주 끝) 다음 날부터 다음 주 끝까지
+  let t = addDays(today(), 7 * wk);
+  if (S.settings.reportWeek === "mon") t = addDays(t, (7 - parseD(t).getDay()) % 7);
+  const ws = addDays(t, -6), nx = addDays(t, 7), pFrom = t > today() ? today() : t;
   const inW = (d) => d && d.slice(0, 10) >= ws && d.slice(0, 10) <= t;
   const inN = (d) => d && d > t && d <= nx;
   const body = pids.map((pid) => {
@@ -3426,8 +3430,8 @@ function buildReport(pids, wk) {
     decW.forEach((r) => L.push(`  - [결정] ${r.title}`));
     al.slice(0, 8).forEach((a) => L.push(`  - [${a.kind}] ${a.title} — ${a.desc}`));
     // 3. 차주 계획
-    L.push(`3. 차주 계획 (${shortD(addDays(t, 1))} ~ ${shortD(nx)})`);
-    const plan = calItems(addDays(t, 1), nx, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
+    L.push(`3. 차주 계획 (${shortD(addDays(pFrom, 1))} ~ ${shortD(nx)})`);
+    const plan = calItems(addDays(pFrom, 1), nx, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
     const wbsRun = S.wbs.filter((w) => w.projectId === pid && Number(w.progress) < 100 && w.start && w.end && w.start <= nx && w.end > t);
     if (!plan.length && !wbsRun.length) L.push(`  - (일정이 등록된 항목 없음 — 타임라인에서 날짜를 채워줘)`);
     plan.forEach((i) => L.push(`  - ${shortD(i.date)} ${CAL_TAG[i.kind] ? "[" + CAL_TAG[i.kind] + "] " : "[" + (i.sub || "일정") + "] "}${i.title}`));

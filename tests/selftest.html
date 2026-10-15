@@ -421,6 +421,15 @@ function tests(w, errors) {
     assert(w.buildReport([pid()], 0).includes(w.shortD(w.addDays(t, 1)) + " [정기] 밀린 정기"), "차주 계획에 없음");
     S().recurring = S().recurring.filter((x) => x.id !== "r_dup");
   });
+  check("주간보고 기간 설정: 월요일~일요일", () => {
+    const prev = S().settings.reportWeek;
+    S().settings.reportWeek = "mon";
+    const d = w.parseD(t), sun = w.addDays(t, (7 - d.getDay()) % 7), mon = w.addDays(sun, -6);
+    const rep = w.buildReport([pid()], 0);
+    assert(rep.startsWith(`주간 보고 (${mon} ~ ${sun})`), "기간: " + rep.split("\n")[0]);
+    assert(rep.includes(`3. 차주 계획 (${w.shortD(w.addDays(t, 1))} ~ ${w.shortD(w.addDays(sun, 7))})`), "차주 범위");
+    S().settings.reportWeek = prev;
+  });
   check("주간보고 금주 실적에 이번 주 업무 진행 기록", () => {
     S().tasks.push({ id: "t_wlog", projectId: pid(), title: "주간 기록 점검", status: "진행중", priority: "low", start: t, due: "", log: [{ type: "comment", at: w.addDays(t, -2), text: "기관 회신 받음\n세부 내용" }] });
     const rep = w.buildReport([pid()], 0);
