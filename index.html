@@ -1635,6 +1635,7 @@ function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const p
 function editTask(id, preset) {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const x = id ? S.tasks.find((t) => t.id === id) : Object.assign({ status: "진행중", priority: "mid", start: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
+  const fromNote = x.noteId && S.notes.find((n) => n.id === x.noteId);
   openForm(id ? "업무" : "업무 추가", [
     { k: "title", l: "업무", t: "text", full: true, req: true, ph: "예: 에스에너지 자료 회신 확인" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
@@ -1649,7 +1650,8 @@ function editTask(id, preset) {
     v.updatedAt = new Date().toISOString();
     if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); } } }] : [],
+  fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "");
 }
 function recurLabel(r) { return r.freq === "monthly" ? `매월 ${r.day}일` : `매주 ${"일월화수목금토"[Number(r.day) || 0]}요일`; }
 function recurStep(r, d) {
@@ -2585,8 +2587,10 @@ function renderNotes() {
       <div><input type="date" id="noteDate" value="${esc(cur.date || "")}"></div></div>
       <textarea id="noteContent" placeholder="회의 내용, 결정사항, 액션아이템…">${esc(cur.content || "")}</textarea>
       <div style="display:flex;gap:6px;margin-top:8px;align-items:center"><span class="muted small" id="noteSaved">자동 저장됨</span>
-      <button class="btn sm" style="margin-left:auto" onclick="copyText(document.getElementById('noteContent').value)">복사</button>
-      <button class="btn sm danger" onclick="delNote('${cur.id}')">삭제</button></div>` : `<div class="empty">왼쪽에서 메모를 고르거나 새로 만들어</div>`) +
+      <button class="btn sm" style="margin-left:auto" onclick="noteToTasks('${cur.id}')">액션 → 업무 만들기</button>
+      <button class="btn sm" onclick="copyText(document.getElementById('noteContent').value)">복사</button>
+      <button class="btn sm danger" onclick="delNote('${cur.id}')">삭제</button></div>
+      ${noteTasksHtml(cur)}` : `<div class="empty">왼쪽에서 메모를 고르거나 새로 만들어</div>`) +
     `</div></div></div>`;
   return h;
 }
@@ -2613,6 +2617,50 @@ function newNote() {
   if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
   const n = { id: uid("n"), projectId: pid, title: "", date: today(), content: "", updatedAt: new Date().toISOString() };
   S.notes.push(n); S.ui.noteId = n.id; commit(); setTimeout(() => $("noteTitle")?.focus(), 0);
+}
+// 회의록 → 업무: [액션]/[Action]/할 일 아래 줄, 또는 "- [ ]"·"TODO" 줄을 후보로 뽑는다.
+// "담당: 내용 (~10/20)" 형식이면 담당과 마감일도 채운다.
+function noteActions(text) {
+  const lines = String(text || "").split(/\r?\n/);
+  const out = []; let inAct = false;
+  lines.forEach((raw) => {
+    const l = raw.trim();
+    if (/^\[?(액션|액션\s*아이템|action\s*items?|todo|할\s*일|후속\s*조치)\]?\s*:?$/i.test(l)) { inAct = true; return; }
+    if (/^\[.+\]$/.test(l) || /^#+\s/.test(l)) { inAct = false; return; }
+    const m = l.match(/^(?:[-*•·]|\d+[.)])\s*(?:\[\s?\]\s*)?(.+)$/);
+    const isTodo = /^(?:[-*]\s*)?\[\s?\]\s+/.test(l) || /^todo\s*[:：]/i.test(l);
+    if (!(inAct && m) && !isTodo) return;
+    let body = (m ? m[1] : l).replace(/^\[\s?\]\s*/, "").replace(/^todo\s*[:：]\s*/i, "").trim();
+    if (!body) return;
+    let owner = "", due = "";
+    const om = body.match(/^([^:：]{1,15})\s*[:：]\s*(.+)$/);
+    if (om) { owner = om[1].trim(); body = om[2].trim(); }
+    const dm = body.match(/\(?\s*~?\s*(\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}|\d{1,2}[./]\d{1,2})\s*(?:까지)?\s*\)?\s*$/);
+    if (dm) { due = normDate(dm[1]); body = body.slice(0, dm.index).trim(); }
+    out.push({ title: body, owner, due });
+  });
+  return out;
+}
+function noteToTasks(nid) {
+  if (noteFlush) noteFlush();
+  const n = S.notes.find((x) => x.id === nid);
+  const acts = noteActions(n.content).filter((a) => !S.tasks.some((t) => t.noteId === nid && t.title === a.title));
+  if (!acts.length) { toast("만들 액션이 없어 — [액션] 아래에 '- 담당: 내용 (~10/20)' 형식으로 적어줘"); return; }
+  openModal("회의록에서 업무 만들기", `<p class="small muted" style="margin-bottom:8px">「${esc(n.title || "(제목 없음)")}」에서 찾은 액션이야. 만들 것만 체크해.</p>` +
+    acts.map((a, i) => `<label class="mrow" style="cursor:pointer"><input type="checkbox" class="actchk" value="${i}" checked style="width:auto">
+      <span class="nm">${esc(a.title)}</span><span class="small muted">${esc(a.owner || "담당 미정")}</span><span class="small muted">${a.due ? "~" + shortD(a.due) : "마감 미정"}</span></label>`).join(""), [
+    { l: "취소", fn: closeModal },
+    { l: "업무 만들기", cls: "primary", fn: () => {
+      const picks = [...document.querySelectorAll(".actchk:checked")].map((c) => acts[Number(c.value)]);
+      picks.forEach((a) => S.tasks.push({ id: uid("t"), projectId: n.projectId, title: a.title, owner: a.owner, due: a.due, start: n.date || today(), status: "진행중", priority: "mid", memo: `회의록: ${n.title || n.date}`, noteId: n.id, updatedAt: new Date().toISOString() }));
+      commit(); closeModal(); toast(`업무 ${picks.length}건 추가`);
+    } },
+  ]);
+}
+function noteTasksHtml(n) {
+  const ts = S.tasks.filter((t) => t.noteId === n.id);
+  if (!ts.length) return `<div class="small muted" style="margin-top:10px">액션 적는 법: <span class="mono">[액션]</span> 아래에 <span class="mono">- 담당: 내용 (~10/20)</span></div>`;
+  return `<div class="sec-t">이 회의에서 나온 업무 ${ts.length}</div>` + ts.map((t) => `<div class="mrow" style="cursor:pointer" onclick="editTask('${t.id}')">${typeIcon("task")}<span class="nm" style="${t.status === "완료" ? "text-decoration:line-through;color:var(--faint)" : ""}">${esc(t.title)}</span><span class="small muted">${esc(t.owner || "")}</span>${badge(t.status, TASK_CLS[t.status] || "gray")}${t.due ? `<span class="small muted">${shortD(t.due)}</span>` : ""}</div>`).join("");
 }
 function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); }
 

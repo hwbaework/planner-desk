@@ -363,6 +363,19 @@ function tests(w, errors) {
     w.closeModal();
     assert(!w.gSearchItems("").length, "빈 검색어에 결과가 나옴");
   });
+  check("회의록 [액션] 줄에서 업무 만들기 (담당·마감 인식, 중복 방지)", () => {
+    const acts = w.noteActions("참석: 고객 PM\n\n[결정]\n- 2단계 통합\n\n[액션]\n- 기획: 회원정보 화면 수정 (~10/20)\n- 개발: 본인인증 일정 회신\n\n[기타]\n- 다음 회의 미정\n- [ ] 회의실 예약");
+    assert(acts.length === 3, "후보 수: " + acts.length + " " + JSON.stringify(acts));
+    assert(acts[0].owner === "기획" && acts[0].title === "회원정보 화면 수정" && /-10-20$/.test(acts[0].due), JSON.stringify(acts[0]));
+    assert(acts[2].title === "회의실 예약", "체크박스 줄: " + acts[2].title);
+    const n = { id: "n_act", projectId: pid(), title: "액션 점검 회의", date: t, content: "[액션]\n- 기획: 액션 점검 업무" };
+    S().notes.push(n); w.noteToTasks("n_act");
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "업무 만들기").click();
+    const made = S().tasks.filter((x) => x.noteId === "n_act");
+    assert(made.length === 1 && made[0].owner === "기획", "생성: " + made.length);
+    w.noteToTasks("n_act");
+    assert(!w.document.getElementById("modalBg").classList.contains("open"), "이미 만든 액션이 다시 뜸");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
