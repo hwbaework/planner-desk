@@ -421,6 +421,23 @@ function tests(w, errors) {
     assert(w.buildReport([pid()], 0).includes(w.shortD(w.addDays(t, 1)) + " [정기] 밀린 정기"), "차주 계획에 없음");
     S().recurring = S().recurring.filter((x) => x.id !== "r_dup");
   });
+  check("업무 전환: 마일스톤 · 데이터 협의 · 개발 전달 (기록 이동)", () => {
+    const mk = (id) => { S().tasks.push({ id, projectId: pid(), title: "전환 " + id, status: "진행중", priority: "mid", start: t, due: w.addDays(t, 5), owner: "담당자", memo: "배경", log: [{ id: "l1", type: "comment", at: t, text: "기관 통화" }] }); };
+    mk("t_cms"); w.convertTask("t_cms", "ms");
+    const ev = S().events.find((e) => e.title === "전환 t_cms");
+    assert(ev && ev.type === "마일스톤" && ev.start === w.addDays(t, 5) && ev.memo.includes("기관 통화"), "마일스톤: " + JSON.stringify(ev));
+    assert(w.milestones(pid()).some((m) => m.id === ev.id), "다음 마일스톤에 안 잡힘");
+    mk("t_cda"); w.convertTask("t_cda", "data");
+    const d = S().datas.find((x) => x.name === "전환 t_cda");
+    assert(d && d.dueDate === w.addDays(t, 5) && d.log.some((e) => e.text === "기관 통화"), "데이터: " + JSON.stringify(d));
+    w.closeModal();
+    mk("t_cho"); w.convertTask("t_cho", "ho");
+    const h = S().handoffs.find((x) => x.title === "전환 t_cho");
+    assert(h && h.status === "plan" && h.code && h.memo.includes("기관 통화"), "개발 전달: " + JSON.stringify(h));
+    w.closeModal();
+    assert(!S().tasks.some((x) => x.id.startsWith("t_c") && x.title.startsWith("전환")), "업무가 남음");
+    S().events = S().events.filter((e) => e.id !== ev.id); S().datas = S().datas.filter((x) => x.id !== d.id); S().handoffs = S().handoffs.filter((x) => x.id !== h.id);
+  });
   check("주간보고 기간 설정: 월요일~일요일", () => {
     const prev = S().settings.reportWeek;
     S().settings.reportWeek = "mon";

@@ -1650,7 +1650,7 @@ function editEvent(id, date) {
   const e = id ? S.events.find((x) => x.id === id) : { start: date || today(), type: "회의", projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id };
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   openForm(id ? "일정" : "일정 추가", [
-    { k: "title", l: "일정", t: "text", full: true, req: true, ph: "예: 울산 상황실 플랫폼 시연" },
+    { k: "title", l: "일정", t: "text", full: true, req: true, ph: "예: 상황실 플랫폼 시연" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "type", l: "구분", t: "select", opts: EVENT_TYPES },
     { k: "start", l: "시작일", t: "date", req: true },
@@ -1709,7 +1709,7 @@ function dataFields(x) {
   return [
     { k: "name", l: "데이터 항목", t: "text", full: true, req: true, ph: "예: 연료전지 발전량 (15분 단위)" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
-    { k: "org", l: "제공 기관 (컨소시엄 참여사)", t: "text", ph: "예: 에스에너지" },
+    { k: "org", l: "제공 기관 (컨소시엄 참여사)", t: "text", ph: "예: 참여기관 A" },
     { k: "contact", l: "기관 담당자 / 연락처", t: "text", ph: "예: 홍길동 대리 010-..." },
     { k: "status", l: "상태", t: "select", opts: DATA_ST },
     { k: "method", l: "제공 방식", t: "select", opts: DATA_METHOD },
@@ -1784,7 +1784,7 @@ function bulkData() {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
   openModal("데이터 항목 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사 (탭 구분): <b>제공 기관 · 데이터 항목 · 담당자 · 제공 방식 · 주기 · 수신 예정일</b>. 뒤쪽 열은 생략 가능. 프로젝트: <b>${esc(projName(pid))}</b></p>
-    <textarea id="bulkText" style="min-height:220px" class="mono" placeholder="에스에너지\t태양광 발전량\t홍길동 대리\tAPI\t15분\t2026-11-01"></textarea>`, [
+    <textarea id="bulkText" style="min-height:220px" class="mono" placeholder="참여기관 A\t태양광 발전량\t홍길동 대리\tAPI\t15분\t2026-11-01"></textarea>`, [
     { l: "취소", fn: closeModal },
     { l: "추가", cls: "primary", fn: () => {
       let n = 0;
@@ -1923,7 +1923,7 @@ function editTask(id, preset) {
   const x = id ? S.tasks.find((t) => t.id === id) : Object.assign({ status: "진행중", priority: "mid", start: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
   const fromNote = x.noteId && S.notes.find((n) => n.id === x.noteId);
   openForm(id ? "업무" : "업무 추가", [
-    { k: "title", l: "업무", t: "text", full: true, req: true, ph: "예: 에스에너지 자료 회신 확인" },
+    { k: "title", l: "업무", t: "text", full: true, req: true, ph: "예: 협력사 자료 회신 확인" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "status", l: "상태", t: "select", opts: TASK_ST },
     { k: "priority", l: "우선순위", t: "select", opts: PRI },
@@ -1936,12 +1936,42 @@ function editTask(id, preset) {
     v.updatedAt = new Date().toISOString();
     if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); if (prev !== x.status) logTask(x, "status", `${prev} → ${x.status}`); const pend = $("tlText")?.value.trim(); if (pend) logTask(x, "comment", pend, $("tlAt")?.value || today()); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } },
+            { l: "전환", cls: "left", fn: () => formSaveThen(() => convertTaskMenu(id)) }] : [],
   (fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "") +
   (id ? `<div class="sec-t">진행 기록</div>
     <div class="evform tlform"><input type="date" id="tlAt" value="${today()}"><textarea id="tlText" placeholder="예: 담당자에게 자료 요청, 금요일 회신 예정"></textarea><button class="btn primary" onclick="addTaskLog('${x.id}')">기록</button></div>
     ${memoDated(x.memo).length ? `<div class="small muted" style="margin:-6px 0 8px">메모에 날짜별 진행사항이 ${memoDated(x.memo).length}줄 있어. <a href="#" onclick="formSaveThen(() => splitMemoToLog('${x.id}'));return false">진행 기록으로 옮기기</a></div>` : ""}
     <ul class="tl" id="taskLog">${taskLogHtml(x)}</ul>` : ""));
+}
+// 업무로 적어둔 것을 맞는 항목으로 옮긴다 (기록·메모는 함께 가져가고 업무는 지움, Ctrl+Z로 되돌림)
+function convertTaskMenu(id) {
+  const x = S.tasks.find((t) => t.id === id); if (!x) return;
+  const opt = (k, l, d) => `<button class="btn" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px" onclick="convertTask('${id}','${k}')"><b>${l}</b><div class="small muted">${d}</div></button>`;
+  openModal("다른 항목으로 전환", `<div class="small muted" style="margin-bottom:10px">${esc(x.title)} — 진행 기록과 메모는 그대로 옮겨가고 이 업무는 지워져. (Ctrl+Z로 되돌릴 수 있어)</div>` +
+    opt("ms", "마일스톤", `마감일(${x.due ? shortD(x.due) : "없으면 인지일"})로 일정에 표시. 프로젝트 개요·타임라인의 다음 마일스톤에 나와`) +
+    opt("data", "데이터 협의", "컨소시엄 기관에서 받을 데이터라면. 수신 예정일 = 마감일, 기록은 협의 기록으로") +
+    opt("ho", "개발 전달", "개발에 넘길 기획 건이라면. 기획중 상태로 만들고 메모에 기록을 붙여"), [{ l: "취소", fn: closeModal }]);
+}
+function convertTask(id, kind) {
+  const x = S.tasks.find((t) => t.id === id); if (!x) return;
+  const logs = (x.log || []).filter((e) => e.type === "comment").sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || "")));
+  const memo = [x.memo || "", ...logs.map((e) => `${e.at} ${e.text}`)].filter(Boolean).join("\n");
+  let open;
+  if (kind === "ms") {
+    const ev = { id: uid("ev"), projectId: x.projectId, title: x.title, type: "마일스톤", start: x.due || x.start || today(), end: "", location: "", memo };
+    S.events.push(ev); open = () => editEvent(ev.id);
+  } else if (kind === "data") {
+    const d = { id: uid("da"), projectId: x.projectId, org: "", name: x.title, contact: x.owner || "", method: "미정", cycle: "미정", status: x.status === "완료" ? "수신 완료" : "협의 중", requestedAt: x.start || today(), dueDate: x.due || "", memo: x.memo || "",
+      log: logs.map((e) => ({ id: uid("l"), at: e.at, ts: e.ts || new Date().toISOString(), type: "기타", text: e.text })) };
+    S.datas.push(d); open = () => openData(d.id);
+  } else {
+    const h = { id: uid("h"), code: nextHOCode(), projectId: x.projectId, title: x.title, status: "plan", events: [], docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due || "", to: "", toEmail: "", cc: "", link: "", memo };
+    S.handoffs.push(h); open = () => openHO(h.id);
+  }
+  S.tasks = S.tasks.filter((t) => t.id !== id);
+  commit(); closeModal(); open();
+  toast({ ms: "마일스톤", data: "데이터 협의", ho: "개발 전달" }[kind] + "으로 전환했어", true);
 }
 function taskLogHtml(x) {
   const l = [...(x.log || [])].sort((a, b) => (b.at + (b.ts || "")).localeCompare(a.at + (a.ts || "")));
@@ -2071,7 +2101,7 @@ function editRecur(id) {
   const r = id ? S.recurring.find((x) => x.id === id) : { freq: "weekly", day: 3, projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id };
   const view = Object.assign({}, r, { wday: r.freq === "weekly" ? String(r.day) : "3", mday: r.freq === "monthly" ? r.day : 1 });
   openForm(id ? "정기 업무" : "정기 업무 추가", [
-    { k: "title", l: "정기 업무", t: "text", full: true, req: true, ph: "예: 울산 에자자 주간업무 보고" },
+    { k: "title", l: "정기 업무", t: "text", full: true, req: true, ph: "예: 주간업무 보고" },
     { k: "projectId", l: "프로젝트", t: "select", opts: activeProjects().map((p) => [p.id, p.name]) },
     { k: "freq", l: "주기", t: "select", opts: [["weekly", "매주"], ["monthly", "매월"]] },
     { k: "wday", l: "요일 (매주일 때)", t: "select", opts: [..."일월화수목금토"].map((d, i) => [String(i), d + "요일"]) },
