@@ -400,6 +400,33 @@ function tests(w, errors) {
     assert(!w.computeAlerts(pid()).some((a) => a.ref[1] === sc.id && a.kind === "화면 변경 후 미전달"), "전달 후에도 경고");
     assert(sc.lastSentVer === sc.version, "전달 버전 갱신 안 됨");
   });
+  check("회의록 인식: 버전·시간·소제목·날짜 위치 (4차 1·2번)", () => {
+    const a = w.noteActions("[액션]\n- 기획: 화면설계서 v1.2 정리\n- 14:00 고객 미팅 준비\n- 개발: 자료 회신 (10/20)\n결정사항\n- 2단계 통합");
+    assert(a.length === 3, "후보: " + JSON.stringify(a));
+    assert(a[0].title === "화면설계서 v1.2 정리" && !a[0].due, "버전을 날짜로 읽음: " + JSON.stringify(a[0]));
+    assert(!a[1].owner && a[1].title.startsWith("14:00"), "시간을 담당으로 읽음: " + JSON.stringify(a[1]));
+    assert(a[2].owner === "개발" && /-10-20$/.test(a[2].due) && a[2].title === "자료 회신", JSON.stringify(a[2]));
+    const sg = w.noteSuggestions("- ~9/11 까지 비용 산출 필요\n- 자료 회신 요청 (10/20)\n- 다음주 시연 예정\n- 8:2로 하자\n- 10월 2일 제출자료 확인 요청 예정");
+    assert(sg.length === 3, "제안: " + JSON.stringify(sg));
+    assert(sg.every((x) => x.due), "날짜를 못 읽음: " + JSON.stringify(sg));
+  });
+  check("밀린 정기 업무는 다음 회차를 중복 표시하지 않음 (4차 5번)", () => {
+    const r = { id: "r_dup", projectId: pid(), title: "밀린 정기", freq: "weekly", day: w.parseD(w.addDays(t, -6)).getDay(), nextDue: w.addDays(t, -6), history: [] };
+    S().recurring.push(r);
+    const items = w.calItems(w.addDays(t, -10), w.addDays(t, 14), pid()).filter((i) => i.kind === "recur" && i.title === "밀린 정기");
+    assert(items.length === 1 && items[0].date === r.nextDue, "회차: " + items.map((i) => i.date).join(","));
+    S().recurring = S().recurring.filter((x) => x.id !== "r_dup");
+  });
+  check("검색에서 다른 프로젝트 테스트 케이스를 열면 그 프로젝트로 전환 (4차 3번)", () => {
+    const other = S().projects.find((p) => p.id !== pid() && !p.archived);
+    assert(other, "다른 프로젝트 없음");
+    S().tcs.push({ id: "tc_x", projectId: other.id, code: "TC-990", scenario: "다른 프로젝트 검색 점검", result: "미수행" });
+    S().ui.pid = pid(); w.render();
+    w.document.getElementById("gq").value = "다른 프로젝트 검색"; w.gSearch("다른 프로젝트 검색");
+    w.gOpen(0); w.closeModal();
+    assert(S().ui.pid === other.id, "프로젝트 전환 안 됨: " + S().ui.pid);
+    assert(w.document.getElementById("tabs").textContent.includes(other.name), "경로 표시가 이전 프로젝트");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);

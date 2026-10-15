@@ -1216,15 +1216,17 @@ function gSearchItems(q) {
   const live = (x) => !proj(x.projectId)?.archived;
   const hit = (...f) => f.some((v) => String(v || "").toLowerCase().includes(q));
   const out = [];
+  // open: 함수. 프로젝트별 화면(화면·테스트·메모)은 그 프로젝트로 전환해서 연다.
+  const inProj = (x, fn) => () => { if (S.ui.pid !== "all" && S.ui.pid !== x.projectId) selProject(x.projectId); fn(); };
   const add = (group, kind, x, title, sub, open) => out.push({ group, kind, title, sub, open, pid: x.projectId });
-  S.tasks.filter(live).forEach((x) => hit(x.title, x.owner, x.memo, x.epic) && add("업무", "task", x, x.title, `${x.status}${x.due ? " · 마감 " + shortD(x.due) : ""}`, `editTask('${x.id}')`));
-  S.handoffs.filter(live).forEach((x) => hit(x.code, x.title, x.to, x.memo) && add("개발 전달", hoKind(x), x, `[${x.code}] ${x.title}`, hoStLabel(x.status), `openHO('${x.id}')`));
-  S.datas.filter(live).forEach((x) => hit(x.name, x.org, x.contact, x.memo, x.spec) && add("데이터 협의", "data", x, `${x.org ? x.org + " · " : ""}${x.name}`, x.status, `openData('${x.id}')`));
-  S.docs.filter(live).forEach((x) => hit(x.name, x.owner, x.memo, x.path) && add("산출물", "doc", x, `${x.phase} ${x.name}`, `${x.status} ${x.version || ""}`, `editDoc('${x.id}')`));
-  S.screens.filter(live).forEach((x) => hit(x.code, x.name, x.menu, x.memo) && add("화면", "doc", x, `${x.code} ${x.name}`, x.status, `S.ui.pid='${x.projectId}';selTab('screens');editScreen('${x.id}')`));
-  S.tcs.filter(live).forEach((x) => hit(x.code, x.scenario, x.steps, x.expected) && add("테스트 케이스", x.result === "Fail" ? "bug" : "tc", x, `${x.code} ${x.scenario}`, x.result, `S.ui.pid='${x.projectId}';editTC('${x.id}')`));
-  S.events.filter(live).forEach((x) => hit(x.title, x.location, x.memo) && add("일정", "event", x, x.title, `${x.type} · ${shortD(x.start)}`, `editEvent('${x.id}')`));
-  S.notes.filter(live).forEach((x) => hit(x.title, x.content) && add("메모·회의록", "doc", x, x.title || "(제목 없음)", x.date || "", `S.ui.pid='${x.projectId}';S.ui.noteId='${x.id}';selTab('notes')`));
+  S.tasks.filter(live).forEach((x) => hit(x.title, x.owner, x.memo, x.epic) && add("업무", "task", x, x.title, `${x.status}${x.due ? " · 마감 " + shortD(x.due) : ""}`, () => editTask(x.id)));
+  S.handoffs.filter(live).forEach((x) => hit(x.code, x.title, x.to, x.memo) && add("개발 전달", hoKind(x), x, `[${x.code}] ${x.title}`, hoStLabel(x.status), () => openHO(x.id)));
+  S.datas.filter(live).forEach((x) => hit(x.name, x.org, x.contact, x.memo, x.spec) && add("데이터 협의", "data", x, `${x.org ? x.org + " · " : ""}${x.name}`, x.status, () => openData(x.id)));
+  S.docs.filter(live).forEach((x) => hit(x.name, x.owner, x.memo, x.path) && add("산출물", "doc", x, `${x.phase} ${x.name}`, `${x.status} ${x.version || ""}`, () => editDoc(x.id)));
+  S.screens.filter(live).forEach((x) => hit(x.code, x.name, x.menu, x.memo) && add("화면", "doc", x, `${x.code} ${x.name}`, x.status, () => { selProject(x.projectId); selTab("screens"); editScreen(x.id); }));
+  S.tcs.filter(live).forEach((x) => hit(x.code, x.scenario, x.steps, x.expected) && add("테스트 케이스", x.result === "Fail" ? "bug" : "tc", x, `${x.code} ${x.scenario}`, x.result, inProj(x, () => editTC(x.id))));
+  S.events.filter(live).forEach((x) => hit(x.title, x.location, x.memo) && add("일정", "event", x, x.title, `${x.type} · ${shortD(x.start)}`, () => editEvent(x.id)));
+  S.notes.filter(live).forEach((x) => hit(x.title, x.content) && add("메모·회의록", "doc", x, x.title || "(제목 없음)", x.date || "", () => { S.ui.noteId = x.id; selProject(x.projectId); selTab("notes"); }));
   // 같은 그룹 안에서는 끝난 항목(완료·검수완료·승인·수신 완료·Pass)을 뒤로
   const order = [...new Set(out.map((r) => r.group))];
   const isDone = (r) => /^(완료|검수완료|승인|수신 완료|Pass)/.test(r.sub || "");
@@ -1255,7 +1257,7 @@ function gKey(e) {
 function gOpen(i) {
   const r = gList[i]; if (!r) return;
   $("gres").classList.remove("open"); $("gq").blur();
-  new Function(r.open)();
+  r.open();
 }
 
 // ───────────── 타임라인 (Jira 타임라인 구조) ─────────────
@@ -1680,6 +1682,7 @@ function recurFirst(r) {
   return addDays(t, ((Number(r.day) || 0) - parseD(t).getDay() + 7) % 7);
 }
 function recurDates(r, from, to) {
+  if (r.nextDue && r.nextDue < today()) return r.nextDue >= from && r.nextDue <= to ? [r.nextDue] : [];
   const out = []; let d = r.nextDue, guard = 0;
   while (d && d <= to && guard++ < 500) { if (d >= from) out.push(d); d = recurStep(r, d); }
   return out;
@@ -2650,6 +2653,21 @@ function newNote() {
 }
 // 회의록 → 업무: [액션]/[Action]/할 일 아래 줄, 또는 "- [ ]"·"TODO" 줄을 후보로 뽑는다.
 // "담당: 내용 (~10/20)" 형식이면 담당과 마감일도 채운다.
+// 줄 어디에 있든 날짜를 찾는다: 2026-10-20 · 10/20 · 10.20 · 10월 20일 (버전 번호 v1.2는 제외)
+function findDate(line) {
+  const pats = [/(?:^|[\s(~])(\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})(?=$|[\s),.까])/, /(?:^|[\s(~])(\d{1,2})\s*월\s*(\d{1,2})\s*일/, /(?:^|[\s(~])(\d{1,2})[./](\d{1,2})(?=$|[\s),까~])/];
+  for (const re of pats) {
+    const m = line.match(re); if (!m) continue;
+    const d = m.length === 2 ? normDate(m[1]) : normDate(`${m[1]}/${m[2]}`);
+    if (!d) continue;
+    const start = m.index + (m[0].length - m[0].trimStart().length);
+    const rest = (line.slice(0, m.index) + " " + line.slice(m.index + m[0].length)).replace(/\(\s*\)|~\s*$|^\s*~|까지/g, " ").replace(/\s{2,}/g, " ").trim();
+    const opens = (rest.match(/\(/g) || []).length, closes = (rest.match(/\)/g) || []).length;
+    const fixed = closes > opens ? rest.replace(/\s*\)/, "") : opens > closes ? rest.replace(/\(\s*(?!.*\))/, "") : rest;
+    return { due: d, rest: fixed.replace(/\s{2,}/g, " ").trim() };
+  }
+  return { due: "", rest: line };
+}
 function noteActions(text) {
   const lines = String(text || "").split(/\r?\n/);
   const out = []; let inAct = false;
@@ -2657,25 +2675,27 @@ function noteActions(text) {
     const l = raw.trim();
     if (/^\[?(액션|액션\s*아이템|action\s*items?|todo|할\s*일|후속\s*조치)\]?\s*:?$/i.test(l)) { inAct = true; return; }
     if (/^\[.+\]$/.test(l) || /^#+\s/.test(l)) { inAct = false; return; }
+    if (inAct && l && !/^(?:[-*•·]|\d+[.)]|\[\s?\])/.test(l) && l.length <= 20) { inAct = false; return; }   // '결정사항' 같은 짧은 소제목에서 끝
     const m = l.match(/^(?:[-*•·]|\d+[.)])\s*(?:\[\s?\]\s*)?(.+)$/);
     const isTodo = /^(?:[-*]\s*)?\[\s?\]\s+/.test(l) || /^todo\s*[:：]/i.test(l);
     if (!(inAct && m) && !isTodo) return;
     let body = (m ? m[1] : l).replace(/^\[\s?\]\s*/, "").replace(/^todo\s*[:：]\s*/i, "").trim();
     if (!body) return;
     let owner = "", due = "";
-    const om = body.match(/^([^:：]{1,15})\s*[:：]\s*(.+)$/);
+    const om = body.match(/^([^:：\d\s][^:：]{0,14})\s*[:：]\s*(.+)$/);   // 숫자로 시작하면(14:00) 담당 아님
     if (om) { owner = om[1].trim(); body = om[2].trim(); }
-    const dm = body.match(/\(?\s*~?\s*(\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}|\d{1,2}[./]\d{1,2})\s*(?:까지)?\s*\)?\s*$/);
-    if (dm) { due = normDate(dm[1]); body = body.slice(0, dm.index).trim(); }
+    const fd = findDate(body); due = fd.due; body = fd.rest || body;
     out.push({ title: body, owner, due });
   });
   return out;
 }
 // 표시가 없는 회의록용: "~하기/필요/요청/확인/검토/회신/예정…"으로 끝나는 줄을 제안 액션으로
 function noteSuggestions(text) {
-  const verb = /(하기|주기|보기|필요|요청|예정|확인|검토|회신|전달|작성|준비|공유|정리|해야\s*함?|할\s*것|하자|진행\s*예정|까지)\s*[.!]?$/;
-  return String(text || "").split(/\r?\n/).map((l) => l.trim().replace(/^(?:[-*•·]|\d+[.)])\s*/, "")).filter((l) => l.length >= 6 && l.length <= 80 && verb.test(l) && !/^\[.*\]$/.test(l))
-    .map((l) => { const dm = l.match(/\(?\s*~?\s*(\d{1,2}[./]\d{1,2})\s*(?:까지)?\s*\)?\s*$/); return { title: dm ? l.slice(0, dm.index).trim() : l, owner: "", due: dm ? normDate(dm[1]) : "", suggested: true }; });
+  // 날짜를 먼저 떼고 끝말로 판단. '예정'은 요청·필요·확인·할 것이 같이 있을 때만(일정 공지는 제외), '하자'(결정)는 제외
+  const verb = /(하기|주기|보기|필요|요청|확인|검토|회신|전달|작성|준비|공유|정리|해야\s*함?|할\s*것|예정)\s*[.!]?$/;
+  return String(text || "").split(/\r?\n/).map((l) => l.trim().replace(/^(?:[-*•·]|\d+[.)])\s*/, "")).filter((l) => l.length >= 6 && l.length <= 90 && !/^\[.*\]$/.test(l))
+    .map((l) => { const fd = findDate(l); return { title: fd.rest, owner: "", due: fd.due, suggested: true }; })
+    .filter((a) => verb.test(a.title) && (!/예정\s*[.!]?$/.test(a.title) || /(요청|필요|확인|할\s*것)/.test(a.title)));
 }
 function noteToTasks(nid) {
   if (noteFlush) noteFlush();
