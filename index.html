@@ -643,7 +643,10 @@ function dday(s) {
   const n = calDays(today(), s);
   return n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
 }
-function toast(msg) { const t = $("toast"); t.textContent = msg; t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), 2600); }
+function toast(msg, withUndo) {
+  const t = $("toast"); t.innerHTML = esc(msg) + (withUndo ? ` <button class="btn sm" style="margin-left:10px" onclick="undo()">되돌리기</button>` : "");
+  t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), withUndo ? 6000 : 2600);
+}
 async function copyText(text, msg = "클립보드에 복사됨") {
   try { await navigator.clipboard.writeText(text); }
   catch (e) { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
@@ -700,14 +703,28 @@ function load() {
   }
   S = normalize(emptyState()); seedDemo(); writeLocal();
 }
-function writeLocal() {
-  const copy = Object.assign({}, S); delete copy._embeddedOlder;
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(copy)); } catch (e) { toast("브라우저 저장 실패: " + e.message); }
+let lastJson = null, undoStack = [], lastPushAt = 0;
+function snapshot() { const copy = Object.assign({}, S); delete copy._embeddedOlder; return JSON.stringify(copy); }
+function writeLocal(trackUndo) {
+  const json = snapshot();
+  if (trackUndo && lastJson && json !== lastJson && Date.now() - lastPushAt > 1000) {
+    undoStack.push(lastJson); if (undoStack.length > 30) undoStack.shift(); lastPushAt = Date.now();
+  }
+  lastJson = json;
+  try { localStorage.setItem(STORE_KEY, json); } catch (e) { toast("브라우저 저장 실패: " + e.message); }
+}
+function undo() {
+  if (!undoStack.length) { toast("되돌릴 변경이 없어"); return; }
+  const ui = S.ui, prev = JSON.parse(undoStack.pop());
+  S = normalize(prev); S.ui = Object.assign(S.ui, { tab: ui.tab, pid: ui.pid });   // 보던 화면은 그대로
+  lastJson = snapshot(); lastPushAt = 0;
+  try { localStorage.setItem(STORE_KEY, lastJson); } catch (e) {}
+  dirty = true; closeModal(); render(); toast(`되돌림 (남은 ${undoStack.length}단계)`);
 }
 function persist() {
   S.updatedAt = new Date().toISOString();
   ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
-  writeLocal(); dirty = true; updateSaveInd();
+  writeLocal(true); dirty = true; updateSaveInd();
   if (fileHandle) { clearTimeout(fileTimer); fileTimer = setTimeout(() => writeToHandle(true), 1500); }
 }
 function commit() { persist(); render(); }
@@ -1515,7 +1532,7 @@ function editEvent(id, date) {
   ], e, (v) => {
     if (id) Object.assign(e, v); else S.events.push(Object.assign({ id: uid("ev") }, v));
     S.ui.calSel = v.start; commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("일정을 삭제할까?")) { S.events = S.events.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("일정을 삭제할까?")) { S.events = S.events.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 
 // ───────────── 데이터 협의 (컨소시엄 데이터 수급) ─────────────
@@ -1585,7 +1602,7 @@ function editData(id, preset) {
     if (id) Object.assign(x, v);
     else { const n = Object.assign({ id: uid("da"), log: [] }, v); S.datas.push(n); setTimeout(() => openData(n.id), 0); }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("데이터 항목을 삭제할까?")) { S.datas = S.datas.filter((d) => d.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("데이터 항목을 삭제할까?")) { S.datas = S.datas.filter((d) => d.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 function openData(id) {
   const x = S.datas.find((d) => d.id === id); if (!x) return;
@@ -1714,7 +1731,7 @@ function editTask(id, preset) {
     v.updatedAt = new Date().toISOString();
     if (id) { const prev = x.status; Object.assign(x, v); markDone(x, prev); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); S.tasks.push(n); }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); } } }] : [],
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
   fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "");
 }
 function recurLabel(r) { return r.freq === "monthly" ? `매월 ${r.day}일` : `매주 ${"일월화수목금토"[Number(r.day) || 0]}요일`; }
@@ -1770,7 +1787,7 @@ function editRecur(id) {
     if (!v.nextDue) v.nextDue = recurFirst(v);
     if (id) Object.assign(r, v); else S.recurring.push(Object.assign({ id: uid("r"), history: [], lastDone: "" }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("정기 업무를 삭제할까?")) { S.recurring = S.recurring.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("정기 업무를 삭제할까?")) { S.recurring = S.recurring.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 
 // ───────────── 개발 전달 · 노티 ─────────────
@@ -1847,7 +1864,7 @@ function editHO(id, preset) {
       setTimeout(() => openHO(h.id), 0);
     }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); relinkScreens(); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); relinkScreens(); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 function openHO(id, presetType) {
   const x = S.handoffs.find((h) => h.id === id); if (!x) return;
@@ -2069,7 +2086,7 @@ function editDoc(id, phaseId, status) {
     if (id) { if (v.status !== d.status) d.history.push({ at: today(), ts: new Date().toISOString(), text: `${d.status} → ${v.status}` }); Object.assign(d, v); }
     else S.docs.push(Object.assign({ id: uid("d"), history: [{ at: today(), ts: new Date().toISOString(), text: `추가 (${v.status})` }], order: 99 }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("산출물을 삭제할까?")) { S.docs = S.docs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : [], hist);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("산출물을 삭제할까?")) { S.docs = S.docs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [], hist);
 }
 function exportDocsCsv() {
   const pid = S.ui.pid;
@@ -2138,7 +2155,7 @@ function editRisk(id, preset) {
     if (v.status === "종료" && r.status !== "종료") v.closedAt = today();
     if (id) Object.assign(r, v); else S.risks.push(Object.assign({ id: uid("ri"), code: nextRiskCode() }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("삭제할까?")) { S.risks = S.risks.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("삭제할까?")) { S.risks = S.risks.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 
 // ───────────── 요구사항 · 추적표 (요구사항 → 화면 → 테스트) ─────────────
@@ -2202,7 +2219,7 @@ function editReq(id) {
     if (v.status === "확정" && !r.confirmedAt) v.confirmedAt = today();
     if (id) Object.assign(r, v); else S.reqs.push(Object.assign({ id: uid("rq"), code: nextReqCode() }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("요구사항을 삭제할까?")) { S.reqs = S.reqs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("요구사항을 삭제할까?")) { S.reqs = S.reqs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 function bulkReqs() {
   const pid = S.ui.pid;
@@ -2309,7 +2326,7 @@ function editScreen(id) {
   ], s, (v) => {
     if (id) Object.assign(s, v); else S.screens.push(Object.assign({ id: uid("s"), projectId: pid, history: [] }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); commit(); closeModal(); } } },
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } },
            { l: "개정", cls: "left", fn: () => { closeModal(); reviseScreen(id); } },
            ...(s.hoId && s.lastSentVer !== undefined && (s.version || "") !== s.lastSentVer ? [{ l: "변경분 전달", cls: "left", fn: () => { closeModal(); sendRevision(id); } }] : [])] : [],
   id && (s.history || []).length ? `<div class="sec-t">개정 이력</div><ul class="tl">${[...s.history].reverse().map((hh) => `<li><div class="h"><b>${esc(hh.from || "")} → ${esc(hh.to)}</b> · ${hh.at}</div><div class="x">${esc(hh.text || "")}</div></li>`).join("")}</ul>${s.lastSentVer !== undefined ? `<div class="small muted">개발에 전달한 버전: ${esc(s.lastSentVer || "-")}</div>` : ""}` : "");
@@ -2385,7 +2402,7 @@ function editWBS(id, phaseId) {
     v.progress = Math.max(0, Math.min(100, Number(v.progress) || 0));
     if (id) Object.assign(w, v); else S.wbs.push(Object.assign({ id: uid("w"), projectId: S.ui.pid }, v));
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("작업을 삭제할까?")) { S.wbs = S.wbs.filter((x) => x.id !== id); commit(); closeModal(); } } }] : []);
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("작업을 삭제할까?")) { S.wbs = S.wbs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
 function bulkWBS() {
   openModal("WBS 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀 WBS에서 복사 (탭 구분): <b>단계(P1~P6 또는 빈칸) · 작업 · 담당 · 시작 · 종료 · 진척률</b>. 날짜는 2026-10-15 / 2026.10.15 / 10/15 형식 가능.</p>
@@ -2500,7 +2517,7 @@ function editTC(id, preset) {
     if (id) { const prev = c.result; Object.assign(c, v); if (v.result !== prev) tcResultChanged(c); }
     else { const n = Object.assign({ id: uid("tc"), code: nextTCCode() }, c, v); if (n.result !== "미수행") n.testedAt = n.testedAt || today(); S.tcs.push(n); }
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("테스트 케이스를 삭제할까?")) { S.tcs = S.tcs.filter((x) => x.id !== id); commit(); closeModal(); } } },
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("테스트 케이스를 삭제할까?")) { S.tcs = S.tcs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } },
           ...(["Fail", "Block"].includes(c.result) && !c.hoId ? [{ l: "결함 전달", cls: "left", fn: () => { closeModal(); tcDefect(c.id); } }] : [])] : []);
 }
 // Fail TC → 개발 전달(결함) 생성. 수신자는 화면의 개발 담당자.
@@ -2962,7 +2979,7 @@ function noteTasksHtml(n) {
   return (rs.length ? `<div class="sec-t">이 회의의 결정·리스크 ${rs.length}</div>` + rs.map((r) => `<div class="mrow" style="cursor:pointer" onclick="editRisk('${r.id}')">${typeIcon(r.type === "이슈" ? "bug" : r.type === "결정" ? "task" : "data")}<span class="nm">${esc(r.title)}</span>${badge(r.type, r.type === "결정" ? "green" : r.type === "이슈" ? "red" : "amber")}</div>`).join("") : "") +
     (ts.length ? `<div class="sec-t">이 회의에서 나온 업무 ${ts.length}</div>` : "") + ts.map((t) => `<div class="mrow" style="cursor:pointer" onclick="editTask('${t.id}')">${typeIcon("task")}<span class="nm" style="${t.status === "완료" ? "text-decoration:line-through;color:var(--faint)" : ""}">${esc(t.title)}</span><span class="small muted">${esc(t.owner || "")}</span>${badge(t.status, TASK_CLS[t.status] || "gray")}${t.due ? `<span class="small muted">${shortD(t.due)}</span>` : ""}</div>`).join("");
 }
-function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); }
+function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); toast("메모를 삭제했어", true); }
 
 // ───────────── 프로젝트 / 설정 / 보고 ─────────────
 function editProject(id) {
@@ -3210,9 +3227,11 @@ document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") { e.preventDefault(); saveFile(false); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("gq").focus(); $("gq").select(); }
   if (e.key === "Escape" && $("modalBg").classList.contains("open")) closeModal();
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "")) { e.preventDefault(); undo(); }
 });
 window.addEventListener("beforeunload", (e) => { if (fileHandle && dirty) { e.preventDefault(); e.returnValue = ""; } });
 load();
+lastJson = snapshot();
 render();
 </script>
 </body>
