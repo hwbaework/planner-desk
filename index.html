@@ -329,6 +329,7 @@
   .cal .sun { color: var(--danger); }
   .cal .sat { color: var(--accent); }
   .cal .day.today .num { background: var(--accent); color: #fff; }
+  .cal .day .dn, .cal-agenda { display: none; }
   .pill { font-size: 12.5px; line-height: 1.35; padding: 1px 5px; margin-top: 2px; border-radius: 3px; border-left: 3px solid var(--line2); background: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill:hover { background: var(--accentw); }
   .pill .k { color: var(--faint); font-size: 10.5px; margin-right: 4px; }
@@ -488,6 +489,17 @@
     .side-nav > * { flex: none; }
     .cal-kinds { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 10px; max-width: 100%; }
     .cal-kinds label { flex: none; }
+    .cal .day { min-height: 48px; }
+    .cal .day .pill, .cal .day .more { display: none; }
+    .cal .day .dn { display: inline-block; margin-top: 2px; font-size: 11px; font-weight: 700; color: var(--accent); background: var(--accentw); border-radius: 8px; padding: 0 6px; }
+    .cal-agenda { display: block; margin-top: 14px; }
+    /* 업무 표 → 카드: 제목 한 줄, 아래에 상태·마감·담당 */
+    .tcards thead, .tcards .tc-opt { display: none; }
+    .tcards tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
+    .tcards td { display: block; border: none !important; box-shadow: none; padding: 0 !important; }
+    .tcards td:empty { display: none; }
+    .tcards td.tc-title { flex: 1 1 100%; order: -1; }
+    .tcards td.empty { flex: 1 1 100%; }
   }
 </style>
 </head>
@@ -1596,10 +1608,13 @@ function renderCal() {
   for (let i = 0; i < rows * 7; i++) {
     const d = addDays(start, i), dt = parseD(d), list = byDay[d] || [];
     h += `<div class="day ${dt.getMonth() !== m - 1 ? "out" : ""} ${d === t ? "today" : ""} ${d === sel ? "sel" : ""}" onclick="calPick('${d}')">
-      <div class="num ${dt.getDay() === 0 ? "sun" : dt.getDay() === 6 ? "sat" : ""}">${dt.getDate()}</div>` +
+      <div class="num ${dt.getDay() === 0 ? "sun" : dt.getDay() === 6 ? "sat" : ""}">${dt.getDate()}</div>${list.length ? `<div class="dn">${list.length}</div>` : ""}` +
       list.slice(0, 4).map(calPill).join("") + (list.length > 4 ? `<div class="more">+${list.length - 4}건 더</div>` : "") + `</div>`;
   }
   h += `</div>`;
+  // 좁은 화면: 칸에는 건수만, 이 달 일정은 목록으로
+  const monthItems = calItems(`${ym}-01`, fmtD(new Date(y, m, 0)), pid);
+  h += `<div class="card cal-agenda"><div class="card-h"><h3>${m}월 일정</h3><span class="sub">${monthItems.length}건</span></div>${itemList(monthItems, true)}</div>`;
   const selItems = calItems(sel, sel, pid);
   h += `<div class="grid2" style="margin-top:14px"><div class="card"><div class="card-h"><h3>${sel} (${wd(sel)})</h3><span class="sub">${selItems.length}건</span>
       <div class="actions"><button class="btn sm" onclick="editEvent(null,'${sel}')">+ 일정</button><button class="btn sm" onclick="editTask(null,{due:'${sel}'})">+ 업무</button></div></div>${itemList(selItems, false)}</div>
@@ -1795,16 +1810,16 @@ function renderTasks() {
     <input class="search" placeholder="업무·담당·메모 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   const eps = epicsOf(pid);
   if (eps.length) h += `<div class="filters"><span class="small muted">분류</span><button class="chip ${!S.ui.taskEpic ? "active" : ""}" onclick="S.ui.taskEpic='';render()">전체</button>${eps.map((e) => `<button class="chip ${S.ui.taskEpic === e ? "active" : ""}" onclick="S.ui.taskEpic=${esc(JSON.stringify(e))};render()">${esc(e)}</button>`).join("")}<button class="chip ${S.ui.taskEpic === "(없음)" ? "active" : ""}" onclick="S.ui.taskEpic='(없음)';render()">분류 없음</button></div>`;
-  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>업무</th><th>상태</th><th>우선</th><th>인지일</th><th>마감</th><th>담당 / 관계자</th></tr></thead><tbody>` +
+  h += `<div class="card"><div class="tbl-wrap"><table class="t tcards"><thead><tr>${pid ? "" : "<th>프로젝트</th>"}<th>업무</th><th>상태</th><th>우선</th><th>인지일</th><th>마감</th><th>담당 / 관계자</th></tr></thead><tbody>` +
     (list.map((x) => {
       const late = x.status !== "완료" && x.due && x.due < t;
       const lastLog = [...(x.log || [])].filter((e) => e.type === "comment").sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).pop();
       const memo = lastLog ? `${shortD(lastLog.at)} ${lastLog.text}` : (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
       return `<tr style="${x.status === "완료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
-        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
+        <td class="tc-title"><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
         <td><select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
-        <td class="nowrap small">${priIcon(x.priority)} ${{ high: "높음", mid: "보통", low: "낮음" }[x.priority] || "보통"}</td>
-        <td class="nowrap">${x.start ? `${shortD(x.start)}${x.status !== "완료" ? ` <span class="muted small">${calDays(x.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
+        <td class="nowrap small tc-opt">${priIcon(x.priority)} ${{ high: "높음", mid: "보통", low: "낮음" }[x.priority] || "보통"}</td>
+        <td class="nowrap tc-opt">${x.start ? `${shortD(x.start)}${x.status !== "완료" ? ` <span class="muted small">${calDays(x.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
         <td class="nowrap" style="${late ? "color:var(--danger);font-weight:700" : ""}">${x.due ? `${shortD(x.due)} <span class="small ${late ? "" : "muted"}">${x.status !== "완료" ? dday(x.due) : ""}</span>` : '<span class="muted">-</span>'}</td>
         <td class="small">${esc(x.owner || "")}</td></tr>`;
     }).join("") || `<tr><td colspan="7" class="empty">해당하는 업무가 없어</td></tr>`) + `</tbody></table></div></div>`;
