@@ -1724,7 +1724,7 @@ function renderTasks() {
   const pr = { high: 0, mid: 1, low: 2 };
   list.sort((a, b) => (a.status === "완료") - (b.status === "완료") || (a.due || "9999").localeCompare(b.due || "9999") || (pr[a.priority] ?? 1) - (pr[b.priority] ?? 1));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.taskFilter='${k}';render()">${l} ${cnt[k]}</button>`;
-  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `<button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
+  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `<button class="btn" onclick="pickTaskCsv()" title="Jira 등에서 내보낸 CSV">CSV 가져오기</button><button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
   h += `<div class="filters">${chip("open", "진행 전체")}${chip("진행중", "진행중")}${chip("대기", "대기")}${chip("예정", "예정")}${chip("완료", "완료")}${chip("all", "전체")}
     <input class="search" placeholder="업무·담당·메모 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   const eps = epicsOf(pid);
@@ -1734,7 +1734,7 @@ function renderTasks() {
       const late = x.status !== "완료" && x.due && x.due < t;
       const memo = (x.memo || "").trim().split("\n").filter(Boolean).pop() || "";
       return `<tr style="${x.status === "완료" ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
-        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
+        <td><div class="link" onclick="editTask('${x.id}')">${typeIcon("task")}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(x.title)}</span></div>${x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}${memo ? `<div class="small muted clamp1">${esc(memo)}</div>` : ""}</td>
         <td><select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select></td>
         <td class="nowrap small">${priIcon(x.priority)} ${{ high: "높음", mid: "보통", low: "낮음" }[x.priority] || "보통"}</td>
         <td class="nowrap">${x.start ? `${shortD(x.start)}${x.status !== "완료" ? ` <span class="muted small">${calDays(x.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
@@ -1754,6 +1754,68 @@ function renderTasks() {
   return h;
 }
 function markDone(x, prevStatus) { if (x.status === "완료" && prevStatus !== "완료") x.completedAt = today(); if (x.status !== "완료") x.completedAt = ""; }
+// ── CSV 가져오기 (Jira 내보내기 CSV 포함): 머리줄 이름으로 열을 자동으로 맞춘다 ──
+function parseCsv(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += c; }
+    else if (c === '"') q = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(cell); rows.push(row); row = []; cell = ""; }
+    else cell += c;
+  }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter((r) => r.some((c) => c.trim()));
+}
+const CSV_COLS = {
+  title: /^(summary|요약|제목|업무|title)$/i, key: /^(issue key|이슈 키|키|key)$/i, status: /^(status|상태)$/i,
+  owner: /^(assignee|담당자|담당)$/i, due: /^(due date|due|기한|마감|마감일)$/i, start: /^(created|생성됨|생성일|start date|시작일|인지일)$/i,
+  epic: /^(parent summary|상위 요약|epic name|epic link summary|에픽|분류|parent)$/i, priority: /^(priority|우선순위)$/i, memo: /^(description|설명|메모)$/i,
+};
+function csvToTasks(text) {
+  const rows = parseCsv(text); if (rows.length < 2) return { items: [], cols: {} };
+  const head = rows[0].map((h) => h.trim()), cols = {};
+  Object.entries(CSV_COLS).forEach(([k, re]) => { const i = head.findIndex((h) => re.test(h)); if (i >= 0) cols[k] = i; });
+  const st = (v) => { v = String(v || "").toLowerCase(); return /done|완료|closed|resolved/.test(v) ? "완료" : /progress|진행/.test(v) ? "진행중" : /review|검토|대기|blocked|hold/.test(v) ? "대기" : "예정"; };
+  const pr = (v) => /highest|high|높|긴급|critical/i.test(v || "") ? "high" : /low|낮/i.test(v || "") ? "low" : "mid";
+  const items = rows.slice(1).map((r) => {
+    const g = (k) => (cols[k] !== undefined ? String(r[cols[k]] || "").trim() : "");
+    return { title: g("title"), key: g("key"), status: st(g("status")), owner: g("owner"), due: normDate(g("due")), start: normDate(g("start")), epic: g("epic"), priority: pr(g("priority")), memo: g("memo").slice(0, 2000) };
+  }).filter((x) => x.title);
+  return { items, cols };
+}
+function pickTaskCsv() {
+  if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".csv,text/csv";
+  inp.onchange = () => inp.files[0] && inp.files[0].text().then(importTaskCsv);
+  inp.click();
+}
+function importTaskCsv(text) {
+  const { items, cols } = csvToTasks(text);
+  if (!items.length) { toast("업무를 못 찾았어 — 첫 줄에 Summary/요약 같은 열 이름이 있어야 해"); return; }
+  const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
+  const found = Object.keys(cols).map((k) => ({ title: "제목", key: "키", status: "상태", owner: "담당", due: "기한", start: "시작", epic: "분류(에픽)", priority: "우선순위", memo: "설명" }[k])).join(" · ");
+  const upd = items.filter((x) => x.key && S.tasks.some((t) => t.extKey === x.key)).length;
+  openModal("CSV 업무 가져오기", `<div class="info">
+      <div class="l">대상 프로젝트</div><div><select id="csvPid" class="inline">${activeProjects().map((p) => `<option value="${p.id}" ${p.id === pid ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+      <div class="l">인식한 열</div><div>${found}</div>
+      <div class="l">업무</div><div>${items.length}건 (새로 ${items.length - upd} · 같은 키 갱신 ${upd})</div></div>
+    <div class="sec-t">미리보기</div>${items.slice(0, 8).map((x) => `<div class="mrow">${typeIcon("task")}<span class="nm">${x.key ? `<span class="mono small muted">${esc(x.key)}</span> ` : ""}${esc(x.title)}</span>${x.epic ? epicTag(x.epic) : ""}${badge(x.status, TASK_CLS[x.status])}</div>`).join("")}${items.length > 8 ? `<div class="small muted">외 ${items.length - 8}건</div>` : ""}`, [
+    { l: "취소", fn: closeModal },
+    { l: "가져오기", cls: "primary", fn: () => {
+      const target = $("csvPid").value; let add = 0, up = 0;
+      items.forEach((x) => {
+        const ex = x.key && S.tasks.find((t) => t.extKey === x.key);
+        const v = { title: x.title, status: x.status, owner: x.owner, due: x.due, epic: x.epic, priority: x.priority, updatedAt: new Date().toISOString() };
+        if (ex) { const prev = ex.status; Object.assign(ex, v); markDone(ex, prev); up++; }
+        else { const n = Object.assign({ id: uid("t"), projectId: target, start: x.start || today(), memo: x.memo, extKey: x.key }, v); markDone(n, ""); S.tasks.push(n); add++; }
+      });
+      commit(); closeModal(); toast(`가져오기: 새로 ${add} · 갱신 ${up}`, true);
+    } },
+  ], true);
+}
 function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const prev = x.status; x[k] = v; x.updatedAt = new Date().toISOString(); if (k === "status") markDone(x, prev); commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
 function editTask(id, preset) {
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }

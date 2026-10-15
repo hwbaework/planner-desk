@@ -559,6 +559,22 @@ function tests(w, errors) {
     const m = w.buildHtml().match(/var EMBEDDED_DATA = ([\s\S]+?); \/\*EMBEDDED_DATA_PLACEHOLDER\*\//);
     assert(JSON.parse(m[1]).fileSavedAt, "저장 파일에 저장 시각 없음");
   });
+  check("Jira CSV 가져오기: 열 자동 인식, 상태·분류 변환, 같은 키는 갱신", () => {
+    const csv = '﻿Summary,Issue key,Status,Assignee,Due date,Parent summary,Priority,Created\n' +
+      '"RE100 교육, 1차",KAN-1,In Progress,홍길동,2026-10-30,RE100 교육,High,2026-10-01 09:00\n' +
+      '통합관제 화면,KAN-2,Done,,,"통합관제",Medium,2026-09-20\n';
+    const { items, cols } = w.csvToTasks(csv);
+    assert(items.length === 2 && cols.title === 0 && cols.epic === 5, "인식 실패: " + JSON.stringify(cols));
+    assert(items[0].title === "RE100 교육, 1차" && items[0].status === "진행중" && items[0].priority === "high" && items[0].due === "2026-10-30", JSON.stringify(items[0]));
+    assert(items[1].status === "완료" && items[1].epic === "통합관제", JSON.stringify(items[1]));
+    S().ui.pid = pid(); w.importTaskCsv(csv);
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "가져오기").click();
+    const n = S().tasks.filter((x) => /^KAN-/.test(x.extKey || "")).length;
+    w.importTaskCsv(csv.replace("In Progress", "Done"));
+    [...w.document.querySelectorAll("#modalFoot button")].find((b) => b.textContent === "가져오기").click();
+    const k1 = S().tasks.filter((x) => x.extKey === "KAN-1");
+    assert(n === 2 && k1.length === 1 && k1[0].status === "완료" && k1[0].completedAt, "갱신 실패: " + k1.length);
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
