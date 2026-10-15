@@ -376,6 +376,15 @@ function tests(w, errors) {
     w.noteToTasks("n_act");
     assert(!w.document.getElementById("modalBg").classList.contains("open"), "이미 만든 액션이 다시 뜸");
   });
+  check("[액션] 표시 없는 회의록은 할 일처럼 보이는 줄을 제안(기본 미체크)", () => {
+    const sg = w.noteSuggestions("[SPC]\n - 6:4까지 협의 가능\n - 다음주 수요일에 진행사항 보여주기\n - 사전 제출자료 제출 요청\n[내부]\n - 메모");
+    assert(sg.length === 2 && sg.every((x) => x.suggested), JSON.stringify(sg));
+    const n = { id: "n_sg", projectId: pid(), title: "제안 점검", date: t, content: " - 견적서 회신 확인\n - 참고 사항" };
+    S().notes.push(n); w.noteToTasks("n_sg");
+    const boxes = [...w.document.querySelectorAll(".actchk")];
+    assert(boxes.length === 1 && !boxes[0].checked, "제안이 미체크가 아님");
+    w.closeModal();
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);

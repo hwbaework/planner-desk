@@ -2641,13 +2641,20 @@ function noteActions(text) {
   });
   return out;
 }
+// 표시가 없는 회의록용: "~하기/필요/요청/확인/검토/회신/예정…"으로 끝나는 줄을 제안 액션으로
+function noteSuggestions(text) {
+  const verb = /(하기|주기|보기|필요|요청|예정|확인|검토|회신|전달|작성|준비|공유|정리|해야\s*함?|할\s*것|하자|진행\s*예정|까지)\s*[.!]?$/;
+  return String(text || "").split(/\r?\n/).map((l) => l.trim().replace(/^(?:[-*•·]|\d+[.)])\s*/, "")).filter((l) => l.length >= 6 && l.length <= 80 && verb.test(l) && !/^\[.*\]$/.test(l))
+    .map((l) => { const dm = l.match(/\(?\s*~?\s*(\d{1,2}[./]\d{1,2})\s*(?:까지)?\s*\)?\s*$/); return { title: dm ? l.slice(0, dm.index).trim() : l, owner: "", due: dm ? normDate(dm[1]) : "", suggested: true }; });
+}
 function noteToTasks(nid) {
   if (noteFlush) noteFlush();
   const n = S.notes.find((x) => x.id === nid);
-  const acts = noteActions(n.content).filter((a) => !S.tasks.some((t) => t.noteId === nid && t.title === a.title));
+  const explicit = noteActions(n.content);
+  const acts = (explicit.length ? explicit : noteSuggestions(n.content)).filter((a) => !S.tasks.some((t) => t.noteId === nid && t.title === a.title));
   if (!acts.length) { toast("만들 액션이 없어 — [액션] 아래에 '- 담당: 내용 (~10/20)' 형식으로 적어줘"); return; }
-  openModal("회의록에서 업무 만들기", `<p class="small muted" style="margin-bottom:8px">「${esc(n.title || "(제목 없음)")}」에서 찾은 액션이야. 만들 것만 체크해.</p>` +
-    acts.map((a, i) => `<label class="mrow" style="cursor:pointer"><input type="checkbox" class="actchk" value="${i}" checked style="width:auto">
+  openModal("회의록에서 업무 만들기", `<p class="small muted" style="margin-bottom:8px">「${esc(n.title || "(제목 없음)")}」에서 ${explicit.length ? "찾은 액션이야. 만들 것만 체크해." : "[액션] 표시가 없어서, 할 일처럼 보이는 줄을 제안했어. 만들 것만 체크해."}</p>` +
+    acts.map((a, i) => `<label class="mrow" style="cursor:pointer"><input type="checkbox" class="actchk" value="${i}" ${a.suggested ? "" : "checked"} style="width:auto">
       <span class="nm">${esc(a.title)}</span><span class="small muted">${esc(a.owner || "담당 미정")}</span><span class="small muted">${a.due ? "~" + shortD(a.due) : "마감 미정"}</span></label>`).join(""), [
     { l: "취소", fn: closeModal },
     { l: "업무 만들기", cls: "primary", fn: () => {
