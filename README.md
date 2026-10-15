@@ -70,7 +70,7 @@ schtasks /Create /SC MINUTE /MO 30 /TN "PlannerDesk 메일 동기화" /TR "\"C:\
 
 ## 자동 점검
 
-로컬 서버를 띄우고 `http://localhost:5178/tests/selftest.html`을 연다. 화면 · 보드 · 경고 · 메일 매칭 · 저장/불러오기 왕복 · 회의록 인식 · 메모 변환 · 단축키 등 75개 항목을 확인한다. 점검은 분리된 저장 공간(`?selftest`)에서 돌아서 실제 데이터를 건드리지 않는다.
+로컬 서버를 띄우고 `http://localhost:5178/tests/selftest.html`을 연다. 화면 · 보드 · 경고 · 메일 매칭 · 저장/불러오기 왕복 · 회의록 인식 · 메모 변환 · 단축키 등 76개 항목을 확인한다. 점검은 분리된 저장 공간(`?selftest`)에서 돌아서 실제 데이터를 건드리지 않는다.
 
 ```bash
 npx --yes http-server@14.1.1 -p 5178 -c-1

@@ -250,6 +250,15 @@ function tests(w, errors) {
     assert(ho.status === "verified", "노티 후 검수 완료 안 됨: " + ho.status);
     assert(sc.status === "검토중", "결함 검수로 화면이 확정됨: " + sc.status);
   });
+  check("TC 단계(단위·통합) 구분: 산출물 칩과 결과서 CSV", () => {
+    S().tcs.push({ id: "tc_unit", projectId: pid(), code: "TC-992", scenario: "단위 점검", stage: "단위", result: "Pass" });
+    const u = w.tcStats(pid(), "단위"), all = w.tcStats(pid());
+    assert(u.total === 1 && u.pass === 1, "단위 집계: " + JSON.stringify(u));
+    assert(w.tcStats(pid(), "통합").total === all.total - 1, "통합 집계");
+    const chip = w.tcChip(pid(), "단위", true);
+    assert(chip.includes("단위 TC Pass 1/1") && chip.includes("결과서 CSV") && chip.includes("검토요청 가능"), "칩: " + chip);
+    S().tcs = S().tcs.filter((x) => x.id !== "tc_unit");
+  });
   check("요구사항 TC가 있어도 화면 기본 TC는 생성", () => {
     window.confirm = () => true; S().ui.pid = pid();
     const sc = { id: "s_rq", projectId: pid(), code: "SCR-RQ-1", name: "요구사항 화면", status: "작성중", version: "v0.1" };

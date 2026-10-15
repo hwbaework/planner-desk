@@ -2353,7 +2353,7 @@ function renderDocs() {
         const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
         const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
         return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
-          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId) : ""}${/요구사항 정의서/.test(d.name) ? reqChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
+          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId, /단위/.test(d.name) ? "단위" : "통합", /결과서/.test(d.name)) : ""}${/요구사항 정의서/.test(d.name) ? reqChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap">${esc(d.owner || "")}</td>
@@ -2777,13 +2777,16 @@ function exportWbsCsv() {
 }
 
 // ───────────── 테스트 케이스 (통합 테스트) ─────────────
-function tcStats(pid) {
-  const l = S.tcs.filter((c) => c.projectId === pid), n = (r) => l.filter((c) => c.result === r).length;
+// stage: "단위" | "통합" (없으면 전체). 단계가 비어 있는 TC는 통합테스트로 본다
+function tcStats(pid, stage) {
+  const l = S.tcs.filter((c) => c.projectId === pid && (!stage || (c.stage || "통합") === stage)), n = (r) => l.filter((c) => c.result === r).length;
   return { total: l.length, pass: n("Pass"), fail: n("Fail"), block: n("Block"), todo: n("미수행") };
 }
-function tcChip(pid) {
-  const t = tcStats(pid); if (!t.total) return "";
-  return ` <span class="chip-ref" title="테스트 케이스 결과" style="cursor:pointer" onclick="selTab('tc')">TC Pass ${t.pass}/${t.total}${t.fail ? ` · Fail ${t.fail}` : ""}</span>`;
+function tcChip(pid, stage, isResult) {
+  const t = tcStats(pid, stage); if (!t.total) return "";
+  const ready = !t.todo && !t.fail && !t.block;
+  return ` <span class="chip-ref" title="${stage}테스트 케이스 결과" style="cursor:pointer" onclick="selProject('${pid}');selTab('tc')">${stage} TC Pass ${t.pass}/${t.total}${t.fail ? ` · Fail ${t.fail}` : ""}${t.todo ? ` · 미수행 ${t.todo}` : ""}</span>` +
+    (isResult ? ` <span class="link small" onclick="event.stopPropagation();exportTCCsv('${stage}','${pid}')">결과서 CSV</span>${ready ? ` <span class="chip-ref" style="color:var(--ok)" title="모두 수행, Fail 0">검토요청 가능</span>` : ""}` : "");
 }
 function nextTCCode() { S.seq.tc = (S.seq.tc || 0) + 1; return `TC-${String(S.seq.tc).padStart(3, "0")}`; }
 function renderTC() {
@@ -2812,7 +2815,7 @@ function renderTC() {
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>TC ID</th><th>화면</th><th>시나리오</th><th>예상 결과</th><th>결과</th><th>수행일</th><th>결함 전달</th></tr></thead><tbody>` +
     (list.map((c) => {
       const sc = S.screens.find((x) => x.id === c.screenId), ho = c.hoId && S.handoffs.find((x) => x.id === c.hoId);
-      return `<tr><td class="mono nowrap">${typeIcon(c.result === "Fail" ? "bug" : "tc")} ${esc(c.code)}${(c.prevHoIds || []).length ? ` <span class="chip-ref" title="이전 결함 전달 이력">재발 ${c.prevHoIds.length}</span>` : ""}</td>
+      return `<tr><td class="mono nowrap">${typeIcon(c.result === "Fail" ? "bug" : "tc")} ${esc(c.code)}${c.stage === "단위" ? ` <span class="chip-ref">단위</span>` : ""}${(c.prevHoIds || []).length ? ` <span class="chip-ref" title="이전 결함 전달 이력">재발 ${c.prevHoIds.length}</span>` : ""}</td>
         <td class="nowrap small">${sc ? `${esc(sc.code)}<div class="muted">${esc(sc.name)}</div>` : '<span class="muted">-</span>'}</td>
         <td><span class="link" onclick="editTC('${c.id}')">${esc(c.scenario)}</span>${c.steps ? `<div class="small muted clamp1">${esc(c.steps)}</div>` : ""}</td>
         <td class="small">${esc(c.expected || "")}</td>
@@ -2866,6 +2869,7 @@ function editTC(id, preset) {
     { k: "screenId", l: "화면", t: "select", opts: [["", "(화면 없음)"], ...S.screens.filter((x) => x.projectId === c.projectId).map((x) => [x.id, `${x.code} ${x.name}`])] },
     { k: "reqId", l: "요구사항", t: "select", opts: [["", "(연결 안 함)"], ...S.reqs.filter((x) => x.projectId === c.projectId && x.status !== "제외").map((x) => [x.id, `${x.code} ${x.title.slice(0, 30)}`])] },
     { k: "result", l: "결과", t: "select", opts: TC_RES },
+    { k: "stage", l: "테스트 단계", t: "select", opts: [["통합", "통합테스트 (P5)"], ["단위", "단위테스트 (P4)"]] },
     { k: "pre", l: "사전 조건", t: "text", full: true, ph: "예: 일반 회원으로 로그인" },
     { k: "steps", l: "테스트 절차", t: "textarea", full: true, ph: "1. 메뉴 진입\n2. 이름 비우고 저장" },
     { k: "expected", l: "예상 결과", t: "textarea", full: true },
@@ -2940,15 +2944,15 @@ function bulkTC() {
     } },
   ]);
 }
-function exportTCCsv() {
+function exportTCCsv(stage, pid = S.ui.pid) {
   const rows = [["TC ID", "REQ", "화면ID", "화면명", "시나리오", "사전 조건", "절차", "예상 결과", "최초 결과", "최종 결과", "재테스트", "실제 결과", "수행일", "수행자", "결함 전달", "결과 이력"]];
-  S.tcs.filter((c) => c.projectId === S.ui.pid).forEach((c) => {
+  S.tcs.filter((c) => c.projectId === pid && (!stage || (c.stage || "통합") === stage)).forEach((c) => {
     const sc = S.screens.find((x) => x.id === c.screenId), ho = S.handoffs.find((x) => x.id === c.hoId);
     const hs = c.history || [], defects = [...new Set([...(c.prevHoIds || []), c.hoId].map((i) => S.handoffs.find((x) => x.id === i)?.code).filter(Boolean))];
     rows.push([c.code, S.reqs.find((r) => r.id === c.reqId)?.code, sc?.code, sc?.name, c.scenario, c.pre, c.steps, c.expected, hs[0]?.result || c.result, c.result, Math.max(0, hs.length - 1), c.actual, c.testedAt, c.tester, defects.join(" "),
       hs.map((x) => `${x.at} ${x.result}${x.ho ? " " + x.ho : ""}`).join(" > ")]);
   });
-  download(`통합테스트결과_${projName(S.ui.pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
+  download(`${stage || "통합"}테스트결과_${projName(pid)}_${stamp()}.csv`, "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
 
 // ───────────── 메일 수신 (붙여넣기 / .eml) ─────────────
