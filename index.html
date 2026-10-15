@@ -360,6 +360,7 @@
   .kcard .av { margin-left: auto; width: 24px; height: 24px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .kcard .next { border: none; background: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0 2px; font-family: inherit; visibility: hidden; }
   .kcard:hover .next { visibility: visible; }
+  @media (hover: none) { .kcard .next { visibility: visible; font-size: 13px; padding: 4px 6px; } }
   .kcard .warnline { margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--danger); }
   .col .add { border: none; background: none; text-align: left; color: var(--dim); padding: 6px 4px; border-radius: 4px; cursor: pointer; font-size: 13.5px; font-family: inherit; }
   .col .add:hover { background: var(--line); color: var(--text); }
@@ -421,6 +422,7 @@
   .quick { display: flex; flex-wrap: wrap; gap: 5px; margin: 14px 0 8px; }
   .evform { display: grid; grid-template-columns: 140px 140px 1fr auto; gap: 6px; align-items: start; margin-bottom: 14px; }
   .evform textarea { min-height: 38px; }
+  .evform.tlform { grid-template-columns: 140px 1fr auto; }
   .sec-t { font-size: 12px; font-weight: 700; color: var(--dim); margin: 14px 0 8px; }
 
   .banner { background: var(--warnw); color: var(--warn); border: 1px solid var(--warn); border-radius: 8px; padding: 9px 14px; margin-bottom: 12px; font-size: 12.5px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
@@ -474,6 +476,18 @@
     .form { grid-template-columns: 1fr; }
     .evform, .mailcand .row { grid-template-columns: 1fr 1fr; }
     main { padding: 14px 16px 60px; }
+  }
+  @media (max-width: 600px) {
+    .evform, .evform.tlform { grid-template-columns: 1fr; }
+    .mrow { flex-wrap: wrap; }
+    .mrow .nm { flex: 1 1 100%; white-space: normal; }
+    .mrow input[type=date] { flex: 1 1 140px; width: auto; }
+    .shell { grid-template-columns: minmax(0, 1fr); }
+    .side, main { min-width: 0; }
+    .side-nav { flex-wrap: nowrap; overflow-x: auto; min-width: 0; max-width: 100%; -webkit-overflow-scrolling: touch; padding-bottom: 2px; }
+    .side-nav > * { flex: none; }
+    .cal-kinds { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 10px; max-width: 100%; }
+    .cal-kinds label { flex: none; }
   }
 </style>
 </head>
@@ -1905,7 +1919,7 @@ function editTask(id, preset) {
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
   (fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "") +
   (id ? `<div class="sec-t">진행 기록</div>
-    <div class="evform" style="grid-template-columns:140px 1fr auto"><input type="date" id="tlAt" value="${today()}"><textarea id="tlText" placeholder="예: 담당자에게 자료 요청, 금요일 회신 예정"></textarea><button class="btn primary" onclick="addTaskLog('${x.id}')">기록</button></div>
+    <div class="evform tlform"><input type="date" id="tlAt" value="${today()}"><textarea id="tlText" placeholder="예: 담당자에게 자료 요청, 금요일 회신 예정"></textarea><button class="btn primary" onclick="addTaskLog('${x.id}')">기록</button></div>
     ${memoDated(x.memo).length ? `<div class="small muted" style="margin:-6px 0 8px">메모에 날짜별 진행사항이 ${memoDated(x.memo).length}줄 있어. <a href="#" onclick="formSaveThen(() => splitMemoToLog('${x.id}'));return false">진행 기록으로 옮기기</a></div>` : ""}
     <ul class="tl" id="taskLog">${taskLogHtml(x)}</ul>` : ""));
 }
