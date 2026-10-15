@@ -1322,6 +1322,31 @@ function boardAdd(col) {
   else if (bk === "tc") editTC(null, { projectId: pid });
 }
 
+// ───────────── 바탕화면 알림 ─────────────
+// 앱이 열려 있는 동안 30분마다 '빨간 경고'를 확인해서, 오늘 아직 알리지 않은 것만 윈도우 알림으로 띄운다.
+const NOTIFY_KINDS = ["접수 노티 없음", "완료 노티 없음", "데이터 미수신", "승인 회신 없음", "이슈·리스크 기한 지남", "업무 마감 지남"];
+function enableNotify() {
+  if (!("Notification" in window)) { toast("이 브라우저는 바탕화면 알림을 지원하지 않아"); return; }
+  Notification.requestPermission().then((p) => { toast(p === "granted" ? "바탕화면 알림 켜짐" : "알림 권한이 거부됐어 — 브라우저 사이트 설정에서 허용해줘"); if (p === "granted") checkNotify(true); });
+}
+function pendingNotifications() {
+  const t = today(), sent = S.ui.notified && S.ui.notified.date === t ? S.ui.notified.keys : [];
+  return computeAlerts(null).filter((a) => NOTIFY_KINDS.includes(a.kind) && !sent.includes(a.kind + ":" + a.ref[1]));
+}
+function checkNotify(force) {
+  if (S.settings.desktopNotify !== "on" || !("Notification" in window) || Notification.permission !== "granted") return [];
+  const list = pendingNotifications(); if (!list.length) return [];
+  const t = today();
+  if (!S.ui.notified || S.ui.notified.date !== t) S.ui.notified = { date: t, keys: [] };
+  S.ui.notified.keys.push(...list.map((a) => a.kind + ":" + a.ref[1])); persistUI();
+  const head = list.slice(0, 3).map((a) => `${a.kind}: ${a.title}`).join("\n");
+  try {
+    const n = new Notification(`Planner Desk · 확인 필요 ${list.length}건`, { body: head + (list.length > 3 ? `\n외 ${list.length - 3}건` : ""), tag: "planner-desk" });
+    n.onclick = () => { window.focus(); S.ui.tab = "dash"; render(); n.close(); };
+  } catch (e) {}
+  return list;
+}
+
 // ───────────── 통합 검색 (Ctrl+K) ─────────────
 // 보관된 프로젝트는 빼고, 제목·코드·담당·메모를 대상으로 찾는다.
 function gSearchItems(q) {
@@ -3133,7 +3158,13 @@ function openSettings() {
     { k: "verifyDays", l: "내 검수 알림 (완료 노티 후 일)", t: "number" },
     { k: "fontScale", l: "글자 크기", t: "select", opts: [["1", "보통"], ["1.1", "크게"], ["1.2", "아주 크게"]] },
     { k: "theme", l: "화면 테마", t: "select", opts: [["light", "화이트"], ["dark", "다크"]] },
-  ], S.settings, (v) => { ["ackDays", "approvalDays", "quietDays", "verifyDays"].forEach((k) => (v[k] = Number(v[k]) || emptyState().settings[k])); Object.assign(S.settings, v); commit(); },
+    { k: "desktopNotify", l: "바탕화면 알림", t: "select", opts: [["off", "끄기"], ["on", "켜기 — 노티 미수신·기한 지남을 윈도우 알림으로"]] },
+  ], S.settings, (v) => {
+    ["ackDays", "approvalDays", "quietDays", "verifyDays"].forEach((k) => (v[k] = Number(v[k]) || emptyState().settings[k]));
+    const turnOn = v.desktopNotify === "on" && S.settings.desktopNotify !== "on";
+    Object.assign(S.settings, v); commit();
+    if (turnOn) enableNotify();
+  },
   [{ l: "사용 안내", cls: "left", fn: () => { closeModal(); openHelp(); } },
    { l: "불러오기", cls: "left", fn: () => { closeModal(); $("importFile").click(); } },
    { l: "다른 이름으로 저장", cls: "left", fn: () => { closeModal(); saveFile(true); } },
@@ -3337,6 +3368,8 @@ window.addEventListener("beforeunload", (e) => { if (fileHandle && dirty) { e.pr
 load();
 lastJson = snapshot(); lastCount = itemCount();
 restoreHandle();
+setTimeout(() => checkNotify(), 3000);
+setInterval(() => { render(); checkNotify(); }, 30 * 60 * 1000);   // 열어 둔 채로 날짜·경고가 바뀌어도 갱신
 render();
 </script>
 </body>

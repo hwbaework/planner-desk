@@ -575,6 +575,18 @@ function tests(w, errors) {
     const k1 = S().tasks.filter((x) => x.extKey === "KAN-1");
     assert(n === 2 && k1.length === 1 && k1[0].status === "완료" && k1[0].completedAt, "갱신 실패: " + k1.length);
   });
+  check("바탕화면 알림: 빨간 경고를 알리고, 같은 날 같은 경고는 다시 안 알림", () => {
+    const shown = [], keep = w.Notification;
+    w.Notification = function (title, opt) { shown.push({ title, body: opt.body }); this.close = () => {}; };
+    w.Notification.permission = "granted"; w.Notification.requestPermission = () => Promise.resolve("granted");
+    S().settings.desktopNotify = "on"; S().ui.notified = null;
+    S().tasks.push({ id: "t_nt", projectId: pid(), title: "알림 점검 업무", status: "진행중", priority: "mid", start: t, due: w.addDays(t, -3) });
+    const first = w.checkNotify();
+    const second = w.checkNotify();
+    w.Notification = keep; S().settings.desktopNotify = "off";
+    assert(first.some((a) => a.ref[1] === "t_nt") && shown.length === 1 && shown[0].title.includes("확인 필요"), "알림 안 뜸");
+    assert(!second.length && shown.length === 1, "같은 경고를 또 알림");
+  });
   check("이모지 아이콘 없음", () => {
     const src = w.document.documentElement.outerHTML;
     const m = src.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B50}]/u);
