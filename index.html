@@ -1733,11 +1733,12 @@ function renderCal() {
   calItems(start, addDays(start, rows * 7 - 1), pid).forEach((i) => (byDay[i.date] = byDay[i.date] || []).push(i));
   const t = today(), sel = S.ui.calSel || t;
   let h = pageHead("캘린더", pid ? `${esc(projName(pid))} 일정만 보는 중` : "전체 프로젝트 일정을 한 화면에",
-    `${pid ? `<button class="btn" onclick="selProject('all')">전체 프로젝트 보기</button>` : ""}<button class="btn primary" onclick="editEvent(null,'${sel}')">+ 일정 추가</button>`);
+    `<button class="btn primary" onclick="editEvent(null,'${sel}')">+ 일정 추가</button>`);
   h += `<div class="cal-bar"><button class="btn sm" onclick="calMove(-1)">이전</button><b class="cal-title">${y}년 ${m}월</b><button class="btn sm" onclick="calMove(1)">다음</button>
     <button class="btn sm ghost" onclick="S.ui.calMonth='';S.ui.calSel='';render()">오늘</button>
     <span class="cal-kinds">${CAL_KINDS.map(([k, l]) => `<label class="check small"><input type="checkbox" ${S.ui.calKinds[k] ? "checked" : ""} onchange="S.ui.calKinds.${k}=this.checked?1:0;persistUI();render()">${l}</label>`).join("")}</span></div>`;
-  if (!pid) h += `<div class="filters">${activeProjects().map((p) => `<button class="chip" onclick="selProject('${p.id}')" title="이 프로젝트만 보기">${projTag(p.id)}</button>`).join("")}</div>`;
+  // Jira 빠른 필터처럼: 칩은 항상 보이고, 누른 칩만 강조. 다시 누르면 전체로
+  h += `<div class="filters"><button class="chip ${pid ? "" : "active"}" onclick="selProject('all')">전체</button>${activeProjects().map((p) => `<button class="chip ${pid === p.id ? "active" : ""}" onclick="selProject('${pid === p.id ? "all" : p.id}')" title="${pid === p.id ? "다시 누르면 전체" : "이 프로젝트만 보기"}">${projTag(p.id)}</button>`).join("")}</div>`;
   h += `<div class="cal">` + [..."일월화수목금토"].map((d, i) => `<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${d}</div>`).join("");
   for (let i = 0; i < rows * 7; i++) {
     const d = addDays(start, i), dt = parseD(d), list = byDay[d] || [];
