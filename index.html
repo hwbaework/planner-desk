@@ -124,6 +124,7 @@
   .tabs b { color: var(--text); font-weight: 600; }
   .side-nav { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 6px; }
   .side-nav h3 { margin-top: 12px; }
+  .wdate { width: 132px; height: 28px; padding: 0 4px; font-size: 13px; }
   .nav-sep { height: 1px; background: var(--line); margin: 8px 8px; }
   .navi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 0 6px 6px 0; cursor: pointer; color: var(--dim); font-weight: 500; }
   .navi:hover { background: var(--sub); color: var(--text); }
@@ -513,7 +514,7 @@
 
 <header class="top">
   <div>
-    <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232684FF'/%3E%3Cstop offset='1' stop-color='%230C66E4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23g%29'/%3E%3Cpath d='M32 12 L48 28 L32 44 L16 28 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M32 36 L40 44 L32 52 L24 44 Z' fill='white'/%3E%3C/svg%3E" alt="">Planner Desk <small>기획 · PMO 데스크</small></div>
+    <div class="brand"><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%232684FF'/%3E%3Cstop offset='1' stop-color='%230C66E4'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url%28%23g%29'/%3E%3Cpath d='M32 12 L48 28 L32 44 L16 28 Z' fill='none' stroke='white' stroke-width='5' stroke-linejoin='round'/%3E%3Cpath d='M32 36 L40 44 L32 52 L24 44 Z' fill='white'/%3E%3C/svg%3E" alt="">Planner Desk </div>
     <div class="today" id="todayLabel"></div>
   </div>
   <div class="gsearch">
@@ -1678,7 +1679,7 @@ function renderData() {
   list.sort((a, b) => (a.org || "").localeCompare(b.org || "", "ko") || DATA_ST.indexOf(a.status) - DATA_ST.indexOf(b.status) || (a.dueDate || "9").localeCompare(b.dueDate || "9"));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.dataFilter='${k}';render()">${l} ${cnt[k]}</button>`;
   let h = pageHead("데이터 협의", `${pid ? esc(projName(pid)) + " · " : ""}컨소시엄 기관별로 받을 데이터, 협의 기록, 수신 예정과 실제 수신을 관리`,
-    `<button class="btn" onclick="bulkData()">엑셀 붙여넣기</button><button class="btn primary" onclick="editData()">+ 데이터 항목</button>`);
+    `<button class="btn primary" onclick="editData()">+ 데이터 항목</button>`);
   h += `<div class="filters">${chip("open", "진행 전체")}${DATA_ST.map((st) => chip(st, st)).join("")}${chip("all", "전체")}
     <input class="search" placeholder="데이터·기관·담당자 검색" value="${esc(S.ui.dataQ || "")}" oninput="S.ui.dataQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   if (orgs.length) h += `<div class="filters"><span class="small muted">제공 기관</span><button class="chip ${!org ? "active" : ""}" onclick="S.ui.dataOrg='';render()">전체</button>${orgs.map((o) => `<button class="chip ${org === o ? "active" : ""}" onclick="S.ui.dataOrg=${esc(JSON.stringify(o))};render()">${esc(o)}</button>`).join("")}</div>`;
@@ -1694,7 +1695,7 @@ function renderData() {
         <td class="nowrap" style="${late ? "color:var(--danger);font-weight:700" : ""}">${x.dueDate ? `${shortD(x.dueDate)}${x.status !== "수신 완료" ? ` <span class="small ${late ? "" : "muted"}">${dday(x.dueDate)}</span>` : ""}` : '<span class="muted">-</span>'}</td>
         <td class="nowrap">${x.lastReceivedAt ? shortD(x.lastReceivedAt) : '<span class="muted">-</span>'}</td>
         <td class="small">${last ? `<span class="muted">${shortD(last.at)} ${esc(last.type || "")}</span><div class="clamp1">${esc(last.text || "")}</div>` : '<span class="muted">기록 없음</span>'}</td></tr>`;
-    }).join("") || `<tr><td colspan="8" class="empty">데이터 항목이 없어. [+ 데이터 항목] 또는 [엑셀 붙여넣기]로 추가해.</td></tr>`) + `</tbody></table></div></div>`;
+    }).join("") || `<tr><td colspan="8" class="empty">데이터 항목이 없어. [+ 데이터 항목]으로 추가해.</td></tr>`) + `</tbody></table></div></div>`;
   return h;
 }
 function setData(id, k, v) {
@@ -1811,7 +1812,7 @@ function renderTasks() {
   const pr = { high: 0, mid: 1, low: 2 };
   list.sort((a, b) => (a.status === "완료") - (b.status === "완료") || (a.due || "9999").localeCompare(b.due || "9999") || (pr[a.priority] ?? 1) - (pr[b.priority] ?? 1));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.taskFilter='${k}';render()">${l} ${cnt[k]}</button>`;
-  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `${(() => { const n = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length).length; return n ? `<button class="btn" onclick="splitAllMemos()" title="메모의 '6월 9일 기준 …' 줄을 날짜별 진행 기록으로">메모 → 진행 기록 (${n}건)</button>` : ""; })()}<button class="btn" onclick="pickTaskCsv()" title="Jira 등에서 내보낸 CSV">CSV 가져오기</button><button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
+  let h = pageHead("업무 관리", pid ? esc(projName(pid)) : "전체 프로젝트 업무 · 마감일 순", `${(() => { const n = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length).length; return n ? `<button class="btn" onclick="splitAllMemos()" title="메모의 '6월 9일 기준 …' 줄을 날짜별 진행 기록으로">메모 → 진행 기록 (${n}건)</button>` : ""; })()}<button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
   h += `<div class="filters">${chip("open", "진행 전체")}${chip("진행중", "진행중")}${chip("대기", "대기")}${chip("예정", "예정")}${chip("완료", "완료")}${chip("all", "전체")}
     <input class="search" placeholder="업무·담당·메모 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   const eps = epicsOf(pid);
@@ -2340,7 +2341,7 @@ function renderDocs() {
   if (S.ui.pid === "all") return renderDocsMatrix();
   const pid = S.ui.pid, s = docStats(pid);
   let h = pageHead("산출물 관리", `수행방법론 단계별 산출물 · 작성 → 공유(검토요청) → 승인 · 전체 승인 ${s.ok}/${s.total} (${s.total ? Math.round((s.ok / s.total) * 100) : 0}%)`,
-    `<button class="btn" onclick="exportDocsCsv()">CSV 내보내기</button>${S.docs.some((d) => d.projectId === pid) ? "" : `<button class="btn primary" onclick="applyTemplate(proj('${pid}'));commit()">방법론 템플릿 적용</button>`}`);
+    `${S.docs.some((d) => d.projectId === pid) ? "" : `<button class="btn primary" onclick="applyTemplate(proj('${pid}'));commit()">방법론 템플릿 적용</button>`}`);
   const cur = currentPhase(pid);
   PHASES.forEach((ph) => {
     const ds = S.docs.filter((d) => d.projectId === pid && d.phase === ph.id).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
@@ -2524,7 +2525,7 @@ function renderReqs() {
   if (q) list = list.filter((r) => (r.code + r.title + (r.desc || "") + (r.source || "")).toLowerCase().includes(q));
   list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
   let h = pageHead("요구사항 · 추적표", `${esc(projName(pid))} · ${live.length}건 · 화면 반영 ${mapped} · 테스트 통과 ${verified} — 요구사항 → 화면 → 테스트가 이어지는지 확인`,
-    `<button class="btn" onclick="bulkReqs()">엑셀 붙여넣기</button><button class="btn" onclick="exportReqCsv()">추적표 CSV</button><button class="btn primary" onclick="editReq()">+ 요구사항</button>`);
+    `<button class="btn primary" onclick="editReq()">+ 요구사항</button>`);
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.reqFilter='${k}';render()">${l} ${cnt[k]}</button>`;
   h += `<div class="filters">${chip("all", "전체")}${REQ_ST.map((st) => chip(st, st)).join("")}
     <input class="search" placeholder="REQ·요구사항·출처 검색" value="${esc(S.ui.reqQ || "")}" oninput="S.ui.reqQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
@@ -2539,7 +2540,7 @@ function renderReqs() {
         <td class="small">${esc(r.source || "")}</td>
         <td>${tr.screens.map((sc) => `<span class="chip-ref">${esc(sc.code)}</span>`).join("") || (miss ? badge("화면 미반영", "amber") : '<span class="muted">-</span>')}</td>
         <td class="nowrap small">${tr.tcs.length ? `${tr.pass}/${tr.tcs.length} Pass${tr.fail ? ` <span style="color:var(--danger);font-weight:700">Fail ${tr.fail}</span>` : ""}` : '<span class="muted">-</span>'}</td></tr>`;
-    }).join("") || `<tr><td colspan="8" class="empty">요구사항이 없어. 요구사항 정의서 엑셀을 [엑셀 붙여넣기]로 한 번에 넣을 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
+    }).join("") || `<tr><td colspan="8" class="empty">요구사항이 없어. [+ 요구사항]으로 추가해.</td></tr>`) + `</tbody></table></div></div>`;
   return h;
 }
 function setReq(id, k, v) { const r = S.reqs.find((x) => x.id === id); r[k] = v; if (k === "status" && v === "확정" && !r.confirmedAt) r.confirmedAt = today(); commit(); }
@@ -2600,7 +2601,7 @@ function renderScreens() {
   const by = (st) => S.screens.filter((s) => s.projectId === pid && s.status === st).length;
   const sent = S.screens.filter((s) => s.projectId === pid && s.hoId).length;
   let h = pageHead("화면 목록 (화면설계서)", `총 ${total}개 · 확정 ${by("확정")} · 검토중 ${by("검토중")} · 작성중 ${by("작성중")} · 변경중 ${by("변경중")} · 개발 전달 ${sent}`,
-    `<button class="btn" onclick="bulkScreens()">엑셀 붙여넣기</button><button class="btn" onclick="sendScreens()">선택 화면 개발 전달</button><button class="btn primary" onclick="editScreen()">＋ 화면 추가</button>`);
+    `<button class="btn" onclick="sendScreens()">선택 화면 개발 전달</button><button class="btn primary" onclick="editScreen()">＋ 화면 추가</button>`);
   h += `<div class="filters"><input class="search" placeholder="화면ID·화면명·메뉴 검색" value="${esc(S.ui.scQ || "")}" oninput="S.ui.scQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th><input type="checkbox" onclick="document.querySelectorAll('.scchk').forEach(c=>c.checked=this.checked)"></th><th>화면ID</th><th>화면명</th><th>메뉴 경로</th><th>설계 상태</th><th>버전</th><th>기획</th><th>개발 전달</th><th>개발 담당</th><th>비고</th></tr></thead><tbody>` +
     (list.map((s) => {
@@ -2616,7 +2617,7 @@ function renderScreens() {
         <td class="nowrap">${ho ? `<span class="link mono small" onclick="openHO('${ho.id}')">${esc(ho.code)}</span> ${badge(hoStLabel(ho.status), HO_CLS[ho.status])}` : `<button class="btn sm ghost" onclick="editHO(null,{screenIds:['${s.id}'],projectId:'${pid}',title:${esc(JSON.stringify(`${s.code} ${s.name} 화면 개발 전달`))}})">전달 등록</button>`}</td>
         <td class="nowrap">${esc(s.dev || (ho && ho.to) || "")}</td>
         <td class="small">${esc(s.memo || "")}</td></tr>`;
-    }).join("") || `<tr><td colspan="10" class="empty">화면이 없어. 엑셀의 화면 목록을 [엑셀 붙여넣기]로 한 번에 넣을 수 있어.</td></tr>`) + `</tbody></table></div></div>`;
+    }).join("") || `<tr><td colspan="10" class="empty">화면이 없어. [＋ 화면 추가]로 추가해.</td></tr>`) + `</tbody></table></div></div>`;
   return h;
 }
 // 화면 개정: 버전업 + 변경 내용 이력. 이미 개발에 넘긴 화면이면 '변경 후 미전달'로 표시된다.
@@ -2707,7 +2708,7 @@ function renderWBS() {
   const avg = ws.length ? Math.round(ws.reduce((a, w) => a + Number(w.progress || 0), 0) / ws.length) : 0;
   const late = ws.filter((w) => w.end && w.end < today() && Number(w.progress) < 100).length;
   let h = pageHead("WBS", `${ws.length}개 작업 · 평균 진척 ${avg}% · 지연 ${late}${r0 ? ` · ${r0} ~ ${r1}` : ""}`,
-    `<button class="btn" onclick="bulkWBS()">엑셀 붙여넣기</button><button class="btn" onclick="exportWbsCsv()">CSV</button><button class="btn primary" onclick="editWBS()">＋ 작업 추가</button>`);
+    `<button class="btn primary" onclick="editWBS()">＋ 작업 추가</button>`);
   const groups = [...PHASES.map((ph) => [ph.id, `P.${ph.id.slice(1)} ${ph.name}`, ph.color]), ["", "일반 업무 / 미분류", "#8b93a1"]];
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>작업</th><th>담당</th><th>시작</th><th>종료</th><th>진척</th><th style="min-width:240px">일정 ${r0 ? `<span class="muted small">(${shortD(r0)} ~ ${shortD(r1)}, 빨간 선=오늘)</span>` : ""}</th></tr></thead><tbody>`;
   groups.forEach(([gid, gname, color]) => {
@@ -2720,8 +2721,8 @@ function renderWBS() {
       const tl = r0 && today() >= r0 && today() <= r1 ? `<div class="todayline" style="left:${pos(today())}%"></div>` : "";
       h += `<tr><td><span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.legacyStatus ? ` <span class="chip-ref">${esc(w.legacyStatus)}</span>` : ""}${w.memo ? ` <span class="muted small" title="${esc(w.memo)}">메모</span>` : ""}</td>
         <td class="nowrap">${esc(w.owner || "")}</td>
-        <td class="nowrap">${w.start ? shortD(w.start) : '<span class="muted">-</span>'}</td>
-        <td class="nowrap" style="${isLate ? "color:var(--danger);font-weight:600" : ""}">${w.end ? shortD(w.end) : '<span class="muted">-</span>'}</td>
+        <td class="nowrap"><input type="date" class="inline wdate" value="${w.start || ""}" onchange="setWBS('${w.id}','start',this.value)"></td>
+        <td class="nowrap"><input type="date" class="inline wdate" style="${isLate ? "color:var(--danger);font-weight:600" : ""}" value="${w.end || ""}" onchange="setWBS('${w.id}','end',this.value)"></td>
         <td class="nowrap"><input class="progress" type="number" min="0" max="100" step="10" value="${Number(w.progress) || 0}" onchange="setWBS('${w.id}','progress',Math.max(0,Math.min(100,Number(this.value)||0)))">%</td>
         <td><div class="gantt">${bar}${tl}</div></td></tr>`;
     });
@@ -2787,7 +2788,7 @@ function tcChip(pid, stage, isResult) {
   const t = tcStats(pid, stage); if (!t.total) return "";
   const ready = !t.todo && !t.fail && !t.block;
   return ` <span class="chip-ref" title="${stage}테스트 케이스 결과" style="cursor:pointer" onclick="selProject('${pid}');selTab('tc')">${stage} TC Pass ${t.pass}/${t.total}${t.fail ? ` · Fail ${t.fail}` : ""}${t.todo ? ` · 미수행 ${t.todo}` : ""}</span>` +
-    (isResult ? ` <span class="link small" onclick="event.stopPropagation();exportTCCsv('${stage}','${pid}')">결과서 CSV</span>${ready ? ` <span class="chip-ref" style="color:var(--ok)" title="모두 수행, Fail 0">검토요청 가능</span>` : ""}` : "");
+    (isResult ? `${ready ? ` <span class="chip-ref" style="color:var(--ok)" title="모두 수행, Fail 0">검토요청 가능</span>` : ""}` : "");
 }
 function nextTCCode() { S.seq.tc = (S.seq.tc || 0) + 1; return `TC-${String(S.seq.tc).padStart(3, "0")}`; }
 function renderTC() {
@@ -2808,7 +2809,7 @@ function renderTC() {
   list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
   const done = t.total - t.todo, pct = t.total ? Math.round((done / t.total) * 100) : 0, passPct = done ? Math.round((t.pass / done) * 100) : 0;
   let h = pageHead("테스트 케이스", `${esc(projName(pid))} · 전체 ${t.total} · 수행 ${pct}% · Pass율 ${passPct}% · Fail ${t.fail} · Block ${t.block}`,
-    `<button class="btn" onclick="genTCs()">화면 목록에서 기본 TC 생성</button><button class="btn" onclick="genReqTCs()">요구사항에서 TC 생성</button><button class="btn" onclick="bulkTC()">엑셀 붙여넣기</button><button class="btn" onclick="exportTCCsv()">결과서 CSV</button><button class="btn primary" onclick="editTC()">+ 테스트 케이스</button>`);
+    `<button class="btn" onclick="genTCs()">화면 목록에서 기본 TC 생성</button><button class="btn" onclick="genReqTCs()">요구사항에서 TC 생성</button><button class="btn primary" onclick="editTC()">+ 테스트 케이스</button>`);
   const chip = (k, l, n) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.tcFilter='${k}';render()">${l} ${n}</button>`;
   h += `<div class="filters">${chip("all", "전체", t.total)}${chip("미수행", "미수행", t.todo)}${chip("Pass", "Pass", t.pass)}${chip("Fail", "Fail", t.fail)}${chip("Block", "Block", t.block)}
     <select class="inline" style="padding:4px 6px" onchange="S.ui.tcScreen=this.value;render()"><option value="">전체 화면</option>${screens.map((x) => `<option value="${x.id}" ${S.ui.tcScreen === x.id ? "selected" : ""}>${esc(x.code)} ${esc(x.name)}</option>`).join("")}</select>

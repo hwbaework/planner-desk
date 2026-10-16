@@ -256,7 +256,7 @@ function tests(w, errors) {
     assert(u.total === 1 && u.pass === 1, "단위 집계: " + JSON.stringify(u));
     assert(w.tcStats(pid(), "통합").total === all.total - 1, "통합 집계");
     const chip = w.tcChip(pid(), "단위", true);
-    assert(chip.includes("단위 TC Pass 1/1") && chip.includes("결과서 CSV") && chip.includes("검토요청 가능"), "칩: " + chip);
+    assert(chip.includes("단위 TC Pass 1/1") && chip.includes("검토요청 가능"), "칩: " + chip);
     S().tcs = S().tcs.filter((x) => x.id !== "tc_unit");
   });
   check("요구사항 TC가 있어도 화면 기본 TC는 생성", () => {
