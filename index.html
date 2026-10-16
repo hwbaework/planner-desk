@@ -124,6 +124,7 @@
   .tabs b { color: var(--text); font-weight: 600; }
   .side-nav { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 6px; }
   .side-nav h3 { margin-top: 12px; }
+  .nav-sep { height: 1px; background: var(--line); margin: 8px 8px; }
   .navi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 0 6px 6px 0; cursor: pointer; color: var(--dim); font-weight: 500; }
   .navi:hover { background: var(--sub); color: var(--text); }
   .navi.active { background: var(--accentw); color: var(--accent); font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
@@ -467,7 +468,7 @@
     .tlw { grid-template-columns: 140px 1fr; }
     .tl-left .tl-r .who, .tl-left .tl-h span { display: none; }
     .tl-left .tl-r { padding-left: 6px !important; font-size: 12.5px; }
-    .side-nav h3 { display: none; }
+    .side-nav h3, .nav-sep { display: none; }
     .navi { border: 1px solid var(--line); border-radius: 14px; padding: 4px 10px; }
     .navi.active { box-shadow: none; border-color: var(--accent); }
     .kpis { grid-template-columns: repeat(2, minmax(0,1fr)); }
@@ -1073,9 +1074,9 @@ function renderTabs() {
   let nav = NAV_GROUPS.map(([g, keys]) => {
     const shown = keys.filter((k) => !(g === "관리" && empty(k)));
     keys.filter((k) => g === "관리" && empty(k)).forEach((k) => hidden.push(k));
-    return `<h3>${g}</h3>` + shown.map(navItem).join("");
-  }).join("");
-  if (hidden.length) nav += `<div class="navi" onclick="S.ui.navMore=!S.ui.navMore;persistUI();render()"><span class="nm muted">${S.ui.navMore ? "접기" : `아직 안 쓰는 메뉴 ${hidden.length}개`}</span></div>` + (S.ui.navMore ? hidden.map(navItem).join("") : "");
+    return shown.map(navItem).join("");
+  }).filter(Boolean).join(`<div class="nav-sep"></div>`);   // 묶음 이름 대신 구분선
+  if (hidden.length) nav += `<div class="navi" onclick="S.ui.navMore=!S.ui.navMore;persistUI();render()"><span class="nm muted">${S.ui.navMore ? "접기" : `더보기 · 비어 있는 메뉴 ${hidden.length}개`}</span></div>` + (S.ui.navMore ? hidden.map(navItem).join("") : "");
   $("sideNav").innerHTML = nav;
   $("tabs").innerHTML = `<span class="crumb" onclick="selProject('all')">프로젝트</span><span class="sep">/</span>${pid ? `<span class="crumb" onclick="selTab('dash')">${esc(projName(pid))}</span><span class="sep">/</span>` : `<span class="crumb" onclick="selTab('dash')">전체 보기</span><span class="sep">/</span>`}<b>${label[S.ui.tab] || ""}</b>`;
 }
