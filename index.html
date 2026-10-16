@@ -394,6 +394,19 @@
   .tl-bar.late { box-shadow: 0 0 0 2px var(--danger); }
   .tl-bar.epic { top: 12px; height: 12px; border-radius: 3px; }
   .tl-ms { position: absolute; top: 11px; width: 14px; height: 14px; transform: rotate(45deg); cursor: pointer; z-index: 1; border-radius: 2px; }
+  .tl-h.mon { height: 26px; background: var(--panel); }
+  .tl-cell.mon { font-weight: 700; color: var(--text); font-size: 12.5px; border-left: 1px solid var(--line2); }
+  .tl-add, .tl-del { border: none; background: none; cursor: pointer; color: var(--faint); font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px; flex: none; font-family: inherit; }
+  .tl-add { margin-left: auto; color: var(--accent); font-weight: 700; }
+  .tl-r.epic .tl-add { margin-left: 4px; }
+  .tl-del { visibility: hidden; }
+  .tl-r:hover .tl-del { visibility: visible; }
+  .tl-add:hover, .tl-del:hover { background: var(--sub); }
+  .tl-del:hover { color: var(--danger); }
+  .tl-bar.drag { cursor: grab; }
+  .tl-grip { position: absolute; right: 0; top: 0; bottom: 0; width: 7px; cursor: ew-resize; }
+  .tl-ms.drag { cursor: grab; }
+  @media (hover: none) { .tl-del { visibility: visible; } }
   .tl-fill { position: absolute; left: 8px; top: 0; bottom: 0; display: flex; gap: 4px; align-items: center; z-index: 1; }
   .tl-fill input[type=date] { width: 124px; height: 24px; padding: 0 4px; font-size: 12px; border-radius: 4px; }
   .tl-fill span { font-size: 11.5px; color: var(--warn); font-weight: 600; white-space: nowrap; }
@@ -1467,8 +1480,21 @@ const TL_KIND = {
   data: { l: "데이터 협의", list: () => S.datas, title: (x) => `${x.org ? x.org + " · " : ""}${x.name}`, s: "requestedAt", e: "dueDate", who: (x) => x.contact, st: (x) => x.status, done: (x) => x.status === "수신 완료", open: (x) => `openData('${x.id}')` },
   doc: { l: "산출물 계획", list: () => S.docs, title: (x) => x.name, s: null, e: "plan", who: (x) => x.owner, st: (x) => x.status, done: (x) => ["승인", "해당없음"].includes(x.status), open: (x) => `editDoc('${x.id}')` },
 };
-const TL_ZOOM = { week: { l: "주", days: 42, px: 30 }, month: { l: "개월", days: 120, px: 9 }, quarter: { l: "분기", days: 365, px: 3 } };
-function tlRange() {
+const TL_ZOOM = { week: { l: "주", days: 42, px: 30 }, month: { l: "개월", days: 120, px: 9 }, quarter: { l: "분기", days: 365, px: 3 }, all: { l: "전체", days: 0, px: 0 } };
+const TL_COL = { wbs: "wbs", task: "tasks", ho: "handoffs", data: "datas", doc: "docs" };
+function tlRange(rows) {
+  if (S.ui.tlZoom === "all") {
+    // 전체 기간: 보이는 항목·프로젝트 기간의 처음~끝을 한 화면에
+    const ds = [today()];
+    (rows || []).forEach((r) => {
+      if (r.grp) ds.push(r.p.start, r.p.end, ...milestones(r.p.id).map((m) => m.start));
+      else if (!r.epic) ds.push(r.K.s ? r.x[r.K.s] : "", r.x[r.K.e]);
+    });
+    const v = ds.filter(Boolean).sort();
+    const r0 = v[0].slice(0, 8) + "01", end = parseD(v[v.length - 1]), r1 = fmtD(new Date(end.getFullYear(), end.getMonth() + 1, 0));
+    const days = calDays(r0, r1) + 1, px = Math.max(1, Math.min(30, Math.floor(1000 / days)));
+    return { z: { l: "전체", days, px }, r0, r1 };
+  }
   const z = TL_ZOOM[S.ui.tlZoom] || TL_ZOOM.month;
   const anchor = S.ui.tlAnchor || today();
   const lead = Math.round(z.days * 0.25);
@@ -1496,7 +1522,7 @@ function tlRows(pid) {
           const ch = items.filter((x) => (x.phase || "") === gid);
           if (!ch.length) return;
           const ds = ch.flatMap((x) => [x.start, x.end]).filter(Boolean).sort();
-          rows.push({ epic: true, kind: "wbs", title: gl, color: gid ? phaseColor(gid) : "#8590a2", s: ds[0], e: ds[ds.length - 1], st: `${ch.length}개`, pid: p.id });
+          rows.push({ epic: true, kind: "wbs", phase: gid, title: gl, color: gid ? phaseColor(gid) : "#8590a2", s: ds[0], e: ds[ds.length - 1], st: `${ch.length}개`, pid: p.id });
           ch.sort((a, b) => (a.start || "9").localeCompare(b.start || "9")).forEach((x) => rows.push({ kind: k, x, K, indent: true }));
         });
       } else items.sort((a, b) => (a[K.e] || "9").localeCompare(b[K.e] || "9")).forEach((x) => rows.push({ kind: k, x, K }));
@@ -1507,63 +1533,115 @@ function tlRows(pid) {
 }
 function renderTimeline() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid, t = today();
-  const { z, r0, r1 } = tlRange(), W = z.days * z.px;
-  const x = (d) => calDays(r0, d) * z.px;
   const rows = tlRows(pid);
-  let h = pageHead("타임라인", `${pid ? esc(projName(pid)) : "전체 프로젝트"} · 시작~종료 막대, 날짜 없는 항목은 그 자리에서 바로 입력`);
+  const { z, r0, r1 } = tlRange(rows), W = z.days * z.px;
+  const x = (d) => calDays(r0, d) * z.px;
+  let h = pageHead("타임라인", `${pid ? esc(projName(pid)) : "전체 프로젝트"} · 막대를 끌어 일정 이동, 오른쪽 끝을 끌어 기간 조정 · 날짜 없는 항목은 그 자리에서 입력`,
+    `<button class="btn primary" onclick="tlAdd()">+ 추가</button>`);
   h += `<div class="tl-bar-top">
     <input class="search" placeholder="타임라인 검색" value="${esc(S.ui.tlQ || "")}" oninput="S.ui.tlQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)">
     ${Object.entries(TL_KIND).map(([k, K]) => `<label class="check small">${typeIcon(k === "ho" ? "ho" : k)}<input type="checkbox" ${S.ui.tlKinds[k] ? "checked" : ""} onchange="S.ui.tlKinds.${k}=this.checked?1:0;persistUI();render()">${K.l}</label>`).join("")}
     <label class="check small"><input type="checkbox" ${S.ui.tlHideDone ? "checked" : ""} onchange="S.ui.tlHideDone=this.checked?1:0;persistUI();render()">완료 숨기기</label>
     <label class="check small"><input type="checkbox" ${S.ui.tlMissing ? "checked" : ""} onchange="S.ui.tlMissing=this.checked?1:0;persistUI();render()">날짜 없는 항목 표시</label>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <span class="small muted">${r0.replace(/-/g, ".")} ~ ${r1.replace(/-/g, ".")}</span>
       <button class="btn sm" onclick="tlShift(-1)">이전</button><button class="btn sm" onclick="S.ui.tlAnchor='';render()">오늘</button><button class="btn sm" onclick="tlShift(1)">다음</button>
       <div class="seg">${Object.entries(TL_ZOOM).map(([k, v]) => `<button class="${S.ui.tlZoom === k ? "on" : ""}" onclick="S.ui.tlZoom='${k}';persistUI();render()">${v.l}</button>`).join("")}</div></span></div>`;
   // 머리줄 칸
   const cells = [];
   if (S.ui.tlZoom === "week") for (let i = 0; i < z.days; i++) { const d = addDays(r0, i), dt = parseD(d); cells.push([x(d), z.px, `${dt.getDate() === 1 || i === 0 ? dt.getMonth() + 1 + "/" : ""}${dt.getDate()}`, dt.getDay() === 0 || dt.getDay() === 6]); }
   else if (S.ui.tlZoom === "month") for (let d = r0; d <= r1; d = addDays(d, 7)) cells.push([x(d), 7 * z.px, shortD(d).replace(/\(.*\)/, ""), false]);
-  else for (let d = r0; d <= r1; ) { const dt = parseD(d), n = fmtD(new Date(dt.getFullYear(), dt.getMonth() + 1, 1)); cells.push([x(d), calDays(d, n) * z.px, `${dt.getFullYear() % 100}.${dt.getMonth() + 1}`, false]); d = n; }
+  else for (let d = r0; d <= r1; ) { const dt = parseD(d), n = fmtD(new Date(dt.getFullYear(), dt.getMonth() + 1, 1)); cells.push([x(d), calDays(d, n) * z.px, `${dt.getMonth() + 1}월`, false]); d = n; }
+  // 위 줄: 연·월 (어느 달을 보고 있는지 항상 보이게)
+  const months = [];
+  for (let d = r0; d <= r1; ) { const dt = parseD(d), n = fmtD(new Date(dt.getFullYear(), dt.getMonth() + 1, 1)); months.push([x(d), Math.min(calDays(d, n), calDays(d, r1) + 1) * z.px, `${dt.getFullYear()}년 ${dt.getMonth() + 1}월`]); d = n; }
+  const monRow = months.map(([l, w, lb]) => `<div class="tl-cell mon" style="left:${l}px;width:${w}px">${w > 60 ? lb : w > 26 ? lb.replace(/^\d+년 /, "") : ""}</div>`).join("");
   const grid = cells.map(([l, w, lb, we]) => `<div class="tl-cell ${we ? "we" : ""}" style="left:${l}px;width:${w}px">${lb}</div>`).join("");
   const gridBody = cells.map(([l, w, , we]) => `<div class="tl-cell ${we ? "we" : ""}" style="left:${l}px;width:${w}px"></div>`).join("");
   const todayLine = t >= r0 && t <= r1 ? `<div class="tl-today" style="left:${x(t) + z.px / 2}px"></div>` : "";
-  let L = `<div class="tl-h" style="padding:0 10px">항목<span style="margin-left:auto">상태 · 담당</span></div>`, R = `<div class="tl-h" style="width:${W}px">${grid}</div>`;
+  let L = `<div class="tl-h mon"></div><div class="tl-h" style="padding:0 10px">항목<span style="margin-left:auto">상태 · 담당</span></div>`, R = `<div class="tl-h mon" style="width:${W}px">${monRow}</div><div class="tl-h" style="width:${W}px">${grid}</div>`;
   rows.forEach((r) => {
     if (r.grp) {
-      L += `<div class="tl-r grp">${projTag(r.p.id)} <span class="muted small">${r.n}</span></div>`;
+      L += `<div class="tl-r grp">${projTag(r.p.id)} <span class="muted small">${r.n}</span>${r.p.start && r.p.end ? ` <span class="small muted" style="font-weight:400;cursor:pointer" onclick="editProject('${r.p.id}')" title="사업 기간 바꾸기">${shortD(r.p.start)} ~ ${shortD(r.p.end)}</span>` : ` <span class="small" style="font-weight:600;color:var(--warn);cursor:pointer" onclick="editProject('${r.p.id}')" title="프로젝트 정보에서 시작·종료일 입력">사업 기간 입력</span>`}<button class="tl-add" title="이 프로젝트에 추가" onclick="tlAdd('${r.p.id}')">+</button></div>`;
       R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}${milestones(r.p.id).map((m) => tlMilestone(m.start, x, r0, r1, "#0c66e4", `editEvent('${m.id}')`, "마일스톤 " + m.title, m.start < today())).join("")}${todayLine}</div>`;
       return;
     }
     if (r.epic) {
-      L += `<div class="tl-r epic" style="padding-left:14px"><span style="width:10px;height:10px;border-radius:2px;background:${r.color};flex:none"></span><span class="nm">${esc(r.title)}</span><span class="who">${esc(r.st)}</span></div>`;
+      L += `<div class="tl-r epic" style="padding-left:14px"><span style="width:10px;height:10px;border-radius:2px;background:${r.color};flex:none"></span><span class="nm">${esc(r.title)}</span><span class="who">${esc(r.st)}</span><button class="tl-add" title="이 단계에 WBS 작업 추가" onclick="editWBS(null,'${r.phase}','${r.pid}')">+</button></div>`;
       R += `<div class="tl-r" style="width:${W}px">${gridBody}${r.s ? tlSpan(r.s, r.e, x, z, r0, r1, r.color, "", "epic", "") : ""}${todayLine}</div>`;
       return;
     }
     const { x: it, K, kind } = r, s0 = K.s ? it[K.s] : "", e0 = it[K.e], done = K.done(it);
     const icon = typeIcon(K.icon ? K.icon(it) : kind), color = TYPE_ICON[K.icon ? K.icon(it) : kind][0];
-    L += `<div class="tl-r" style="padding-left:${r.indent ? 30 : 10}px">${icon}<span class="nm" onclick="${K.open(it)}" title="${esc(K.title(it))}">${esc(K.title(it))}</span><span class="who">${esc(K.st(it))}${K.who(it) ? " · " + esc(K.who(it)) : ""}</span></div>`;
+    L += `<div class="tl-r" style="padding-left:${r.indent ? 30 : 10}px">${icon}<span class="nm" onclick="${K.open(it)}" title="${esc(K.title(it))}">${esc(K.title(it))}</span><span class="who">${esc(K.st(it))}${K.who(it) ? " · " + esc(K.who(it)) : ""}</span><button class="tl-del" title="삭제" onclick="tlDel('${kind}','${it.id}')">×</button></div>`;
     let bar = "";
     if (!e0) bar = `<div class="tl-fill"><span>${s0 ? "마감 없음" : "날짜 없음"}</span>${K.s && !s0 && !K.noStartFill ? `<input type="date" title="시작" onchange="tlSet('${kind}','${it.id}','${K.s}',this.value)">` : ""}<input type="date" title="${K.s ? (kind === "ho" ? "완료 예정" : "종료·마감") : "계획일"}" onchange="tlSet('${kind}','${it.id}','${K.e}',this.value)"></div>`;
-    else if (!K.s || !s0) bar = tlMilestone(e0, x, r0, r1, color, K.open(it), K.title(it), done);
-    else bar = tlSpan(s0, e0, x, z, r0, r1, color, K.open(it), done ? "done" : !done && e0 < t ? "late" : "", K.title(it));
+    else if (!K.s || !s0) bar = tlMilestone(e0, x, r0, r1, color, K.open(it), K.title(it), done, `data-k="${kind}" data-id="${it.id}" data-e="${K.e}"`);
+    else bar = tlSpan(s0, e0, x, z, r0, r1, color, K.open(it), done ? "done" : !done && e0 < t ? "late" : "", K.title(it), `data-k="${kind}" data-id="${it.id}" data-s="${K.s}" data-e="${K.e}"`);
     R += `<div class="tl-r" style="width:${W}px">${gridBody}${bar}${todayLine}</div>`;
   });
   if (rows.length <= (pid ? 1 : 0)) L += `<div class="empty">표시할 항목이 없어</div>`;
-  h += `<div class="tlw"><div class="tl-left">${L}</div><div class="tl-right" id="tlRight">${R}</div></div>`;
+  h += `<div class="tlw"><div class="tl-left">${L}</div><div class="tl-right" id="tlRight" data-px="${z.px}">${R}</div></div>`;
   return h;
 }
-function tlSpan(s0, e0, x, z, r0, r1, color, click, cls, title) {
+function tlSpan(s0, e0, x, z, r0, r1, color, click, cls, title, data = "") {
   if (e0 < s0) [s0, e0] = [e0, s0];
   if (e0 < r0 || s0 > r1) return "";
   const a = s0 < r0 ? r0 : s0, b = e0 > r1 ? r1 : e0;
   const w = Math.max(z.px, (calDays(a, b) + 1) * z.px);
-  return `<div class="tl-bar ${cls}" style="left:${x(a)}px;width:${w}px;background:${color}" ${click ? `onclick="${click}"` : ""} title="${esc(title)} ${s0} ~ ${e0}">${w > 70 && title ? esc(title) : ""}</div>`;
+  return `<div class="tl-bar ${cls} ${data ? "drag" : ""}" ${data} style="left:${x(a)}px;width:${w}px;background:${color}" ${click ? `onclick="if(!window._tlDragged){${click}}"` : ""} title="${esc(title)} ${s0} ~ ${e0}">${w > 70 && title ? esc(title) : ""}${data ? `<i class="tl-grip"></i>` : ""}</div>`;
 }
-function tlMilestone(d, x, r0, r1, color, click, title, done) {
+function tlMilestone(d, x, r0, r1, color, click, title, done, data = "") {
   if (!d || d < r0 || d > r1) return "";
-  return `<div class="tl-ms" style="left:${x(d)}px;background:${color};${done ? "opacity:.45" : ""}" onclick="${click}" title="${esc(title)} ${d}"></div>`;
+  return `<div class="tl-ms ${data ? "drag" : ""}" ${data} style="left:${x(d)}px;background:${color};${done ? "opacity:.45" : ""}" onclick="if(!window._tlDragged){${click}}" title="${esc(title)} ${d}"></div>`;
 }
-function tlShift(k) { const z = TL_ZOOM[S.ui.tlZoom] || TL_ZOOM.month; S.ui.tlAnchor = addDays(S.ui.tlAnchor || today(), Math.round(z.days / 2) * k); render(); }
+function tlShift(k) { if (S.ui.tlZoom === "all") S.ui.tlZoom = "month"; const z = TL_ZOOM[S.ui.tlZoom] || TL_ZOOM.month; S.ui.tlAnchor = addDays(S.ui.tlAnchor || today(), Math.round(z.days / 2) * k); render(); }
+// 막대 끌기: 가운데 = 시작·종료 함께 이동, 오른쪽 끝 = 종료만 조정 (일 단위로 맞춤)
+document.addEventListener("mousedown", (e) => {
+  const bar = e.target.closest(".tl-bar.drag, .tl-ms.drag"); if (!bar || e.button !== 0) return;
+  const px = Number($("tlRight")?.dataset.px) || 9, resize = e.target.classList.contains("tl-grip");
+  const x0 = e.clientX, left0 = bar.offsetLeft, w0 = bar.offsetWidth; let days = 0;
+  window._tlDragged = false; e.preventDefault();
+  const move = (ev) => {
+    days = Math.round((ev.clientX - x0) / px);
+    if (Math.abs(ev.clientX - x0) > 3) window._tlDragged = true;
+    if (resize) bar.style.width = Math.max(px, w0 + days * px) + "px"; else bar.style.left = left0 + days * px + "px";
+  };
+  const up = () => {
+    document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up);
+    if (window._tlDragged && days) {
+      const { k, id, s: sf, e: ef } = bar.dataset, it = TL_KIND[k].list().find((x) => x.id === id);
+      if (it) {
+        if (!resize && sf && it[sf]) it[sf] = addDays(it[sf], days);
+        it[ef] = addDays(it[ef], days);
+        if (sf && it[sf] && it[ef] < it[sf]) it[ef] = it[sf];
+        it.updatedAt = new Date().toISOString(); commit(); toast(`${resize ? "종료" : "일정"} ${days > 0 ? "+" : ""}${days}일`, true);
+      }
+    } else if (window._tlDragged) render();
+    setTimeout(() => (window._tlDragged = false), 0);
+  };
+  document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
+});
+// 타임라인에서 바로 추가 · 삭제
+function tlAdd(pid) {
+  pid = pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id);
+  if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
+  const go = (fn) => `closeModal();S.ui.pid='${pid}';${fn}`;
+  const opt = (fn, l, d) => `<button class="btn" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px" onclick="${go(fn)}"><b>${l}</b><div class="small muted">${d}</div></button>`;
+  openModal(`타임라인에 추가 · ${esc(projName(pid))}`,
+    opt("editWBS(null,'')", "WBS 작업", "단계별 작업 · 시작~종료 막대") +
+    opt("editTask(null,{start:today(),due:addDays(today(),7)})", "업무", "인지일~마감 막대") +
+    opt("editEvent(null,today());setTimeout(()=>{const t=document.querySelector('#fForm [data-k=type]');if(t)t.value='마일스톤'},0)", "마일스톤", "프로젝트 줄에 다이아몬드로 표시") +
+    opt("editData()", "데이터 협의", "요청일~수신 예정일") +
+    opt("editHO()", "개발 전달", "전달일~완료 예정일") +
+    opt(`editProject('${pid}')`, "사업 기간", "프로젝트 줄의 전체 기간 막대 (시작·종료일)"), [{ l: "취소", fn: closeModal }]);
+}
+function tlDel(kind, id) {
+  const K = TL_KIND[kind], it = K.list().find((x) => x.id === id); if (!it) return;
+  if (!confirm(`'${K.title(it)}' (${K.l})을 삭제할까?`)) return;
+  S[TL_COL[kind]] = S[TL_COL[kind]].filter((x) => x.id !== id);
+  commit(); toast("삭제했어", true);
+}
 function tlSet(kind, id, field, val) {
   const it = TL_KIND[kind].list().find((x) => x.id === id); if (!it) return;
   it[field] = val; if ("updatedAt" in it || kind === "task") it.updatedAt = new Date().toISOString();
@@ -2729,8 +2807,8 @@ function renderWBS() {
   return h;
 }
 function setWBS(id, k, v) { const w = S.wbs.find((x) => x.id === id); w[k] = v; commit(); }
-function editWBS(id, phaseId) {
-  const w = id ? S.wbs.find((x) => x.id === id) : { phase: phaseId ?? "", progress: 0 };
+function editWBS(id, phaseId, pid) {
+  const w = id ? S.wbs.find((x) => x.id === id) : { phase: phaseId ?? "", progress: 0, projectId: pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id) };
   openForm(id ? "WBS 작업" : "WBS 작업 추가", [
     { k: "title", l: "작업", t: "text", full: true, req: true },
     { k: "phase", l: "단계", t: "select", opts: [["", "일반 업무 / 미분류"], ...PHASES.map((p) => [p.id, `${p.id} ${p.name}`])] },
@@ -2741,7 +2819,7 @@ function editWBS(id, phaseId) {
     { k: "memo", l: "메모", t: "textarea", full: true },
   ], w, (v) => {
     v.progress = Math.max(0, Math.min(100, Number(v.progress) || 0));
-    if (id) Object.assign(w, v); else S.wbs.push(Object.assign({ id: uid("w"), projectId: S.ui.pid }, v));
+    if (id) Object.assign(w, v); else S.wbs.push(Object.assign({ id: uid("w"), projectId: w.projectId }, v));
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("작업을 삭제할까?")) { S.wbs = S.wbs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }

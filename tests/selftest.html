@@ -592,6 +592,28 @@ function tests(w, errors) {
     w.closeModal();
     assert(memo.includes("새 변경") && !memo.includes("옛 변경"), memo);
   });
+  check("타임라인: 월 머리줄 · 전체 기간 · 추가 · 삭제 · 막대 끌어 이동", () => {
+    S().ui.pid = pid(); S().ui.tab = "timeline"; S().ui.tlZoom = "month"; S().ui.tlKinds.wbs = 1; S().ui.tlHideDone = 0; S().ui.tlQ = ""; w.render();
+    assert(w.document.querySelector(".tl-h.mon .tl-cell.mon")?.textContent.includes("월"), "월 머리줄 없음");
+    S().ui.tlZoom = "all"; w.render();
+    assert(w.document.querySelector(".tl-bar-top").textContent.includes("~") && w.document.getElementById("tlRight"), "전체 기간");
+    S().ui.tlZoom = "month";
+    w.tlAdd(pid());
+    assert(w.document.getElementById("modalTitle").textContent.startsWith("타임라인에 추가"), "추가 창");
+    w.closeModal();
+    const wb = { id: "w_tl", projectId: pid(), phase: "P1", title: "타임라인 끌기", start: t, end: w.addDays(t, 4), progress: 0 };
+    S().wbs.push(wb); w.render();
+    const bar = w.document.querySelector('.tl-bar[data-id="w_tl"]');
+    assert(bar, "막대 없음");
+    const px = Number(w.document.getElementById("tlRight").dataset.px), r = bar.getBoundingClientRect();
+    bar.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, button: 0, clientX: r.left + 5, clientY: r.top + 5 }));
+    w.document.dispatchEvent(new w.MouseEvent("mousemove", { bubbles: true, clientX: r.left + 5 + px * 3, clientY: r.top + 5 }));
+    w.document.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
+    assert(wb.start === w.addDays(t, 3) && wb.end === w.addDays(t, 7), "끌어 이동: " + wb.start + "~" + wb.end);
+    window.confirm = () => true;
+    w.tlDel("wbs", "w_tl");
+    assert(!S().wbs.some((x) => x.id === "w_tl"), "삭제 안 됨");
+  });
   check("사이드 메뉴는 항상 전부 보이고 묶음 이름 없이 구분선으로 나눔", () => {
     S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
     const names = [...w.document.querySelectorAll("#sideNav .navi .nm")].map((e) => e.textContent);
