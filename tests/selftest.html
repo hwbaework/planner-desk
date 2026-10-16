@@ -592,11 +592,11 @@ function tests(w, errors) {
     w.closeModal();
     assert(memo.includes("새 변경") && !memo.includes("옛 변경"), memo);
   });
-  check("비어 있는 관리 메뉴는 접히고, 항목이 있으면 보임 (5차 5번)", () => {
-    S().ui.pid = pid(); S().ui.tab = "dash"; S().ui.navMore = false; w.render();
+  check("사이드 메뉴는 항상 전부 보이고 묶음 이름 없이 구분선으로 나눔", () => {
+    S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
     const names = [...w.document.querySelectorAll("#sideNav .navi .nm")].map((e) => e.textContent);
-    assert(names.includes("업무"), "업무 메뉴가 숨겨짐");
-    assert(names.some((n) => /아직 안 쓰는 메뉴|접기/.test(n)) || !names.length === false, "접기 줄 처리");
+    assert(names.length === C("NAV_GROUPS").flatMap((g) => g[1]).length, "메뉴 수: " + names.length);
+    assert(!w.document.querySelector("#sideNav h3") && w.document.querySelectorAll("#sideNav .nav-sep").length === 2, "묶음 이름/구분선");
   });
   check("파일 저장 알림: 저장한 적 없거나 하루 지나면 배너, '오늘은 그만'이면 숨김", () => {
     S().fileSavedAt = ""; S().ui.saveNagSnooze = ""; w.persist(); w.render();

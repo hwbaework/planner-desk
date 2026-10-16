@@ -78,6 +78,8 @@
     .board { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .cal .day { min-height: 70px; }
   }
+  /* 검색창 왼쪽 끝을 본문 왼쪽 끝(사이드바 232 + 본문 여백 22)에 맞춤: 232 + 22 - 상단 여백 18 - 간격 12 */
+  @media (min-width: 901px) { .top > :first-child { flex: none; width: 224px; } }
   @media (min-width: 901px) { .top { flex-wrap: nowrap; } .top .save-ind { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
   @media (min-width: 901px) and (max-width: 1250px) { .brand small, .top .save-ind { display: none; } .top .btn span { display: none; } .top .btn .ico + span { margin-left: 0; } }
   @media (max-width: 900px) { .gsearch { order: 5; flex: 1 1 100%; max-width: none; } }
@@ -125,6 +127,7 @@
   .side-nav { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 6px; }
   .side-nav h3 { margin-top: 12px; }
   .wdate { width: 132px; height: 28px; padding: 0 4px; font-size: 13px; }
+  .navi.none .nm { color: var(--faint); }
   .nav-sep { height: 1px; background: var(--line); margin: 8px 8px; }
   .navi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 0 6px 6px 0; cursor: pointer; color: var(--dim); font-weight: 500; }
   .navi:hover { background: var(--sub); color: var(--text); }
@@ -1070,14 +1073,9 @@ function renderTabs() {
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   const has = { tasks: S.tasks, data: S.datas, ho: S.handoffs, risks: S.risks, docs: S.docs, reqs: S.reqs, screens: S.screens, wbs: S.wbs, tc: S.tcs, notes: S.notes };
   const empty = (k) => has[k] && !has[k].some(sc) && S.ui.tab !== k;
-  const navItem = (k) => { const [n, red] = count(k); return `<div class="navi ${S.ui.tab === k ? "active" : ""}" onclick="selTab('${k}')"><span class="nm">${label[k]}</span>${n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`; };
-  const hidden = [];
-  let nav = NAV_GROUPS.map(([g, keys]) => {
-    const shown = keys.filter((k) => !(g === "관리" && empty(k)));
-    keys.filter((k) => g === "관리" && empty(k)).forEach((k) => hidden.push(k));
-    return shown.map(navItem).join("");
-  }).filter(Boolean).join(`<div class="nav-sep"></div>`);   // 묶음 이름 대신 구분선
-  if (hidden.length) nav += `<div class="navi" onclick="S.ui.navMore=!S.ui.navMore;persistUI();render()"><span class="nm muted">${S.ui.navMore ? "접기" : `더보기 · 비어 있는 메뉴 ${hidden.length}개`}</span></div>` + (S.ui.navMore ? hidden.map(navItem).join("") : "");
+  const navItem = (k, none) => { const [n, red] = count(k); return `<div class="navi ${S.ui.tab === k ? "active" : ""} ${none ? "none" : ""}" title="${none ? "아직 항목 없음" : ""}" onclick="selTab('${k}')"><span class="nm">${label[k]}</span>${n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`; };
+  // 메뉴는 항상 전부, 원래 순서대로. 항목이 없는 메뉴는 흐리게만 표시
+  const nav = NAV_GROUPS.map(([g, keys]) => keys.map((k) => navItem(k, empty(k))).join("")).join(`<div class="nav-sep"></div>`);   // 묶음 이름 대신 구분선
   $("sideNav").innerHTML = nav;
   $("tabs").innerHTML = `<span class="crumb" onclick="selProject('all')">프로젝트</span><span class="sep">/</span>${pid ? `<span class="crumb" onclick="selTab('dash')">${esc(projName(pid))}</span><span class="sep">/</span>` : `<span class="crumb" onclick="selTab('dash')">전체 보기</span><span class="sep">/</span>`}<b>${label[S.ui.tab] || ""}</b>`;
 }
