@@ -626,6 +626,16 @@ function tests(w, errors) {
     assert(w.wbsDocs(wb)[0].doc?.id === d.id && w.docSource(d).some((x) => x.id === "w_doc"), "작업↔산출물 연결");
     S().wbs = S().wbs.filter((x) => x.id !== "w_doc"); S().docs = S().docs.filter((x) => x.id !== d.id);
   });
+  check("캘린더 프로젝트 칩: 여러 개 같이 보기, 다시 누르면 빼기, 전체", () => {
+    const other = S().projects.find((p) => p.id !== pid() && !p.archived);
+    S().ui.pid = "all"; S().ui.tab = "cal"; S().ui.calProjs = []; w.render();
+    w.calToggleProj(pid());
+    assert(S().ui.pid === "all" && w.calProjSet().join() === pid(), "하나 선택: " + w.calProjSet());
+    if (other) { w.calToggleProj(other.id); assert(w.calProjSet().length === 0 || w.calProjSet().length === 2, "둘 선택"); }
+    w.calToggleProj("all");
+    assert(w.calProjSet().length === 0 && w.document.querySelector("main .filters .chip.active")?.textContent === "전체", "전체로");
+    assert(w.document.querySelector(".cal-bar .icon-btn svg"), "화살표 아이콘 없음");
+  });
   check("로고 누르면 홈(전체 보기 대시보드)", () => {
     S().ui.pid = pid(); S().ui.tab = "wbs"; w.render();
     w.document.querySelector(".brand").click();
@@ -637,12 +647,11 @@ function tests(w, errors) {
     assert(names.length === C("NAV_GROUPS").flatMap((g) => g[1]).length, "메뉴 수: " + names.length);
     assert(!w.document.querySelector("#sideNav h3") && w.document.querySelectorAll("#sideNav .nav-sep").length === 2, "묶음 이름/구분선");
   });
-  check("파일 저장 알림: 저장한 적 없거나 하루 지나면 배너, '오늘은 그만'이면 숨김", () => {
-    S().fileSavedAt = ""; S().ui.saveNagSnooze = ""; w.persist(); w.render();
+  check("파일 저장 알림: 저장한 적 없거나 하루 지나면 배너 (끌 수 없음)", () => {
+    S().fileSavedAt = ""; w.persist(); w.render();
     assert(w.document.getElementById("bannerArea").textContent.includes("파일로 저장한 적이 없어"), "배너 없음");
-    S().ui.saveNagSnooze = t; w.render();
-    assert(!w.document.getElementById("bannerArea").textContent.includes("파일로 저장"), "숨김 안 됨");
-    S().ui.saveNagSnooze = ""; S().fileSavedAt = new Date(Date.now() + 60000).toISOString(); w.render();
+    assert(!w.document.getElementById("bannerArea").textContent.includes("오늘은 그만"), "'오늘은 그만'이 남음");
+    S().fileSavedAt = new Date(Date.now() + 60000).toISOString(); w.render();
     assert(!w.document.getElementById("bannerArea").textContent.includes("파일로 저장"), "방금 저장했는데 배너");
     w.openSettings(); assert(w.document.getElementById("modalBody").textContent.includes("마지막 파일 저장"), "설정에 데이터 정보 없음"); w.closeModal();
   });

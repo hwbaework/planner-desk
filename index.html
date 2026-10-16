@@ -128,6 +128,8 @@
   .side-nav h3 { margin-top: 12px; }
   .wdate { width: 132px; height: 28px; padding: 0 4px; font-size: 13px; }
   .navi.none .nm { color: var(--faint); }
+  .btn.icon-btn { padding: 0; width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; }
+  .btn.icon-btn .ico { width: 16px; height: 16px; margin: 0; }
   .nav-sep { height: 1px; background: var(--line); margin: 8px 8px; }
   .navi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 0 6px 6px 0; cursor: pointer; color: var(--dim); font-weight: 500; }
   .navi:hover { background: var(--sub); color: var(--text); }
@@ -1096,11 +1098,11 @@ function renderBanner() {
     <button class="btn sm" onclick="useEmbedded()">파일 데이터로 열기</button><button class="btn sm ghost" onclick="S._embeddedOlder=false;render()">닫기</button></div>`;
   const saved = S.fileSavedAt || "", changed = (S.updatedAt || "") > saved;
   const days = saved ? calDays(saved.slice(0, 10)) : null;
-  if (changed && (days === null || days >= 1) && S.ui.saveNagSnooze !== today() && S.projects.length) {
+  if (changed && (days === null || days >= 1) && S.projects.length) {
     h += `<div class="banner savenag" style="background:var(--accentw);color:var(--text);border-color:var(--accent)">
       <b>${days === null ? "아직 파일로 저장한 적이 없어." : `파일로 저장한 지 ${days}일 지났어.`}</b>
       <span class="small why">지금 데이터는 이 브라우저에만 있어서, 브라우저 기록을 지우면 사라질 수 있어.</span>
-      <button class="btn sm primary" onclick="saveFile(false)">지금 저장</button><button class="btn sm ghost" style="margin-left:0" onclick="S.ui.saveNagSnooze=today();persistUI();render()">오늘은 그만</button></div>`;
+      <button class="btn sm primary" onclick="saveFile(false)">지금 저장</button></div>`;
   }
   $("bannerArea").innerHTML = h;
 }
@@ -1596,7 +1598,7 @@ function renderTimeline() {
     <label class="check small"><input type="checkbox" ${S.ui.tlMissing ? "checked" : ""} onchange="S.ui.tlMissing=this.checked?1:0;persistUI();render()">날짜 없는 항목 표시</label>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
       <span class="small muted">${r0.replace(/-/g, ".")} ~ ${r1.replace(/-/g, ".")}</span>
-      <button class="btn sm" onclick="tlShift(-1)">이전</button><button class="btn sm" onclick="S.ui.tlAnchor='';render()">오늘</button><button class="btn sm" onclick="tlShift(1)">다음</button>
+      <button class="btn sm icon-btn" onclick="tlShift(-1)" title="이전" aria-label="이전">${ICO_PREV}</button><button class="btn sm" onclick="S.ui.tlAnchor='';render()">오늘</button><button class="btn sm icon-btn" onclick="tlShift(1)" title="다음" aria-label="다음">${ICO_NEXT}</button>
       <div class="seg">${Object.entries(TL_ZOOM).map(([k, v]) => `<button class="${S.ui.tlZoom === k ? "on" : ""}" onclick="S.ui.tlZoom='${k}';persistUI();render()">${v.l}</button>`).join("")}</div></span></div>`;
   // 머리줄 칸
   const cells = [];
@@ -1703,7 +1705,7 @@ function tlSet(kind, id, field, val) {
 // 기간 안의 표시 항목: 일정 · 업무 마감 · 개발 완료예정 · 산출물 계획 · 정기 업무 · WBS
 function calItems(from, to, pid, kinds = S.ui.calKinds) {
   const out = [], inR = (d) => d && d >= from && d <= to;
-  const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
+  const sc = (x) => (Array.isArray(pid) ? pid.includes(x.projectId) : pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   const add = (date, kind, title, x, click, extra = {}) => out.push(Object.assign({ date, kind, title, pid: x.projectId, click }, extra));
   if (kinds.event) S.events.filter(sc).forEach((e) => {
     if (!e.start) return;
@@ -1722,8 +1724,21 @@ function calItems(from, to, pid, kinds = S.ui.calKinds) {
   const order = { event: 0, recur: 1, task: 2, data: 3, ho: 4, doc: 5, wbs: 6 };
   return out.sort((a, b) => a.date.localeCompare(b.date) || order[a.kind] - order[b.kind]);
 }
+// 캘린더에서 볼 프로젝트: 사이드바에서 하나 골랐으면 그것, 전체 보기면 칩으로 고른 것들(없으면 전부)
+function calProjSet() {
+  if (S.ui.pid !== "all") return [S.ui.pid];
+  return (S.ui.calProjs || []).filter((id) => proj(id) && !proj(id).archived);
+}
+function calToggleProj(id) {
+  let set = calProjSet();
+  if (id === "all") set = [];
+  else set = set.includes(id) ? set.filter((x) => x !== id) : [...set, id];
+  if (set.length === activeProjects().length) set = [];
+  S.ui.pid = "all"; S.ui.calProjs = set; persistUI(); render();
+}
+const ICO_PREV = '<svg class="ico" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>', ICO_NEXT = '<svg class="ico" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>';
 function renderCal() {
-  const pid = S.ui.pid === "all" ? null : S.ui.pid;
+  const set = calProjSet(), pid = set.length ? set : null;
   const ym = S.ui.calMonth || today().slice(0, 7);
   const [y, m] = ym.split("-").map(Number);
   const first = new Date(y, m - 1, 1);
@@ -1732,13 +1747,13 @@ function renderCal() {
   const byDay = {};
   calItems(start, addDays(start, rows * 7 - 1), pid).forEach((i) => (byDay[i.date] = byDay[i.date] || []).push(i));
   const t = today(), sel = S.ui.calSel || t;
-  let h = pageHead("캘린더", pid ? `${esc(projName(pid))} 일정만 보는 중` : "전체 프로젝트 일정을 한 화면에",
+  let h = pageHead("캘린더", "",
     `<button class="btn primary" onclick="editEvent(null,'${sel}')">+ 일정 추가</button>`);
-  h += `<div class="cal-bar"><button class="btn sm" onclick="calMove(-1)">이전</button><b class="cal-title">${y}년 ${m}월</b><button class="btn sm" onclick="calMove(1)">다음</button>
+  h += `<div class="cal-bar"><button class="btn sm icon-btn" onclick="calMove(-1)" title="이전 달" aria-label="이전 달">${ICO_PREV}</button><b class="cal-title">${y}년 ${m}월</b><button class="btn sm icon-btn" onclick="calMove(1)" title="다음 달" aria-label="다음 달">${ICO_NEXT}</button>
     <button class="btn sm ghost" onclick="S.ui.calMonth='';S.ui.calSel='';render()">오늘</button>
     <span class="cal-kinds">${CAL_KINDS.map(([k, l]) => `<label class="check small"><input type="checkbox" ${S.ui.calKinds[k] ? "checked" : ""} onchange="S.ui.calKinds.${k}=this.checked?1:0;persistUI();render()">${l}</label>`).join("")}</span></div>`;
-  // Jira 빠른 필터처럼: 칩은 항상 보이고, 누른 칩만 강조. 다시 누르면 전체로
-  h += `<div class="filters"><button class="chip ${pid ? "" : "active"}" onclick="selProject('all')">전체</button>${activeProjects().map((p) => `<button class="chip ${pid === p.id ? "active" : ""}" onclick="selProject('${pid === p.id ? "all" : p.id}')" title="${pid === p.id ? "다시 누르면 전체" : "이 프로젝트만 보기"}">${projTag(p.id)}</button>`).join("")}</div>`;
+  // Jira 빠른 필터처럼: 칩은 항상 보이고 여러 개 켜고 끌 수 있음. [전체]는 모두
+  h += `<div class="filters"><button class="chip ${pid ? "" : "active"}" onclick="calToggleProj('all')">전체</button>${activeProjects().map((p) => `<button class="chip ${set.includes(p.id) ? "active" : ""}" onclick="calToggleProj('${p.id}')" title="${set.includes(p.id) ? "누르면 빼기" : "누르면 같이 보기"}">${projTag(p.id)}</button>`).join("")}</div>`;
   h += `<div class="cal">` + [..."일월화수목금토"].map((d, i) => `<div class="dow ${i === 0 ? "sun" : i === 6 ? "sat" : ""}">${d}</div>`).join("");
   for (let i = 0; i < rows * 7; i++) {
     const d = addDays(start, i), dt = parseD(d), list = byDay[d] || [];
