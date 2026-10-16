@@ -626,6 +626,11 @@ function tests(w, errors) {
     assert(w.wbsDocs(wb)[0].doc?.id === d.id && w.docSource(d).some((x) => x.id === "w_doc"), "작업↔산출물 연결");
     S().wbs = S().wbs.filter((x) => x.id !== "w_doc"); S().docs = S().docs.filter((x) => x.id !== d.id);
   });
+  check("로고 누르면 홈(전체 보기 대시보드)", () => {
+    S().ui.pid = pid(); S().ui.tab = "wbs"; w.render();
+    w.document.querySelector(".brand").click();
+    assert(S().ui.pid === "all" && S().ui.tab === "dash", "홈 이동: " + S().ui.pid + "/" + S().ui.tab);
+  });
   check("사이드 메뉴는 항상 전부 보이고 묶음 이름 없이 구분선으로 나눔", () => {
     S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
     const names = [...w.document.querySelectorAll("#sideNav .navi .nm")].map((e) => e.textContent);
