@@ -72,7 +72,7 @@
     .card, .kpi, .wk, .mx { box-shadow: none; break-inside: avoid; }
     table.t th { position: static; }
     a { color: #000; text-decoration: none; }
-    select.inline { border: none; appearance: none; -webkit-appearance: none; padding: 0; }
+    select.inline { border: none; appearance: none; -webkit-appearance: none; padding: 0 !important; background-image: none !important; }
     .tbl-wrap, .tl-right, .board, .tlw { overflow: visible !important; }
     .tlw { zoom: .62; }
     .board { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -433,6 +433,10 @@
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--accentw); border-color: var(--accent); }
   textarea { min-height: 90px; resize: vertical; line-height: 1.55; }
   select[multiple] { min-height: 110px; }
+  /* 셀렉트 화살표: 오른쪽 끝에서 띄움 */
+  select:not([multiple]) { appearance: none; -webkit-appearance: none; padding-right: 30px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23626f86' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; }
   .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
   .check input { width: auto; }
 
@@ -578,6 +582,27 @@ const EMBED_RE = new RegExp("var EMBEDDED_DATA = [\\s\\S]*?/\\*EMBEDDED_DATA" + 
 const STORE_KEY = new URLSearchParams(location.search).has("selftest") ? "planner-desk-selftest" : "planner-desk-v1";
 
 // 수행방법론 > 추진 체계 (Phase / Activity / 산출물)
+// WBS 작업이 끝나면 나와야 하는 산출물. 방법론 목록에 없는 것은 '권장'(필요하면 한 번에 만들기)
+const ACT_DOCS = {
+  "프로젝트 계획수립": ["착수보고서", "프로젝트 수행 계획서(WBS)"],
+  "현행 프로세스 분석": ["As-Is 프로세스 분석서"],
+  "현행 시스템 분석": ["현행 시스템 분석서"],
+  "개발 요구 사항 수집": ["요구사항 정의서", "URS"],
+  "아키텍처 설계": ["아키텍처 설계서"],
+  "To-Be 이미지 설계": ["To-Be 프로세스 정의서", "프로토타이핑"],
+  "Fit-Gap 분석": ["Fit-Gap 분석서"],
+  "개발 설계서 작성": ["화면설계서", "인터페이스 정의서"],
+  "개발 환경 구축": ["개발환경 구성 정의서"],
+  "어플리케이션 개발": ["프로그램 목록"],
+  "테스트 데이터 수집": ["테스트 데이터 목록"],
+  "단위 테스트": ["단위테스트 케이스", "단위테스트 결과서"],
+  "운영환경 구축": ["운영환경 구성 정의서"],
+  "통합 테스트": ["통합 테스트 계획서", "통합 테스트 결과서"],
+  "FDS 작성": ["FDS"],
+  "시스템 교육 실시": ["사용자 교육 계획서", "사용자 매뉴얼", "운영자 매뉴얼"],
+  "프로젝트 완료 보고": ["프로젝트 검수/완료보고서"],
+  "인수인계": ["프로젝트 인수인계서"],
+};
 const PHASES = [
   { id: "P1", name: "Preparation", color: "#2f5d8a",
     acts: ["프로젝트 계획수립"],
@@ -924,6 +949,26 @@ function evLabel(t) { return (EV_TYPES.find((x) => x[0] === t) || [t, t])[1]; }
 function lastEvent(h, types) { return [...h.events].filter((e) => !types || types.includes(e.type)).sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || ""))).pop(); }
 function isOpenHO(h) { return h.status !== "verified" && h.status !== "hold"; }
 
+// 이 WBS 작업의 산출물: 직접 고른 것(docIds) 또는 작업명 기준 기본 목록. 없는 문서는 doc: null
+function wbsDocs(w) {
+  const pd = S.docs.filter((d) => d.projectId === w.projectId);
+  if (Array.isArray(w.docIds)) return w.docIds.map((id) => pd.find((d) => d.id === id)).filter(Boolean).map((d) => ({ name: d.name, doc: d }));
+  const key = Object.keys(ACT_DOCS).find((k) => k.replace(/\s/g, "") === String(w.title || "").replace(/\s/g, ""));
+  return (key ? ACT_DOCS[key] : []).map((name) => ({ name, doc: pd.find((d) => d.name.replace(/\s/g, "") === name.replace(/\s/g, "")) || null }));
+}
+// 이 산출물이 나오는 WBS 작업
+function docSource(d) { return S.wbs.filter((w) => w.projectId === d.projectId && wbsDocs(w).some((x) => x.doc?.id === d.id)); }
+function wbsDocChips(w) {
+  return wbsDocs(w).map((x) => x.doc
+    ? `<span class="chip-ref" style="cursor:pointer" onclick="editDoc('${x.doc.id}')" title="${esc(x.doc.status)}">${esc(x.name)} ${badge(x.doc.status, DOC_CLS[x.doc.status] || "")}</span>`
+    : `<span class="chip-ref" style="cursor:pointer;border-style:dashed;color:var(--warn)" onclick="wbsMakeDoc('${w.id}','${esc(x.name)}')" title="산출물 목록에 없음 — 눌러서 만들기">+ ${esc(x.name)}</span>`).join("") || '<span class="muted small">-</span>';
+}
+function wbsMakeDoc(wid, name) {
+  const w = S.wbs.find((x) => x.id === wid);
+  const d = { id: uid("d"), projectId: w.projectId, phase: w.phase || "", name, status: "미착수", version: "v0.1", owner: w.owner || "", plan: w.end || "", requestedAt: "", approvedAt: "", approver: "", path: "", memo: "", history: [], order: 99 };
+  S.docs.push(d); if (Array.isArray(w.docIds)) w.docIds.push(d.id);
+  commit(); toast(`산출물 '${name}' 추가 — 계획일은 작업 종료일로 잡았어`);
+}
 function applyTemplate(p) {
   PHASES.forEach((ph) => {
     ph.docs.forEach((name, i) => S.docs.push({ id: uid("d"), projectId: p.id, phase: ph.id, name, status: "미착수", version: "v0.1", owner: "", plan: "", requestedAt: "", approvedAt: "", approver: "", path: "", memo: "", history: [], order: i }));
@@ -966,6 +1011,10 @@ function computeAlerts(pid) {
     }
   });
   S.wbs.filter(scope).forEach((w) => {
+    if ((Number(w.progress) >= 100 || (w.end && w.end < t)) && wbsDocs(w).some((x) => !x.doc || !["승인", "해당없음"].includes(x.doc.status))) {
+      const miss = wbsDocs(w).filter((x) => !x.doc || !["승인", "해당없음"].includes(x.doc.status));
+      out.push({ level: "warn", kind: "산출물 미완료", ref: ["wbs", w.id], pid: w.projectId, days: w.end ? calDays(w.end) : 0, title: w.title, desc: miss.map((x) => `${x.name} ${x.doc ? x.doc.status : "없음"}`).join(" · ") });
+    }
     if (w.end && w.end < t && Number(w.progress) < 100) out.push({ level: "warn", kind: "WBS 지연", ref: ["wbs", w.id], pid: w.projectId, days: calDays(w.end), title: w.title, desc: `종료 ${shortD(w.end)} (${dday(w.end)}) · 진척 ${w.progress || 0}%` });
   });
   S.tasks.filter(scope).forEach((x) => {
@@ -2431,7 +2480,7 @@ function renderDocs() {
         const waiting = d.status === "검토요청" && d.requestedAt ? bizDays(d.requestedAt) : null;
         const hoCnt = S.handoffs.filter((x) => x.docIds.includes(d.id)).length;
         return `<tr style="${d.status === "해당없음" ? "opacity:.5" : ""}">
-          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId, /단위/.test(d.name) ? "단위" : "통합", /결과서/.test(d.name)) : ""}${/요구사항 정의서/.test(d.name) ? reqChip(d.projectId) : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
+          <td><span class="link" onclick="editDoc('${d.id}')">${typeIcon("doc")}<span class="tlabel">${esc(d.name)}</span></span>${/테스트 (결과|계획)서|단위테스트/.test(d.name) ? tcChip(d.projectId, /단위/.test(d.name) ? "단위" : "통합", /결과서/.test(d.name)) : ""}${/요구사항 정의서/.test(d.name) ? reqChip(d.projectId) : ""}${docSource(d).length ? ` <span class="muted small" title="이 산출물이 나오는 WBS 작업">← ${docSource(d).map((w) => esc(w.title)).join(", ")}</span>` : ""}${hoCnt ? ` <span class="chip-ref" title="개발 전달 건">전달 ${hoCnt}</span>` : ""}${d.memo ? ` <span class="muted small" title="${esc(d.memo)}">메모</span>` : ""}</td>
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap">${esc(d.owner || "")}</td>
@@ -2783,19 +2832,21 @@ function renderWBS() {
   const pos = (s) => ((calDays(r0, s)) / span) * 100;
   const avg = ws.length ? Math.round(ws.reduce((a, w) => a + Number(w.progress || 0), 0) / ws.length) : 0;
   const late = ws.filter((w) => w.end && w.end < today() && Number(w.progress) < 100).length;
-  let h = pageHead("WBS", `${ws.length}개 작업 · 평균 진척 ${avg}% · 지연 ${late}${r0 ? ` · ${r0} ~ ${r1}` : ""}`,
+  const missDocs = ws.flatMap((w) => wbsDocs(w).filter((x) => !x.doc)).length;
+  let h = pageHead("WBS", `${ws.length}개 작업 · 평균 진척 ${avg}% · 지연 ${late}${missDocs ? ` · 산출물 목록에 없는 문서 ${missDocs}개 (점선, 눌러서 추가)` : ""}${r0 ? ` · ${r0} ~ ${r1}` : ""}`,
     `<button class="btn primary" onclick="editWBS()">＋ 작업 추가</button>`);
   const groups = [...PHASES.map((ph) => [ph.id, `P.${ph.id.slice(1)} ${ph.name}`, ph.color]), ["", "일반 업무 / 미분류", "#8b93a1"]];
-  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>작업</th><th>담당</th><th>시작</th><th>종료</th><th>진척</th><th style="min-width:240px">일정 ${r0 ? `<span class="muted small">(${shortD(r0)} ~ ${shortD(r1)}, 빨간 선=오늘)</span>` : ""}</th></tr></thead><tbody>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th style="min-width:170px">작업</th><th>산출물</th><th>담당</th><th>시작</th><th>종료</th><th>진척</th><th style="min-width:240px">일정 ${r0 ? `<span class="muted small">(${shortD(r0)} ~ ${shortD(r1)}, 빨간 선=오늘)</span>` : ""}</th></tr></thead><tbody>`;
   groups.forEach(([gid, gname, color]) => {
     const rows = ws.filter((w) => (w.phase || "") === gid).sort((a, b) => (a.start || "9").localeCompare(b.start || "9"));
     if (!rows.length && !gid) return;
-    h += `<tr><td colspan="6" style="background:var(--sub);font-weight:700;box-shadow:inset 4px 0 0 ${color}">${gname} <span class="muted small">${rows.length}</span> <button class="btn sm ghost" onclick="editWBS(null,'${gid}')">＋</button></td></tr>`;
+    h += `<tr><td colspan="7" style="background:var(--sub);font-weight:700;box-shadow:inset 4px 0 0 ${color}">${gname} <span class="muted small">${rows.length}</span> <button class="btn sm ghost" onclick="editWBS(null,'${gid}')">＋</button></td></tr>`;
     rows.forEach((w) => {
       const isLate = w.end && w.end < today() && Number(w.progress) < 100;
       const bar = r0 && w.start && w.end ? `<div class="bar" style="left:${pos(w.start)}%;width:${Math.max(0.8, ((calDays(w.start, w.end) + 1) / span) * 100)}%;background:${isLate ? "var(--danger)" : color}"><i style="width:${Math.min(100, Number(w.progress) || 0)}%"></i></div>` : "";
       const tl = r0 && today() >= r0 && today() <= r1 ? `<div class="todayline" style="left:${pos(today())}%"></div>` : "";
       h += `<tr><td><span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.legacyStatus ? ` <span class="chip-ref">${esc(w.legacyStatus)}</span>` : ""}${w.memo ? ` <span class="muted small" title="${esc(w.memo)}">메모</span>` : ""}</td>
+        <td>${wbsDocChips(w)}</td>
         <td class="nowrap">${esc(w.owner || "")}</td>
         <td class="nowrap"><input type="date" class="inline wdate" value="${w.start || ""}" onchange="setWBS('${w.id}','start',this.value)"></td>
         <td class="nowrap"><input type="date" class="inline wdate" style="${isLate ? "color:var(--danger);font-weight:600" : ""}" value="${w.end || ""}" onchange="setWBS('${w.id}','end',this.value)"></td>
@@ -2816,9 +2867,12 @@ function editWBS(id, phaseId, pid) {
     { k: "start", l: "시작", t: "date" },
     { k: "end", l: "종료", t: "date" },
     { k: "progress", l: "진척률(%)", t: "number" },
+    { k: "docIds", l: "이 작업의 산출물", t: "multi", opts: S.docs.filter((d) => d.projectId === w.projectId).map((d) => [d.id, `${d.phase || ""} ${d.name}`]), hint: "Ctrl+클릭으로 여러 개. 고르지 않으면 작업명 기준 기본 산출물로 연결" },
     { k: "memo", l: "메모", t: "textarea", full: true },
-  ], w, (v) => {
+  ], Object.assign({}, w, { docIds: wbsDocs(w).filter((x) => x.doc).map((x) => x.doc.id) }), (v) => {
     v.progress = Math.max(0, Math.min(100, Number(v.progress) || 0));
+    const auto = wbsDocs(Object.assign({}, w, { docIds: undefined })).filter((x) => x.doc).map((x) => x.doc.id).sort().join();
+    if (!id || v.docIds.slice().sort().join() === auto) delete v.docIds;   // 기본과 같으면 저장 안 함 (작업명 바뀌면 따라감)
     if (id) Object.assign(w, v); else S.wbs.push(Object.assign({ id: uid("w"), projectId: w.projectId }, v));
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("작업을 삭제할까?")) { S.wbs = S.wbs.filter((x) => x.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);

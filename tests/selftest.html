@@ -614,6 +614,18 @@ function tests(w, errors) {
     w.tlDel("wbs", "w_tl");
     assert(!S().wbs.some((x) => x.id === "w_tl"), "삭제 안 됨");
   });
+  check("WBS 작업 → 산출물 연결: 기본 목록, 없는 문서 만들기, 끝난 작업의 산출물 미완료 경고", () => {
+    const wb = { id: "w_doc", projectId: pid(), phase: "P4", title: "단위 테스트", start: w.addDays(t, -10), end: w.addDays(t, -1), progress: 100 };
+    S().wbs.push(wb);
+    const ds = w.wbsDocs(wb);
+    assert(ds.map((x) => x.name).join() === "단위테스트 케이스,단위테스트 결과서", "기본 산출물: " + ds.map((x) => x.name).join());
+    assert(w.computeAlerts(pid()).some((a) => a.kind === "산출물 미완료" && a.ref[1] === "w_doc"), "산출물 미완료 경고 없음");
+    const n = S().docs.length; w.wbsMakeDoc("w_doc", "단위테스트 케이스");
+    const d = S().docs[n];
+    assert(d && d.name === "단위테스트 케이스" && d.phase === "P4" && d.plan === wb.end, "산출물 만들기");
+    assert(w.wbsDocs(wb)[0].doc?.id === d.id && w.docSource(d).some((x) => x.id === "w_doc"), "작업↔산출물 연결");
+    S().wbs = S().wbs.filter((x) => x.id !== "w_doc"); S().docs = S().docs.filter((x) => x.id !== d.id);
+  });
   check("사이드 메뉴는 항상 전부 보이고 묶음 이름 없이 구분선으로 나눔", () => {
     S().ui.pid = pid(); S().ui.tab = "dash"; w.render();
     const names = [...w.document.querySelectorAll("#sideNav .navi .nm")].map((e) => e.textContent);
