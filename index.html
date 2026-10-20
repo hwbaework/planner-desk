@@ -482,8 +482,6 @@
   .pill .ti { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
   .epic-lz { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 0 6px; border-radius: 3px; border: 1px solid; white-space: nowrap; margin-right: 4px; }
   [data-theme="dark"] .epic-lz { filter: brightness(1.6) saturate(.8); background: transparent !important; }
-  .ms-tag { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; padding: 0 8px; border: 1px solid var(--accent); border-radius: 3px; color: var(--accent); white-space: nowrap; }
-  .ms-tag i { width: 8px; height: 8px; background: var(--accent); transform: rotate(45deg); display: inline-block; }
   .ptag { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
   .ptag i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
 
@@ -884,7 +882,7 @@ function taskViaHtml(x) {
 }
 const TASK_CLS = { "진행중": "blue", "대기": "amber", "완료": "green" };
 const PRI = [["high", "높음"], ["mid", "보통"], ["low", "낮음"]];
-const EVENT_TYPES = ["마일스톤", "회의", "출장", "시연", "보고", "교육", "휴가", "기타"];
+const EVENT_TYPES = ["회의", "출장", "시연", "보고", "교육", "휴가", "기타"];
 const DATA_ST = ["협의 전", "협의 중", "합의", "수신 중", "수신 완료", "보류"];
 const DATA_CLS = { "협의 전": "gray", "협의 중": "violet", "합의": "blue", "수신 중": "amber", "수신 완료": "green", "보류": "muted" };
 const DATA_METHOD = ["API", "파일(엑셀/CSV)", "DB 연계", "RTU/계측기", "수기 입력", "미정"];
@@ -1208,6 +1206,40 @@ function normalize(d) {
   }
   if (!s.settings.saveDir && !s.settings.saveDir1) s.settings.saveDir = "C:\\Users\\RMS\\Desktop\\java\\planner-desk";
   s.settings.saveDir1 = true;
+  // 울산 기획안 일정(10.20): 메뉴마다 기획안 전달 업무 (화면설계서·프로세스 정의서 함께). '완료'로 받은 건 전달됐는지 확인 필요로
+  if (!s.settings.ulPlan1020) {
+    const ul = (s.projects || []).find((p) => /울산/.test(p.name || ""));
+    if (ul) {
+      if (!ul.pm) ul.pm = "노선규 상무, 성준원 과장";
+      const L = [["통합관제", "KAN-100", "", 1], ["컨설팅", "KAN-212", "", 1], ["RE100(전력거래)", "KAN-201", "", 1, "v1.0"],
+        ["데이터 마켓플레이스", "KAN-315", "2026-10-21"], ["카본", "KAN-308", "2026-10-28"], ["온실가스", "KAN-301", "2026-11-04"], ["관리", "KAN-400", "2026-11-11"]];
+      const now = new Date().toISOString();
+      L.forEach(([nm, wid, due, done, ver], i) => {
+        const title = `기획안 전달 — ${nm} (화면설계서·프로세스 정의서)`;
+        if (s.tasks.some((t) => t.projectId === ul.id && t.title === title)) return;
+        const w = s.wbs.find((x) => x.projectId === ul.id && x.wid === wid);
+        s.tasks.push({ id: "t" + Date.now().toString(36) + i + Math.random().toString(36).slice(2, 6), projectId: ul.id, title, priority: "mid", status: "진행중", stage: "기획",
+          wbsId: w ? w.id : "", start: "", due, owner: "", link: "",
+          memo: done ? `기획안 일정표에 '완료'${ver ? ` (${ver})` : ""}로 되어 있음 — 화면설계서·프로세스 정의서까지 전달됐는지 확인 필요` : `기획안 일정 ~${due.slice(5).replace("-", "/")} · 화면설계서·프로세스 정의서 같이 전달`,
+          log: [{ at: "2026-10-20", ts: now, type: "comment", text: done ? "기획안 일정표: 완료 → 전달 확인 필요" : `기획안 일정표: ~${due.slice(5).replace("-", "/")}` }], createdAt: now, updatedAt: now });
+      });
+    }
+    s.settings.ulPlan1020 = true;
+  }
+  // 울산 외부 개발: 예지보전 = 아이티공간, 온실가스 인벤토리(하위 화면까지) = 띵스파이어
+  if (!s.settings.ulOwners1020b) {
+    const ul = (s.projects || []).find((p) => /울산/.test(p.name || ""));
+    if (ul) {
+      const set = (wid, who, withKids) => { const w = s.wbs.find((x) => x.projectId === ul.id && x.wid === wid); if (!w) return;
+        s.wbs.filter((x) => x.projectId === ul.id && x.code && (x.id === w.id || (withKids && x.code.startsWith(w.code + ".")))).forEach((x) => (x.owner = who)); };
+      set("KAN-108", "아이티공간", true);
+      set("KAN-301", "띵스파이어", true);
+      if (!(ul.years || []).length) ul.years = [2024, 2025, 2026].map((y) => ({ start: `${y}-01-01`, end: `${y}-12-31` }));   // 1·2·3차년도 (1년 단위)
+      if (!ul.start) ul.start = "2024-01-01";
+      if (!/아이티공간|띵스파이어/.test(ul.devLead || "")) ul.devLead = [ul.devLead, "아이티공간(예지보전) · 띵스파이어(온실가스)"].filter(Boolean).join(" · ");
+    }
+    s.settings.ulOwners1020b = true;
+  }
   if (!s.settings.fdCols1) {
     const u = (s.projects || []).find((p) => /울산/.test(p.name || ""));
     if (u) {
@@ -1525,10 +1557,6 @@ function computeAlerts(pid) {
   return out.sort((a, b) => rank[a.level] - rank[b.level] || b.days - a.days);
 }
 
-// 다음 마일스톤 (오늘 포함, 가장 가까운 것)
-function milestones(pid) { return S.events.filter((e) => e.projectId === pid && e.type === "마일스톤" && e.start).sort((a, b) => a.start.localeCompare(b.start)); }
-function nextMilestone(pid) { return milestones(pid).find((e) => e.start >= today()); }
-function msTag(pid) { const m = nextMilestone(pid); return m ? `<span class="ms-tag" title="${esc(m.title)} ${m.start}"><i></i>${esc(m.title)} <b>${dday(m.start)}</b></span>` : ""; }
 function currentPhase(pid) {
   const t = today();
   const ws = S.wbs.filter((w) => w.projectId === pid && w.phase && w.start && w.end && w.start <= t && t <= w.end);
@@ -1649,8 +1677,8 @@ function renderDash() {
   if (pid) {
     const p = proj(pid);
     const span = p.start || p.end ? `${p.start || "?"} ~ ${p.end || "?"}${p.end ? ` · 종료 ${dday(p.end)}` : ""}` : "기간 미입력";
-    h += pageHead(esc(p.name), `${esc(p.client || "고객사 미입력")} · ${span}${p.pm ? " · PM " + esc(p.pm) : ""}${p.devLead ? " · 개발 PL " + esc(p.devLead) : ""} ${msTag(pid)}`,
-      `<button class="btn" onclick="editEvent(null, today());setTimeout(()=>{const t=document.querySelector('#fForm [data-k=type]');if(t)t.value='마일스톤'},0)">+ 마일스톤</button><button class="btn" onclick="editProject('${pid}')">프로젝트 정보</button><button class="btn primary" onclick="editTask()">＋ 업무 추가</button>`);
+    h += pageHead(esc(p.name), `${esc(p.client || "고객사 미입력")} · ${span}${p.pm ? " · PM " + esc(p.pm) : ""}${p.devLead ? " · 개발업체 " + esc(p.devLead) : ""}`,
+      `<button class="btn" onclick="editProject('${pid}')">프로젝트 정보</button><button class="btn primary" onclick="editTask()">＋ 업무 추가</button>`);
   } else {
     h += pageHead("전체 프로젝트 현황", `진행 프로젝트 ${activeProjects().length}개`, `<button class="btn primary" onclick="editProject()">＋ 프로젝트</button>`);
   }
@@ -1703,7 +1731,7 @@ function renderDash() {
       }).join("") + `</div></div></div>`;
   } else {
     h += `<div class="card"><div class="card-h"><h3>프로젝트별 현황</h3></div><div class="tbl-wrap"><table class="t"><thead><tr>
-      <th>프로젝트</th><th>현재 단계</th><th>산출물 승인</th><th class="nowrap">진행 업무</th><th class="nowrap">데이터 협의</th><th class="nowrap">진행 전달</th><th class="nowrap">노티 미수신</th><th>지연</th><th>다음 마일스톤</th><th>종료</th></tr></thead><tbody>` +
+      <th>프로젝트</th><th>현재 단계</th><th>산출물 승인</th><th class="nowrap">진행 업무</th><th class="nowrap">데이터 협의</th><th class="nowrap">진행 전달</th><th class="nowrap">노티 미수신</th><th>지연</th><th>종료</th></tr></thead><tbody>` +
       (activeProjects().map((p) => {
         const a = computeAlerts(p.id); const s = docStats(p.id); const ph = currentPhase(p.id);
         const pct = s.total ? Math.round((s.ok / s.total) * 100) : 0;
@@ -1715,9 +1743,8 @@ function renderDash() {
           <td class="num">${S.handoffs.filter((x) => x.projectId === p.id && isOpenHO(x)).length}</td>
           <td class="num">${(() => { const n = a.filter((x) => x.level === "danger").length; return n ? badge(n, "red") : "0"; })()}</td>
           <td class="num">${a.filter((x) => x.level === "warn").length}</td>
-          <td class="nowrap">${msTag(p.id) || '<span class="muted">-</span>'}</td>
           <td class="nowrap">${p.end ? `${p.end} <span class="muted">${dday(p.end)}</span>` : "-"}</td></tr>`;
-      }).join("") || `<tr><td colspan="10" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
+      }).join("") || `<tr><td colspan="9" class="empty">프로젝트 없음</td></tr>`) + `</tbody></table></div></div>`;
   }
 
   h += `<div class="grid2" style="margin-top:14px">
@@ -2213,7 +2240,7 @@ function renderTimeline() {
   rows.forEach((r) => {
     if (r.grp) {
       L += `<div class="tl-r grp">${tlFoldBtn(r)}${projTag(r.p.id)} <span class="muted small">${r.n}</span>${r.p.start && r.p.end ? ` <span class="small muted" style="font-weight:400;cursor:pointer" onclick="editProject('${r.p.id}')" title="사업 기간 바꾸기">${shortD(r.p.start)} ~ ${shortD(r.p.end)}</span>` : ` <span class="small" style="font-weight:600;color:var(--warn);cursor:pointer" onclick="editProject('${r.p.id}')" title="프로젝트 정보에서 시작·종료일 입력">사업 기간 입력</span>`}<button class="tl-add" title="이 프로젝트에 추가" onclick="tlAdd('${r.p.id}')">+</button></div>`;
-      R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}${milestones(r.p.id).map((m) => tlMilestone(m.start, x, r0, r1, "#0c66e4", `editEvent('${m.id}')`, "마일스톤 " + m.title, m.start < today())).join("")}${todayLine}</div>`;
+      R += `<div class="tl-r grp" style="width:${W}px">${r.p.start && r.p.end ? tlSpan(r.p.start, r.p.end, x, z, r0, r1, "#8590a2", "", "epic", "") : ""}${todayLine}</div>`;
       return;
     }
     if (r.epic) {
@@ -2291,7 +2318,6 @@ function tlAdd(pid) {
   openModal(`타임라인에 추가 · ${esc(projName(pid))}`,
     opt("editWBS(null,'')", "WBS 작업", "단계별 작업 · 시작~종료 막대") +
     opt("editTask(null,{start:today(),due:addDays(today(),7)})", "업무", "시작일~마감 막대") +
-    opt("editEvent(null,today());setTimeout(()=>{const t=document.querySelector('#fForm [data-k=type]');if(t)t.value='마일스톤'},0)", "마일스톤", "프로젝트 줄에 다이아몬드로 표시") +
     opt("editData()", "데이터 협의", "요청일~수신 예정일") +
     opt(`editProject('${pid}')`, "사업 기간", "프로젝트 줄의 전체 기간 막대 (시작·종료일)"), [{ l: "취소", fn: closeModal }]);
 }
@@ -2388,7 +2414,7 @@ function renderCal() {
   return h;
 }
 function calPill(i) {
-  const tag = i.sub === "마일스톤" ? "마일스톤" : CAL_TAG[i.kind];
+  const tag = CAL_TAG[i.kind];
   const drag = i.kind === "recur" ? "" : ` draggable="true" ondragstart="calDrag(event,'${i.kind}|${i.id}|${i.date}|${i.edge || ""}')"`;
   return `<div class="pill ${i.done ? "done" : ""} ${i.late ? "late" : ""}"${drag} title="${esc(projName(i.pid))} · ${esc((tag ? tag + " · " : "") + i.title)}${i.late ? ` · ${calDays(i.date)}일 지남` : ""}${drag ? " · 끌어서 날짜 변경" : ""}" onclick="event.stopPropagation();${i.click}">${typeIcon(i.icon || i.kind)}${esc(i.title)}</div>`;
 }
