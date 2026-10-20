@@ -197,6 +197,7 @@
   .wbs-tree .frz-end { box-shadow: -1px 0 0 0 var(--fz), inset -1px 0 0 var(--line); }
   .wbs-tree td:nth-child(3) { white-space: nowrap; }
   .wbs-tree tr.wbs-grp td { background: var(--sub); font-weight: 600; }
+  .wbs-tree tr.wbs-done td { background: var(--okw); } .wbs-tree tr.wbs-done .frz { --fz: var(--okw); }
   .wbs-tree td { padding-top: 4px; padding-bottom: 4px; }
   .wbs-tree tr.fn-row td { background: var(--sub); font-size: 13px; }
   .wbs-tree tr.wbs-menu td { background: var(--accentw); font-weight: 700; }
@@ -282,6 +283,7 @@
   .kpi.danger .v { color: var(--danger); }
   .kpi.warn .v { color: var(--warn); }
   .kpi.ok .v { color: var(--ok); }
+  .ok-t { color: var(--ok); font-weight: 700; } .danger-t { color: var(--danger); font-weight: 600; }
 
   .grid2 { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 14px; }
   .grid2 > .card + .card { margin-top: 0; }
@@ -401,6 +403,10 @@
   .wk-i { width: 34px; height: 34px; border-radius: 50%; background: var(--sub); display: inline-flex; align-items: center; justify-content: center; flex: none; }
   .ov { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
   .donut { display: flex; align-items: center; gap: 14px; }
+  .ov3-wrap { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .ov3 { border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; }
+  .ov3:hover { border-color: var(--line2); }
+  .ov3-h { font-weight: 700; font-size: 13.5px; margin-bottom: 4px; }
   .dn-v { font-size: 26px; font-weight: 700; fill: var(--text); }
   .dn-l { font-size: 11px; fill: var(--faint); }
   .dn-legend div { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 3px 0; color: var(--dim); }
@@ -770,6 +776,8 @@
 // 왼쪽 메뉴바는 상단바 바로 아래에 붙어 따라옴: 상단바 높이(줄바꿈되면 달라짐)를 CSS로 넘김
 const setTopH = () => document.documentElement.style.setProperty("--top-h", document.querySelector(".top").getBoundingClientRect().height + "px");
 setTopH(); addEventListener("resize", setTopH); new ResizeObserver(setTopH).observe(document.querySelector(".top"));
+// 날짜 칸은 아이콘이 아니라 칸 어디를 눌러도 달력이 뜸
+document.addEventListener("click", (e) => { const d = e.target.closest?.('input[type="date"]'); if (d && !d.disabled && !d.readOnly) try { d.showPicker(); } catch (_) {} });
 // ─────────────────────────────────────────────────────────────
 //  Planner Desk — 단일 HTML. 데이터는 브라우저(localStorage)에 자동 저장되고,
 //  [저장]을 누르면 현재 데이터를 내장한 HTML 파일로 저장된다.
@@ -1167,7 +1175,7 @@ function syncFuncTCs() {
   S.tcs = S.tcs.filter((c) => !c.funcId || live.has(c.funcId) || (c.result !== "미수행" && (delete c.funcId, true)));
 }
 function persist() {
-  syncFuncTCs(); syncCodes();
+  syncFuncTCs(); syncCodes(); syncScreens();
   S.updatedAt = new Date().toISOString();
   ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => S[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = S.updatedAt; }));
   writeLocal(true); dirty = true; updateSaveInd();
@@ -1556,6 +1564,11 @@ function renderDash() {
       (open ? (p.memo ? `<div class="concept-b">${conceptHtml(p.memo)}</div>` : `<div class="empty">메모 없음 · [편집]</div>`) : "") + `</div>`;
   }
   h += todayCard(pid, alerts);
+  if (pid) {
+    h += projDash(pid);
+    h += `<div style="margin-top:14px">${missingCard(pid)}</div>`;
+    return h;
+  }
   const kpis = [
     [noNoti, "danger", "goWork('ho')", "개발 기한 지남", "완료 예정일이 지난 개발"],
     [openHo, "", "goWork('ho')", "진행 중 개발 전달", "검수완료 전 건"],
@@ -1610,6 +1623,27 @@ function renderDash() {
   h += `<div style="margin-top:14px">${missingCard(pid)}</div>`;
   return h;
 }
+// 프로젝트 한 곳의 현황: 업무 단계 · 열린 이슈 · 메뉴별 화면 진척 · 산출물 (모두 각 메뉴의 데이터 그대로)
+function projDash(pid) {
+  // 프로젝트 한 곳: 상태 개요 · 메뉴별 화면 (날짜 없는 항목은 아래에서)
+  const T = wbsTree(pid), isGrp = (w) => (T.kids[w.code] || []).length || T.level(w) === 1;
+  const leafOf = (w) => (isGrp(w) ? (T.kids[w.code] || []).flatMap(leafOf) : [w]);
+  const scOf = (w) => S.screens.find((x) => x.id === (w.screenIds || [])[0]);
+  const all = T.roots.flatMap(leafOf), avg = (l) => (l.length ? Math.round(l.reduce((a, w) => a + wbsLeafProg(w).progress, 0) / l.length) : 0);
+  let h = `<div class="card"><div class="card-h"><h3>상태 개요</h3></div><div class="card-b">${statusOverview3(pid)}</div></div>`;
+  // 메뉴(1뎁스)별 화면: 진척 · 화면설계 확정 · 기능정의서 · 테스트 케이스
+  const cnt = (l, f) => { const n = l.filter(f).length; return `<span class="${n === l.length && l.length ? "ok-t" : ""}">${n}/${l.length}</span>`; };
+  h += `<div class="card" style="margin-top:14px"><div class="card-h"><h3>메뉴별 화면</h3><span class="sub">${all.length}개 화면</span><div class="actions"><button class="btn sm" onclick="selTab('wbs')">WBS</button></div></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th style="width:1%">ID</th><th>메뉴</th><th style="width:30%">진척</th><th class="nowrap" style="width:1%">화면설계 확정</th><th class="nowrap" style="width:1%">기능정의서</th><th class="nowrap" style="width:1%">테스트 케이스</th></tr></thead><tbody>` +
+    (T.roots.map((w) => { const l = leafOf(w), pc = avg(l);
+      return `<tr><td class="mono small nowrap">${esc(w.wid || "")}</td><td><b>${esc(w.title)}</b> <span class="small muted">${l.length}</span></td>
+        <td><div style="display:flex;align-items:center;gap:8px"><span class="ov-bar"><i style="width:${pc}%"></i></span><span class="small" style="width:36px;text-align:right">${pc}%</span></div></td>
+        <td class="nowrap small" style="text-align:center">${cnt(l, (x) => scOf(x)?.status === "확정")}</td>
+        <td class="nowrap small" style="text-align:center;cursor:pointer" onclick="selTab('funcs')">${cnt(l, (x) => x.fdDone)}</td>
+        <td class="nowrap small" style="text-align:center;cursor:pointer" onclick="selTab('tc')">${cnt(l, (x) => x.tcDone)}</td></tr>`; }).join("")
+      || `<tr><td colspan="6" class="empty">메뉴별 WBS가 아직 없어</td></tr>`) + `</tbody></table></div></div>`;
+  return h;
+}
 function weekSummary(pid) {
   const t = today(), from = addDays(t, -6), to7 = addDays(t, 7);
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
@@ -1632,15 +1666,25 @@ function donut(parts, center, sub) {
   return `<div class="donut"><svg viewBox="0 0 140 140" width="140" height="140">${arcs}<text x="70" y="68" text-anchor="middle" class="dn-v">${center}</text><text x="70" y="88" text-anchor="middle" class="dn-l">${sub}</text></svg>
     <div class="dn-legend">${parts.map(([l, v, c]) => `<div><i style="background:${c}"></i>${esc(l)} <b>${v}</b></div>`).join("")}</div></div>`;
 }
+function statusOverview3(pid) {
+  const of = (list, sts) => sts.map(([l, c, f]) => [l, list.filter(f).length, c]);
+  const ts = S.tasks.filter((x) => x.projectId === pid), rs = S.risks.filter((x) => x.projectId === pid), ds = S.docs.filter((x) => x.projectId === pid && x.status !== "해당없음");
+  const box = (title, tab, parts, n) => `<div class="ov3" style="cursor:pointer" onclick="selTab('${tab}')"><div class="ov3-h">${title}</div>${donut(parts, n, "건")}</div>`;
+  return `<div class="ov3-wrap">` +
+    box("업무", "tasks", of(ts, [["진행중", "#1d7afc", (x) => x.status === "진행중" && !isFutureTask(x)], ["대기", "#f18d13", (x) => x.status === "대기"], ["예정", "#8590a2", isFutureTask], ["완료", "#22a06b", (x) => x.status === "완료"]]), ts.length) +
+    box("이슈 · 리스크", "risks", of(rs, [["오픈", "#e2483d", (x) => (x.status || "오픈") === "오픈"], ["진행", "#1d7afc", (x) => x.status === "진행"], ["완료", "#22a06b", (x) => x.status === "완료"]]), rs.length) +
+    box("산출물", "docs", of(ds, DOC_ST.filter((k) => k !== "해당없음").map((k) => [k, { 미착수: "#8590a2", 작성중: "#1d7afc", 검토중: "#f18d13", 완료: "#22a06b" }[k] || "#8590a2", (x) => x.status === k])), ds.length) +
+    `</div>`;
+}
 function statusOverview(pid) {
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   const ts = S.tasks.filter(sc);
   const parts = [["진행중", ts.filter((x) => x.status === "진행중" && !isFutureTask(x)).length, "#1d7afc"], ["대기", ts.filter((x) => x.status === "대기").length, "#f18d13"],
     ["예정", ts.filter(isFutureTask).length, "#8590a2"], ["완료", ts.filter((x) => x.status === "완료").length, "#22a06b"]];
   const types = [["task", "업무", ts.length], ["ho", "개발 전달", S.handoffs.filter(sc).length], ["doc", "산출물", S.docs.filter((d) => sc(d) && d.status !== "해당없음").length],
-    ["data", "데이터 협의", S.datas.filter(sc).length], ["tc", "테스트", S.tcs.filter(sc).length]];
+    ["bug", "이슈", S.risks.filter(sc).length], ["wbs", "화면", S.screens.filter(sc).length]];
   const max = Math.max(1, ...types.map((x) => x[2]));
-  return `<div class="ov">${donut(parts, ts.length, "전체 업무")}
+  return `<div class="ov">${donut(parts, ts.length, pid ? "업무" : "전체 업무")}
     <div class="ov-types"><div class="small muted" style="margin-bottom:6px">항목 유형</div>${types.map(([k, l, n]) => `<div class="ov-row">${typeIcon(k)}<span class="tlabel" style="width:78px">${l}</span><span class="ov-bar"><i style="width:${(n / max) * 100}%"></i></span><b>${n}</b></div>`).join("")}</div></div>`;
 }
 // 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
@@ -1664,20 +1708,21 @@ function missingDates(pid) {
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   return {
     task: S.tasks.filter((x) => sc(x) && isOpenTask(x) && !x.due),
-    wbs: S.wbs.filter((x) => sc(x) && wbsLeafProg(x).progress < 100 && (!x.start || !x.end)),
+    wbs: S.wbs.filter((x) => sc(x) && x.code && x.code.includes(".") && !S.wbs.some((y) => y.projectId === x.projectId && y.code && y.code.startsWith(x.code + ".")) && wbsLeafProg(x).progress < 100 && (!x.start || !x.end)),
     doc: S.docs.filter((x) => sc(x) && !["완료", "해당없음"].includes(x.status) && !x.plan),
   };
 }
+// 날짜 없는 항목: 여기서 넣지 않고, 눌러서 그 메뉴로 가서 넣음
 function missingCard(pid) {
   const m = missingDates(pid), total = m.task.length + m.wbs.length + m.doc.length;
   if (!total) return "";
-  const row = (kind, x, title, inputs) => `<div class="mrow">${typeIcon(kind)}<span class="nm" title="${esc(title)}">${esc(title)}</span>${pid ? "" : `<span class="small muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projTag(x.projectId)}</span>`}${inputs}</div>`;
-  const inp = (kind, id, f, ph) => `<label class="small muted">${ph}<input type="date" onchange="tlSet('${kind}','${id}','${f}',this.value)"></label>`;
-  const sec = (l, list, f) => list.length ? `<div class="sec-t">${l} ${list.length}</div>${list.slice(0, 5).map(f).join("")}${list.length > 5 ? `<div class="small muted" style="padding:2px 0 6px">외 ${list.length - 5}건 — 타임라인에서 계속</div>` : ""}` : "";
-  return `<div class="card" id="missingCard"><div class="card-h"><h3>날짜 없는 항목</h3><span class="sub">${total}건 · 날짜가 있어야 지연 경고·현재 단계·차주 계획이 정확해져</span><div class="actions"><button class="btn sm" onclick="S.ui.tlMissing=1;selTab('timeline')">타임라인에서 채우기</button></div></div><div class="card-b">` +
-    sec("마감일 없는 업무", m.task, (x) => row("task", x, x.title, inp("task", x.id, "due", "마감"))) +
-    sec("일정 없는 WBS", m.wbs, (x) => row("wbs", x, `${x.phase ? x.phase + " " : ""}${x.title}`, (x.start ? "" : inp("wbs", x.id, "start", "시작")) + (x.end ? "" : inp("wbs", x.id, "end", "종료")))) +
-    sec("계획일 없는 산출물", m.doc, (x) => row("doc", x, `${x.phase} ${x.name}`, inp("doc", x.id, "plan", "계획"))) +
+  const go = (x, tab) => `selProject('${x.projectId}');selTab('${tab}')`;
+  const row = (kind, x, title, on) => `<div class="mrow row-click" style="cursor:pointer" onclick="${on}">${typeIcon(kind)}<span class="nm" title="${esc(title)}">${esc(title)}</span>${pid ? "" : `<span class="small muted" style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${projTag(x.projectId)}</span>`}</div>`;
+  const sec = (l, list, f, tab, tl) => list.length ? `<div class="sec-t" style="display:flex;align-items:center">${l} ${list.length}<span style="flex:1"></span><button class="btn sm ghost" onclick="${pid ? `selTab('${tab}')` : go(list[0], tab)}">${tl} →</button></div>${list.slice(0, 5).map(f).join("")}${list.length > 5 ? `<div class="small muted" style="padding:2px 0 6px">외 ${list.length - 5}건</div>` : ""}` : "";
+  return `<div class="card" id="missingCard"><div class="card-h"><h3>날짜 없는 항목</h3><span class="sub">${total}건</span></div><div class="card-b">` +
+    sec("마감일 없는 업무", m.task, (x) => row("task", x, x.title, `${go(x, "tasks")};editTask('${x.id}')`), "tasks", "업무") +
+    sec("일정 없는 WBS", m.wbs, (x) => row("wbs", x, `${x.wid ? x.wid + " " : ""}${x.title}`, go(x, "wbs")), "wbs", "WBS") +
+    sec("계획일 없는 산출물", m.doc, (x) => row("doc", x, `${x.phase} ${x.name}`, go(x, "docs")), "docs", "산출물") +
     `</div></div>`;
 }
 function alertRow(a) {
@@ -1698,8 +1743,10 @@ function recentActivity(pid) {
   S.handoffs.filter((h) => !pid || h.projectId === pid).forEach((h) => h.events.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>[${esc(h.code)}]</b> ${evLabel(e.type)}${e.text ? " — " + esc(e.text.split("\n")[0].slice(0, 60)) : ""}`, cls: RESP_EV.includes(e.type) ? "resp" : MINE_EV.includes(e.type) ? "mine" : "", click: `openHO('${h.id}')` })));
   S.docs.filter((d) => !pid || d.projectId === pid).forEach((d) => d.history.forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>${esc(d.name)}</b> ${esc(e.text)}`, cls: e.text.includes("승인") ? "resp" : "", click: `editDoc('${d.id}')` })));
   S.tasks.filter((t) => !pid || t.projectId === pid).forEach((t) => (t.log || []).forEach((e) => items.push({ at: e.at, ts: e.ts || "", html: `<b>${esc(t.title)}</b> ${e.type === "status" ? esc(e.text) : "— " + esc(e.text.split("\n")[0].slice(0, 60))}`, cls: e.type === "status" ? "mine" : "resp", click: `editTask('${t.id}')` })));
-  items.sort((a, b) => (b.at + b.ts).localeCompare(a.at + a.ts));
-  if (!items.length) return `<div class="empty">아직 기록이 없어</div>`;
+  const auto = /요구사항에서 옮김|데이터 협의에서 옮김|이 업무로 합침|\(상태 정리\)|\(사업 쪽 관리 항목\)/;
+  const real = items.filter((i) => !auto.test(i.html)).sort((a, b) => (b.at + b.ts).localeCompare(a.at + a.ts));
+  if (!real.length) return `<div class="empty">아직 기록이 없어</div>`;
+  items.length = 0; items.push(...real);
   return `<ul class="tl">` + items.slice(0, 14).map((i) => `<li class="${i.cls}"><div class="h">${shortD(i.at)}${pid ? "" : ""}</div><div class="x" style="cursor:pointer" onclick="${i.click}">${i.html}</div></li>`).join("") + `</ul>`;
 }
 
@@ -2148,6 +2195,7 @@ function tlDel(kind, id) {
 }
 function tlSet(kind, id, field, val) {
   const it = TL_KIND[kind].list().find((x) => x.id === id); if (!it) return;
+  if (badPeriod(it, field, val)) return;
   it[field] = val; if ("updatedAt" in it || kind === "task") it.updatedAt = new Date().toISOString();
   commit(); toast("날짜 저장");
 }
@@ -3161,6 +3209,21 @@ function nextTaskCode(pid) {
 }
 // 개발 전달 번호는 따로 안 만들고, 출처(업무·요구사항) 번호를 씀. 출처 없이 바로 만든 전달만 새 업무 번호
 function nextHOCode(pid) { return nextTaskCode(pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id)); }
+// 화면은 WBS를 따라감: 메뉴 아래 끝 줄은 화면이 저절로 생기고, 화면ID = WBS ID, 화면명 = WBS 작업명
+function syncScreens() {
+  S.wbs.forEach((w) => {
+    if (!w.code || !w.code.includes(".") || (w.screenIds || []).length) return;
+    if (S.wbs.some((x) => x.projectId === w.projectId && x.code && x.code.startsWith(w.code + "."))) return;
+    const sc = { id: uid("s"), projectId: w.projectId, code: w.wid || "", name: w.title || "", status: "작성중", owner: S.settings.me || "", history: [] };
+    S.screens.push(sc); w.screenIds = [sc.id];
+  });
+  S.wbs.forEach((w) => {
+    const ids = w.screenIds || []; if (ids.length !== 1) return;
+    const sc = S.screens.find((x) => x.id === ids[0]); if (!sc) return;
+    if (w.wid && sc.code !== w.wid) sc.code = w.wid;
+    if (w.title && sc.name !== w.title) sc.name = w.title;
+  });
+}
 function syncCodes() {
   const born = (t) => t.createdAt || (t.log || []).map((e) => e.ts || e.at || "").filter(Boolean).sort()[0] || t.start || t.completedAt || "";
   S.tasks.filter((t) => !t.code).sort((a, b) => born(a).localeCompare(born(b))).forEach((t) => (t.code = nextTaskCode(t.projectId)));
@@ -3354,6 +3417,11 @@ function docRow(d, pid, indent) {
     <td class="doc-path">${docPathHtml(d)}</td>
     <td class="nowrap"><button class="btn sm ghost" onclick="reviseDoc('${d.id}',this)" title="개정(버전업)">개정</button></td></tr>`;
 }
+function setDocDate(id, k, v) {
+  const d = S.docs.find((x) => x.id === id); if (!d) return;
+  d[k] = v; d.history = d.history || []; d.history.push({ at: today(), ts: new Date().toISOString(), text: `${k === "plan" ? "계획일" : "공유(검토요청)일"} ${v || "지움"}` });
+  commit();
+}
 function renderDocs() {
   if (S.ui.pid === "all") return renderDocsMatrix();
   const pid = S.ui.pid, s = docStats(pid);
@@ -3370,7 +3438,7 @@ function renderDocs() {
     h += `<div class="mx"><div class="mx-ph" style="background:${ph.color}">
       <div class="id">P.${ph.id.slice(1)}${cur === ph.id ? " · 현재 단계" : ""}</div><div class="nm">${ph.name}</div>
       <ul>${ph.acts.map((a) => `<li>${esc(a)}</li>`).join("")}</ul><div class="prog">승인 ${st.ok}/${st.total}</div></div>
-      <div class="mx-body"><div class="tbl-wrap"><table class="t doc-t"><colgroup><col style="width:260px"><col style="width:118px"><col style="width:64px"><col style="width:90px"><col style="width:82px"><col style="width:100px"><col style="width:100px"><col style="width:180px"><col style="width:80px"></colgroup><thead><tr><th>산출물</th><th>상태</th><th>버전</th><th>담당</th><th>계획일</th><th>공유(검토요청)</th><th>승인</th><th>파일 위치</th><th></th></tr></thead><tbody>` +
+      <div class="mx-body"><div class="tbl-wrap"><table class="t doc-t"><colgroup><col style="width:260px"><col style="width:118px"><col style="width:64px"><col style="width:90px"><col style="width:124px"><col style="width:170px"><col style="width:100px"><col style="width:180px"><col style="width:80px"></colgroup><thead><tr><th>산출물</th><th>상태</th><th>버전</th><th>담당</th><th>계획일</th><th>공유(검토요청)</th><th>승인</th><th>파일 위치</th><th></th></tr></thead><tbody>` +
       (ds.map((d) => {
         const late = d.plan && d.plan < today() && !["완료", "해당없음", "검토중"].includes(d.status);
         const waiting = d.status === "검토중" && d.requestedAt ? bizDays(d.requestedAt) : null;
@@ -3380,8 +3448,8 @@ function renderDocs() {
           <td><select class="inline" onchange="setDocStatus('${d.id}',this.value)">${DOC_ST.map((x) => `<option ${x === d.status ? "selected" : ""}>${x}</option>`).join("")}</select></td>
           <td class="mono nowrap">${esc(d.version || "")}</td>
           <td class="nowrap dbl-edit" ondblclick="dblEdit(this,'${d.id}','owner','docs')">${esc(d.owner || "")}</td>
-          <td class="nowrap" style="${late ? "color:var(--danger);font-weight:600" : ""}">${d.plan ? shortD(d.plan) : '<span class="muted">-</span>'}</td>
-          <td class="nowrap">${d.requestedAt ? shortD(d.requestedAt) + (waiting !== null ? ` <span class="small" style="color:${waiting > S.settings.approvalDays ? "var(--danger)" : "var(--faint)"}">${waiting}일째</span>` : "") : '<span class="muted">-</span>'}</td>
+          <td class="nowrap"><input type="date" class="inline wdate" style="${late ? "color:var(--danger);font-weight:600" : ""}" value="${d.plan || ""}" onchange="setDocDate('${d.id}','plan',this.value)"></td>
+          <td class="nowrap"><input type="date" class="inline wdate" value="${d.requestedAt || ""}" onchange="setDocDate('${d.id}','requestedAt',this.value)">${waiting !== null ? ` <span class="small" style="color:${waiting > S.settings.approvalDays ? "var(--danger)" : "var(--faint)"}">${waiting}일째</span>` : ""}</td>
           <td class="nowrap">${d.approvedAt ? `${shortD(d.approvedAt)} <span class="muted small">${esc(d.approver || "")}</span>` : d.approver ? `<span class="muted small">${esc(d.approver)}</span>` : '<span class="muted">-</span>'}</td>
           <td class="doc-path">${docPathHtml(d)}</td>
           <td class="nowrap"><button class="btn sm ghost" onclick="reviseDoc('${d.id}',this)" title="개정(버전업)">개정</button></td></tr>`;
@@ -3652,7 +3720,7 @@ function renderScreens() {
   const by = (st) => S.screens.filter((s) => s.projectId === pid && s.status === st).length;
   const sent = S.screens.filter((s) => s.projectId === pid && s.hoId).length;
   let h = pageHead("화면 목록 (화면설계서)", `총 ${total}개 · 확정 ${by("확정")} · 검토중 ${by("검토중")} · 작성중 ${by("작성중")} · 변경중 ${by("변경중")} · 개발 전달 ${sent}`,
-    `<button class="btn primary" onclick="editScreen()">＋ 화면 추가</button>`);
+    "");
   const dir = proj(pid).screenDir || "";
   h += `<div class="card" style="margin-bottom:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><b class="small">화면설계서 위치</b>
     <span class="mono small dbl-edit" style="flex:1;min-width:200px;word-break:break-all" onclick="dblEdit(this,'${pid}','screenDir','projects')">${dir ? esc(dir) : '<span class="muted">경로</span>'}</span>
@@ -3969,8 +4037,8 @@ function renderWBS() {
   const head = (first) => `<thead><tr>${first}<th style="min-width:170px">작업</th><th>산출물 · 화면</th><th style="width:80px">담당</th><th style="width:120px">시작</th><th style="width:120px">종료</th><th style="width:56px">진척</th><th style="min-width:240px">${ruler || "일정"}</th></tr></thead>`;
   const leafCells = (w, isLate, r) => `
         <td class="nowrap dbl-edit" ondblclick="dblEdit(this,'${w.id}','owner','wbs')">${esc(w.owner || "")}</td>
-        <td class="nowrap"><input type="date" class="inline wdate" value="${w.start || ""}" onchange="setWBS('${w.id}','start',this.value)"></td>
-        <td class="nowrap"><input type="date" class="inline wdate" style="${isLate ? "color:var(--danger);font-weight:600" : ""}" value="${w.end || ""}" onchange="setWBS('${w.id}','end',this.value)"></td>
+        <td class="nowrap"><input type="date" class="inline wdate" value="${w.start || ""}" max="${w.end || ""}" onchange="setWBS('${w.id}','start',this.value)"></td>
+        <td class="nowrap"><input type="date" class="inline wdate" style="${isLate ? "color:var(--danger);font-weight:600" : ""}" value="${w.end || ""}" min="${w.start || ""}" onchange="setWBS('${w.id}','end',this.value)"></td>
         <td class="nowrap">${r && r.auto ? `<b title="기능 FP 기준 자동">${r.progress}%</b>` : `<input class="progress" type="number" min="0" max="100" step="10" value="${Number(w.progress) || 0}" onchange="setWBS('${w.id}','progress',Math.max(0,Math.min(100,Number(this.value)||0)))">%`}</td>`;
 
   // 1) 메뉴별 WBS (번호 트리)
@@ -3984,7 +4052,7 @@ function renderWBS() {
       const isLate = r.end && r.end < today() && r.progress < 100;
       const color = lv === 1 ? "#2f5d8a" : lv === 2 ? "#3a97b0" : "#4688ec";
       const fb = ch.length ? `<button class="tl-fold" onclick="wbsFold('${fk}')" title="${folded ? "펼치기" : "접기"}"><svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px;margin:0"><path d="${folded ? "m9 18 6-6-6-6" : "m6 9 6 6 6-6"}"/></svg></button>` : `<span style="display:inline-block;width:24px"></span>`;
-      h += `<tr class="${ch.length ? "wbs-grp" : ""} ${lv === 1 ? "wbs-menu" : ""} row-click" onclick="rowClick(event,()=>editWBS('${w.id}'))" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');wbsDropBefore(event.dataTransfer.getData('text/plain'),'${w.id}')"><td class="mono small nowrap">${esc(w.code)}</td><td class="mono small nowrap">${esc(w.wid || "")}</td>
+      h += `<tr class="${ch.length ? "wbs-grp" : ""} ${lv === 1 ? "wbs-menu" : ""} ${!ch.length && lv > 1 && r.progress >= 100 ? "wbs-done" : ""} row-click" onclick="rowClick(event,()=>editWBS('${w.id}'))" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');wbsDropBefore(event.dataTransfer.getData('text/plain'),'${w.id}')"><td class="mono small nowrap">${esc(w.code)}</td><td class="mono small nowrap">${esc(w.wid || "")}</td>
         <td style="padding-left:${8 + (lv - 1) * 16}px">${fb}<span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.note ? ` <span class="chip-ref">${esc(w.note)}</span>` : ""}<span class="wbs-act"><button class="ico-btn" onclick="wbsAddChild('${w.id}')" title="하위 추가">+</button><button class="ico-btn" onclick="wbsOutdent('${w.id}')" title="한 단계 올리기">←</button><button class="ico-btn" onclick="wbsIndent('${w.id}')" title="한 단계 내리기">→</button></span></td>
 ` +
         fpCell(w, r, !ch.length) + cfCells(w) + (ch.length ? `<td class="nowrap dbl-edit" ondblclick="dblEdit(this,'${w.id}','owner','wbs')">${esc(w.owner || "")}</td><td class="nowrap small">${r.start || ""}</td><td class="nowrap small" style="${isLate ? "color:var(--danger);font-weight:600" : ""}">${r.end || ""}</td><td class="nowrap small"><b>${r.progress}%</b></td>` : leafCells(w, isLate, r)) +
@@ -4152,7 +4220,14 @@ function wbsFreeze() {
   [...t.rows].forEach((r) => [...r.cells].slice(0, n).forEach((c, i) => { c.classList.add("frz"); c.style.left = lefts[i] + "px"; if (i === n - 1) c.classList.add("frz-end"); }));
 }
 function wbsFold(k) { S.ui.wbsFold = S.ui.wbsFold || {}; if (S.ui.wbsFold[k]) delete S.ui.wbsFold[k]; else S.ui.wbsFold[k] = 1; persistUI(); render(); }
-function setWBS(id, k, v) { const w = S.wbs.find((x) => x.id === id); w[k] = v; commit(); }
+// 시작 ≤ 종료: 어긋나면 저장하지 않고 원래 값으로 (start-end, start-due 짝)
+function badPeriod(x, k, v) {
+  const endK = "end" in x || k === "end" ? "end" : "due";
+  const s0 = k === "start" ? v : x.start, e0 = k === "end" || k === "due" ? v : x[endK];
+  if (["start", "end", "due"].includes(k) && s0 && e0 && s0 > e0) { toast("시작일이 종료일보다 늦을 수 없어"); render(); return true; }
+  return false;
+}
+function setWBS(id, k, v) { const w = S.wbs.find((x) => x.id === id); if (badPeriod(w, k, v)) return; w[k] = v; commit(); }
 const WBS_MAX_DEPTH = 4;
 function editWBS(id, phaseId, pid, parentCode) {
   const w = id ? S.wbs.find((x) => x.id === id) : { phase: phaseId ?? "", progress: 0, projectId: pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id) };
@@ -4220,7 +4295,10 @@ function editWBS(id, phaseId, pid, parentCode) {
     const sub = w.code ? S.wbs.filter((x) => x.projectId === w.projectId && x.code && x.code.startsWith(w.code + ".")) : [];
     if (!confirm(sub.length ? `이 작업과 하위 작업 ${sub.length}개를 함께 삭제할까?` : "작업을 삭제할까?")) return;
     const del = new Set([id, ...sub.map((x) => x.id)]);
+    const goneSc = new Set(S.wbs.filter((x) => del.has(x.id)).flatMap((x) => x.screenIds || []));
     S.wbs = S.wbs.filter((x) => !del.has(x.id));
+    S.screens = S.screens.filter((x) => !goneSc.has(x.id));
+    S.handoffs.forEach((h) => { if ((h.screenIds || []).some((y) => goneSc.has(y))) h.screenIds = h.screenIds.filter((y) => !goneSc.has(y)); });
     S.funcs.forEach((f) => { if (del.has(f.wbsId)) { f.wbsId = ""; f.code = ""; } });
     // 지운 자리는 뒤 번호가 당겨 채우고 ID도 다시 매김
     if (w.code) { wbsCloseGap(w.projectId, wbsParentCode(w.code)); wbsAutoIds(w.projectId); }
@@ -5142,7 +5220,7 @@ function openForm(title, fields, obj, onSave, extraBtns = [], extraHtml = "", ex
     else if (f.t === "ro") input = `<input type="text" value="${esc(v)}" disabled class="mono">`;
     else if (f.t === "html") input = `<div class="ro-box">${f.html || '<span class="muted">-</span>'}</div>`;
     else if (f.t === "raw") return `<div class="${f.full ? "full" : ""}"><label class="raw-l">${esc(f.l)}${f.btn || ""}</label>${f.html}</div>`;
-    else if (f.t === "period") return `<div class="full"><label>${esc(f.l)}</label><div class="date-pair"><input type="date" data-k="${f.k[0]}" value="${esc(obj[f.k[0]] || "")}"><span class="muted">~</span><input type="date" data-k="${f.k[1]}" value="${esc(obj[f.k[1]] || "")}"></div></div>`;
+    else if (f.t === "period") return `<div class="full"><label>${esc(f.l)}</label><div class="date-pair"><input type="date" data-k="${f.k[0]}" value="${esc(obj[f.k[0]] || "")}" max="${esc(obj[f.k[1]] || "")}" onchange="this.parentNode.querySelectorAll('input')[1].min=this.value"><span class="muted">~</span><input type="date" data-k="${f.k[1]}" value="${esc(obj[f.k[1]] || "")}" min="${esc(obj[f.k[0]] || "")}" onchange="this.parentNode.querySelector('input').max=this.value"></div></div>`;
     else if (f.t === "sec") return `<div class="full form-sec">${esc(f.l)}</div>`;
     else if (f.t === "check") return `<div class="full"><label class="check"><input type="checkbox" data-k="${f.k}" data-check="1" ${v ? "checked" : ""}> ${esc(f.l)}</label></div>`;
     else input = `<input type="${f.t}" data-k="${f.k}" value="${esc(v)}" placeholder="${esc(f.ph || "")}"${f.list ? ` list="dl_${f.k}"` : ""}>${f.list ? `<datalist id="dl_${f.k}">${f.list.map((o) => `<option value="${esc(o)}">`).join("")}</datalist>` : ""}`;
@@ -5162,6 +5240,7 @@ function openForm(title, fields, obj, onSave, extraBtns = [], extraHtml = "", ex
     });
     const miss = fields.find((f) => f.req && !v[f.k]);
     if (miss) { toast(`${miss.l} 입력 필요`); return; }
+    if (v.start && ((v.end && v.start > v.end) || (v.due && v.start > v.due))) { toast("시작일이 종료일보다 늦을 수 없어"); return; }
     if (onSave(v) !== false) { if ($("modalTitle").textContent === title) closeModal(); }
   } }], fields.length > 9 || side.length > 0);
   setTimeout(() => document.querySelector("#fForm [data-k]")?.focus(), 30);
@@ -5272,7 +5351,7 @@ async function autoLoadDataFile() {
 autoLoadDataFile();
 // 키가 바뀐 프로젝트는 WBS ID와 연결 번호를 새 키로 다시 매김
 function reidPending() { const ps = S.projects.filter((p) => p._reid); if (!ps.length) return; ps.forEach((p) => { delete p._reid; wbsAutoIds(p.id); }); persist(); render(); }
-syncFuncTCs(); syncCodes();   // 배치된 기능의 단위테스트, 업무 번호·개발 전달 번호 (예전 데이터)
+syncFuncTCs(); syncCodes(); syncScreens();   // 배치된 기능의 단위테스트, 업무 번호·개발 전달 번호 (예전 데이터)
 reidPending();
 </script>
 </body>
