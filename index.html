@@ -212,6 +212,14 @@
   .wbs-tree td:nth-child(3) { white-space: nowrap; }
   .wbs-tree tr.wbs-grp td { background: var(--sub); font-weight: 600; }
   .wbs-tree tr.wbs-done td { background: var(--okw); } .wbs-tree tr.wbs-done .frz { --fz: var(--okw); }
+  .wbs-tk-btn { font-size: 11.5px; font-weight: 600; padding: 0 7px; margin-left: 6px; border-radius: 10px; border: 1px solid var(--accent); background: var(--panel); color: var(--accent); cursor: pointer; line-height: 18px; }
+  .wbs-tk-in { display: grid; gap: 10px; max-width: 100%; overflow-x: auto; }
+  .wbs-tk-col { background: var(--panel); border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; min-height: 60px; }
+  .wbs-tk-h { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .wbs-tk-i { font-size: 13.5px; line-height: 1.5; padding: 5px 0; cursor: pointer; border-top: 1px dashed var(--line); }
+  .wbs-tk-i:first-of-type { border-top: none; }
+  .wbs-tk-i:hover { color: var(--accent); }
+  .wbs-tk-i.is-done { color: var(--faint); text-decoration: line-through; }
   .wbs-tree tr.wbs-late td { background: var(--dangerw); } .wbs-tree tr.wbs-late .frz { --fz: var(--dangerw); }
   .wbs-tree td { padding-top: 4px; padding-bottom: 4px; }
   .wbs-tree tr.fn-row td { background: var(--sub); font-size: 13px; }
@@ -774,9 +782,9 @@
   </main>
 </div>
 
-<div class="modal-bg" id="modalBg" onmousedown="if(event.target===this) closeModal()">
+<div class="modal-bg" id="modalBg" onmousedown="if(event.target===this) tryCloseModal()">
   <div class="modal" id="modal">
-    <div class="modal-h"><h2 id="modalTitle"></h2><button class="btn ghost icon" onclick="closeModal()" title="닫기 (Esc)"><svg class="ico" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
+    <div class="modal-h"><h2 id="modalTitle"></h2><button class="btn ghost icon" onclick="tryCloseModal()" title="닫기 (Esc)"><svg class="ico" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div>
     <div class="modal-b" id="modalBody"></div>
     <div class="modal-f" id="modalFoot"></div>
   </div>
@@ -1539,7 +1547,7 @@ function docStats(pid, phId) {
 // ───────────── render: shell ─────────────
 function render() {
   if (noteFlush) noteFlush();   // 메모 입력 중 화면을 바꾸면 먼저 저장
-  setTimeout(setTopH, 30); updateSaveDir();
+  setTimeout(setTopH, 30); updateSaveDir(); wbsTasksOf._c = null;
   document.body.classList.toggle("side-fold", !!S.ui.sideFold);
   if (S.ui.pid !== "all" && !proj(S.ui.pid)) S.ui.pid = "all";
   document.documentElement.setAttribute("data-theme", S.settings.theme === "dark" ? "dark" : "light");
@@ -3042,7 +3050,7 @@ function editTask(id, preset) {
       Object.assign(x, v); markDone(x, prev); if (prev !== x.status) logTask(x, "status", `${prev} → ${x.status}`); const pend = $("tlText")?.value.trim(); if (pend) logTask(x, "comment", pend, $("tlAt")?.value || today(), tlExtra()); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); const pend = $("tlText")?.value.trim(); if (pend) logTask(n, "comment", pend, $("tlAt")?.value || today(), tlExtra()); S.tasks.push(n); }
     if (issueR) issueR.taskId = (S.tasks.find((t) => t.riskId === issueR.id) || {}).id || "";
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
+  }, (window._modalBack ? [{ l: "← WBS로", cls: "left", fn: closeModal }] : []).concat(id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []),
   // 진행 기록: 입력은 왼쪽(업무 정보 아래), 쌓인 기록은 오른쪽 (길어져도 따로 스크롤)
   {
     main: (x.riskId && S.risks.some((r) => r.id === x.riskId) ? (() => { const r = S.risks.find((z) => z.id === x.riskId); return `<div class="small" style="margin-top:12px">출처 이슈: <a href="#" onclick="closeModal();editRisk('${r.id}');return false">${esc(r.code)} ${esc(r.title)}</a> ${devImpactBadge(r)}</div>`; })() : "") + (fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "") + `<div class="sec-t log-h">진행 기록${id ? `<button class="btn sm" onclick="toggleLogPane()" title="오른쪽 기록 접기/펴기">${S.ui.logFold ? "기록 펴기" : "기록 접기"}</button><button class="btn sm" onclick="addTaskLog('${x.id}')" title="적은 내용을 기록에 추가">+ 추가</button><button class="btn primary sm" onclick="formSaveThen(() => flowNext('${x.id}'))" title="저장하고 다음 단계로">${flowNextLabel(x)}</button>` : ""}</div>
@@ -4112,7 +4120,7 @@ function renderWBS() {
       const color = lv === 1 ? "#2f5d8a" : lv === 2 ? "#3a97b0" : "#4688ec";
       const fb = ch.length ? `<button class="tl-fold" onclick="wbsFold('${fk}')" title="${folded ? "펼치기" : "접기"}"><svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px;margin:0"><path d="${folded ? "m9 18 6-6-6-6" : "m6 9 6 6 6-6"}"/></svg></button>` : `<span style="display:inline-block;width:24px"></span>`;
       h += `<tr class="${ch.length ? "wbs-grp" : ""} ${lv === 1 ? "wbs-menu" : ""} ${!ch.length && lv > 1 ? (r.progress >= 100 ? "wbs-done" : isLate ? "wbs-late" : "") : ""} row-click" onclick="rowClick(event,()=>editWBS('${w.id}'))" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');wbsDropBefore(event.dataTransfer.getData('text/plain'),'${w.id}')"><td class="mono small nowrap">${esc(w.code)}</td><td class="mono small nowrap">${esc(w.wid || "")}</td>
-        <td style="padding-left:${8 + (lv - 1) * 16}px">${fb}<span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.note ? ` <span class="chip-ref">${esc(w.note)}</span>` : ""}<span class="wbs-act"><button class="ico-btn" onclick="wbsAddChild('${w.id}')" title="하위 추가">+</button><button class="ico-btn" onclick="wbsOutdent('${w.id}')" title="한 단계 올리기">←</button><button class="ico-btn" onclick="wbsIndent('${w.id}')" title="한 단계 내리기">→</button></span></td>
+        <td style="padding-left:${8 + (lv - 1) * 16}px">${fb}<span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.note ? ` <span class="chip-ref">${esc(w.note)}</span>` : ""}${(() => { const n = wbsTasksOf(w).length; return n ? ` <button class="wbs-tk-btn" onclick="editWBS('${w.id}')">업무 ${n}</button>` : ""; })()}<span class="wbs-act"><button class="ico-btn" onclick="wbsAddChild('${w.id}')" title="하위 추가">+</button><button class="ico-btn" onclick="wbsOutdent('${w.id}')" title="한 단계 올리기">←</button><button class="ico-btn" onclick="wbsIndent('${w.id}')" title="한 단계 내리기">→</button></span></td>
 ` +
         fpCell(w, r, !ch.length) + cfCells(w) + (ch.length ? `<td class="nowrap dbl-edit" ondblclick="dblEdit(this,'${w.id}','owner','wbs')">${esc(w.owner || "")}</td><td class="nowrap small">${r.start || ""}</td><td class="nowrap small" style="${isLate ? "color:var(--danger);font-weight:600" : ""}">${r.end || ""}</td><td class="nowrap small"><b>${r.progress}%</b></td>` : leafCells(w, isLate, r)) +
         `<td><div class="gantt" ${gW}>${barOf(r.start, r.end, r.progress, color, isLate)}${tl}</div></td></tr>`;
@@ -4278,6 +4286,26 @@ function wbsFreeze() {
   const L0 = hs[0].getBoundingClientRect().left; hs.forEach((h) => lefts.push(Math.floor(h.getBoundingClientRect().left - L0)));   // 내림 → 옆 칸과 살짝 겹쳐 틈(뒤 눈금 비침) 없음
   [...t.rows].forEach((r) => [...r.cells].slice(0, n).forEach((c, i) => { c.classList.add("frz"); c.style.left = lefts[i] + "px"; if (i === n - 1) c.classList.add("frz-end"); }));
 }
+// WBS에 걸린 업무 (업무의 '관련 WBS', 개발 전달은 연결된 업무 기준) — 메뉴 줄은 하위까지 모아서
+function wbsTasksOf(w) {
+  if (!wbsTasksOf._c || wbsTasksOf._c.at !== w.projectId) {
+    const byW = {};
+    workItems(w.projectId).forEach((it) => { const wid = it.kind === "ho" ? taskOfHO(it.x)?.wbsId : it.x.wbsId; if (wid) (byW[wid] = byW[wid] || []).push(it); });
+    wbsTasksOf._c = { at: w.projectId, byW, T: wbsTree(w.projectId) };
+  }
+  const { byW, T } = wbsTasksOf._c;
+  const all = (x) => [...(byW[x.id] || []), ...(x.code ? (T.kids[x.code] || []).flatMap(all) : [])];
+  return all(w);
+}
+// WBS 작업 창의 관련 업무: 일반 · 협의 · 기획 · 개발 · 테스트 · 완료 칸
+function wbsTaskBoard(w) {
+  const list = wbsTasksOf(w), FL = flowSteps();
+  if (!list.length) return `<span class="muted small">-</span>`;
+  const cols = [["일반", (it) => it.flow < 0 && !workDone(it)], ...FL.map((n, i) => [n, (it) => (workDone(it) ? i === FL.length - 1 : it.flow === i)])].filter(([n, f]) => n !== "일반" || list.some(f));
+  return `<div class="wbs-tk-in" style="grid-template-columns:repeat(${cols.length},minmax(160px,1fr))">` +
+    cols.map(([n, f]) => { const its = list.filter(f);
+      return `<div class="wbs-tk-col"><div class="wbs-tk-h">${n} <span class="muted">${its.length}</span></div>${its.map((it) => `<div class="wbs-tk-i ${workDone(it) ? "is-done" : ""}" onclick="closeModal();window._modalBack=()=>editWBS('${w.id}');${it.click}">${codeTag(it.code)} ${esc(it.title)}</div>`).join("")}</div>`; }).join("") + `</div>`;
+}
 function wbsFold(k) { S.ui.wbsFold = S.ui.wbsFold || {}; if (S.ui.wbsFold[k]) delete S.ui.wbsFold[k]; else S.ui.wbsFold[k] = 1; persistUI(); render(); }
 // 시작 ≤ 종료: 어긋나면 저장하지 않고 원래 값으로 (start-end, start-due 짝)
 function badPeriod(x, k, v) {
@@ -4303,7 +4331,7 @@ function editWBS(id, phaseId, pid, parentCode) {
     // 메뉴별 WBS: 진척은 기능 기준 자동, 화면은 이미 연결된 것을 보여주기만 (눌러서 열기)
     // 담당 | 진척, 화면, 시작 | 종료 한 줄
     { k: "owner", l: "담당", t: "text", full: !(menuWbs && id) },
-    ...(menuWbs && id ? [{ k: "_prog", l: "진척 (기능 기준)", t: "ro", v: (() => { const r = wbsTree(w.projectId).roll.get(w.id) || {}; return `${r.progress || 0}% · 기능 ${r.n || 0}건`; })() },
+    ...(menuWbs && id ? [{ k: "_prog", l: "진척", t: "ro", v: (() => { const r = wbsTree(w.projectId).roll.get(w.id) || {}; return `${r.progress || 0}%`; })() },
       { k: "_screens", l: "화면", t: "html", full: true, html: wbsScreenChips(w) }] : []),
     // 수행 단계·비고·산출물은 예전 수행 단계 작업에만 (메뉴별 WBS는 메뉴·화면이라 필요 없음)
     ...(menuWbs ? [] : [{ k: "phase", l: "수행 단계", t: "select", opts: [["", "일반 업무 / 미분류"], ...PHASES.map((p) => [p.id, `${p.id} ${p.name}`])] },
@@ -4362,7 +4390,7 @@ function editWBS(id, phaseId, pid, parentCode) {
     // 지운 자리는 뒤 번호가 당겨 채우고 ID도 다시 매김
     if (w.code) { wbsCloseGap(w.projectId, wbsParentCode(w.code)); wbsAutoIds(w.projectId); }
     commit(); closeModal(); toast("삭제했어", true);
-  } }] : []);
+  } }] : [], menuWbs && id && wbsTasksOf(w).length ? `<div class="sec-t">관련 업무 ${wbsTasksOf(w).length}</div>${wbsTaskBoard(w)}` : "", "below");
 }
 // WBS 항목에 산출물 연결 (같은 프로젝트에 같은 이름이 있으면 그것, 없으면 새로)
 function wbsLinkDoc(w, name) {
@@ -4954,12 +4982,21 @@ function openModal(title, body, buttons = [], wide = false) {
   buttons.forEach((b, i) => {
     const isLeft = /\bleft\b/.test(b.cls || "");
     if (!isLeft && i > 0 && /\bleft\b/.test(buttons[i - 1].cls || "")) { const sp = document.createElement("span"); sp.style.flex = "1"; f.appendChild(sp); }
-    const el = document.createElement("button"); el.className = "btn " + (b.cls || "").replace(/\bleft\b/, ""); el.textContent = b.l; el.onclick = b.fn; if (/primary/.test(b.cls || "")) el.title = "Ctrl+Enter"; f.appendChild(el);
+    const el = document.createElement("button"); el.className = "btn " + (b.cls || "").replace(/\bleft\b/, ""); el.textContent = b.l; el.onclick = b.fn === closeModal ? tryCloseModal : b.fn; if (/primary/.test(b.cls || "")) el.title = "Ctrl+Enter"; f.appendChild(el);
   });
   f.style.display = buttons.length ? "flex" : "none";
   $("modalBg").classList.add("open");
+  window._modalSnap = null; setTimeout(() => (window._modalSnap = modalSnap()), 60);
 }
-function closeModal() { quickOpen = false; closeModalInner(); }
+// 창 안 입력값을 한 줄로: 열 때와 다르면 '고친 게 있다'
+function modalSnap() { return [...$("modalBody").querySelectorAll("input, textarea, select")].map((el) => (el.type === "checkbox" ? el.checked : el.value)).join(""); }
+// Esc · × · 바깥 클릭 · 취소: 고친 게 있을 때만 물어보고 닫음 (저장은 그대로)
+function tryCloseModal() {
+  if (!$("modalBg").classList.contains("open")) return;
+  if (window._modalSnap != null && modalSnap() !== window._modalSnap && !confirm("작성 중인 내용이 있어. 저장하지 않고 닫을까?")) return;
+  closeModal();
+}
+function closeModal() { quickOpen = false; closeModalInner(); const b = window._modalBack; window._modalBack = null; if (b) setTimeout(b, 0); }
 function closeModalInner() { $("modalBg").classList.remove("open"); }
 // 업무 창 오른쪽 기록 칸 접기/펴기 (기억)
 function toggleLogPane() {
@@ -5059,7 +5096,7 @@ document.addEventListener("mousedown", (e) => { if (!e.target.closest(".gsearch"
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && (e.code === "KeyS" || e.key.toLowerCase() === "s")) { e.preventDefault(); saveFile(false); }
   if ((e.ctrlKey || e.metaKey) && (e.code === "KeyK" || e.key.toLowerCase() === "k")) { e.preventDefault(); $("gq").focus(); $("gq").select(); }
-  if (e.key === "Escape" && $("modalBg").classList.contains("open")) closeModal();
+  if (e.key === "Escape" && $("modalBg").classList.contains("open")) tryCloseModal();
   if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && $("modalBg").classList.contains("open")) {
     const btn = [...document.querySelectorAll("#modalFoot button")].find((b) => b.classList.contains("primary"));
     if (btn) { e.preventDefault(); btn.click(); }
