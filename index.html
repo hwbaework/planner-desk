@@ -307,7 +307,8 @@
   .kpi.warn .v { color: var(--warn); }
   .kpi.ok .v { color: var(--ok); }
   .ok-t { color: var(--ok); font-weight: 700; }
-  .no-due { color: var(--warn); font-weight: 600; } .danger-t { color: var(--danger); font-weight: 600; }
+  .no-due { color: var(--warn); font-weight: 600; }
+  .td-due { flex: none; font-size: 12px; color: var(--danger); font-weight: 600; white-space: nowrap; } .danger-t { color: var(--danger); font-weight: 600; }
 
   .grid2 { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 14px; }
   .grid2 > .card + .card { margin-top: 0; }
@@ -1502,7 +1503,7 @@ function computeAlerts(pid) {
       if (false && bd > ackLimit) out.push({ level: "danger", kind: "접수 노티 없음", ref: ["ho", h.id], pid: h.projectId, days: bd, title: `[${h.code}] ${h.title}`, desc: `${h.to || "수신자"}에게 ${shortD(h.sentAt)} 전달 후 영업일 ${bd}일째 회신 없음 (기준 ${ackLimit}일)` });
     }
     if (["sent", "ack", "dev"].includes(h.status) && h.dueDate && h.dueDate < t) {
-      out.push({ level: "danger", kind: "개발 기한 지남", ref: ["ho", h.id], pid: h.projectId, days: calDays(h.dueDate), title: `[${h.code}] ${h.title}`, desc: `완료 예정 ${shortD(h.dueDate)} 경과 (${dday(h.dueDate)}) · 현재 ${hoStLabel(h.status)}` });
+      out.push({ level: "danger", kind: "개발 기한 지남", ref: ["ho", h.id], pid: h.projectId, due: h.dueDate, dueL: "완료 예정", days: calDays(h.dueDate), title: `[${h.code}] ${h.title}`, desc: `완료 예정 ${shortD(h.dueDate)} 경과 (${dday(h.dueDate)}) · 현재 ${hoStLabel(h.status)}` });
     } else if (["ack", "dev"].includes(h.status)) {
       const base = lastResp?.at || h.sentAt;
       const bd = bizDays(base);
@@ -1520,7 +1521,7 @@ function computeAlerts(pid) {
       if (bd > Number(st.approvalDays)) out.push({ level: "danger", kind: "승인 회신 없음", ref: ["doc", d.id], pid: d.projectId, days: bd, title: d.name, desc: `${shortD(d.requestedAt)} 검토요청 후 영업일 ${bd}일 · 승인자 ${d.approver || "미지정"}` });
     }
     if (d.plan && d.plan < t && !["완료", "해당없음", "검토중"].includes(d.status)) {
-      out.push({ level: "warn", kind: "산출물 일정 지연", ref: ["doc", d.id], pid: d.projectId, days: calDays(d.plan), title: `${d.phase} ${d.name}`, desc: `계획 ${shortD(d.plan)} (${dday(d.plan)}) · ${d.status}` });
+      out.push({ level: "warn", kind: "산출물 일정 지연", ref: ["doc", d.id], pid: d.projectId, due: d.plan, dueL: "계획", days: calDays(d.plan), title: `${d.phase} ${d.name}`, desc: `계획 ${shortD(d.plan)} (${dday(d.plan)}) · ${d.status}` });
     }
   });
   S.wbs.filter(scope).forEach((w) => {
@@ -1528,10 +1529,10 @@ function computeAlerts(pid) {
       const miss = wbsDocs(w).filter((x) => !x.doc || !["완료", "해당없음"].includes(x.doc.status));
       out.push({ level: "warn", kind: "산출물 미완료", ref: ["wbs", w.id], pid: w.projectId, days: w.end ? calDays(w.end) : 0, title: w.title, desc: miss.map((x) => `${x.name} ${x.doc ? x.doc.status : "없음"}`).join(" · ") });
     }
-    if (w.end && w.end < t && wbsLeafProg(w).progress < 100) out.push({ level: "warn", kind: "WBS 지연", ref: ["wbs", w.id], pid: w.projectId, days: calDays(w.end), title: w.title, desc: `종료 ${shortD(w.end)} (${dday(w.end)}) · 진척 ${wbsLeafProg(w).progress}%` });
+    if (w.end && w.end < t && wbsLeafProg(w).progress < 100) out.push({ level: "warn", kind: "WBS 지연", ref: ["wbs", w.id], pid: w.projectId, due: w.end, dueL: "종료", days: calDays(w.end), title: w.title, desc: `종료 ${shortD(w.end)} (${dday(w.end)}) · 진척 ${wbsLeafProg(w).progress}%` });
   });
   S.tasks.filter(scope).forEach((x) => {
-    if (isOpenTask(x) && x.due && x.due < t) out.push({ level: "warn", kind: "업무 마감 지남", ref: ["task", x.id], pid: x.projectId, days: calDays(x.due), title: x.title, desc: `마감 ${shortD(x.due)} (${dday(x.due)}) · ${x.status}${x.owner ? " · " + x.owner : ""}` });
+    if (isOpenTask(x) && x.due && x.due < t) out.push({ level: "warn", kind: "마감 지연", ref: ["task", x.id], pid: x.projectId, due: x.due, dueL: "마감", days: calDays(x.due), title: x.title, desc: `마감 ${shortD(x.due)} (${dday(x.due)}) · ${x.status}${x.owner ? " · " + x.owner : ""}` });
   });
   S.datas.filter(scope).forEach((x) => {
     if (["합의", "수신 중"].includes(x.status) && x.dueDate && x.dueDate < t && !(x.lastReceivedAt && x.lastReceivedAt >= x.dueDate))
@@ -1549,7 +1550,7 @@ function computeAlerts(pid) {
   });
   S.risks.filter(scope).forEach((r) => {
     if (r.status === "완료" || r.type === "결정" || r.type === "가정") return;
-    if (r.due && r.due < t) out.push({ level: "danger", kind: "이슈·리스크 기한 지남", ref: ["risk", r.id], pid: r.projectId, days: calDays(r.due), title: `${r.code} ${r.title}`, desc: `${r.type} · 대응 기한 ${shortD(r.due)} (${dday(r.due)}) · ${r.owner || "담당 미정"}` });
+    if (r.due && r.due < t) out.push({ level: "danger", kind: "이슈·리스크 기한 지남", ref: ["risk", r.id], pid: r.projectId, due: r.due, dueL: "기한", days: calDays(r.due), title: `${r.code} ${r.title}`, desc: `${r.type} · 대응 기한 ${shortD(r.due)} (${dday(r.due)}) · ${r.owner || "담당 미정"}` });
     else if (riskScore(r) >= 3 && !(r.plan || "").trim()) out.push({ level: "warn", kind: "대응 방안 없음", ref: ["risk", r.id], pid: r.projectId, days: 0, title: `${r.code} ${r.title}`, desc: `${r.type} · 영향 ${r.impact} × 가능성 ${r.prob} · 대응 방안을 적어줘` });
   });
   S.recurring.filter(scope).forEach((r) => {
@@ -1633,7 +1634,7 @@ function renderTabs() {
   const label = Object.fromEntries(TABS);
   const count = (k) => {
     // 업무 옆 숫자 = 지금 챙길 것만: 마감 지난 업무·정기 업무, 기한 지난 개발, 개발 끝나서 내가 확인할 것(테스트 대기)
-    const a = alerts.filter((x) => (NAV_ALERT[k] || []).includes(x.ref[0]) && (k !== "tasks" || ["업무 마감 지남", "정기 업무 지남", "개발 기한 지남", "테스트 대기"].includes(x.kind)));
+    const a = alerts.filter((x) => (NAV_ALERT[k] || []).includes(x.ref[0]) && (k !== "tasks" || ["마감 지연", "정기 업무 지남", "개발 기한 지남", "테스트 대기"].includes(x.kind)));
     return [a.length, a.some((x) => x.level === "danger")];
   };
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
@@ -1805,7 +1806,9 @@ function donut(parts, center, sub) {
 function statusOverview3(pid) {
   const of = (list, sts) => sts.map(([l, c, f]) => [l, list.filter(f).length, c]);
   const ts = S.tasks.filter((x) => x.projectId === pid), rs = S.risks.filter((x) => x.projectId === pid), ds = S.docs.filter((x) => x.projectId === pid && x.status !== "해당없음");
-  const box = (title, tab, parts, n) => `<div class="ov3" style="cursor:pointer" onclick="selTab('${tab}')"><div class="ov3-h">${title}</div>${donut(parts, n, "건")}</div>`;
+  // 가운데는 아직 안 끝난 수, 제목 옆에 전체 수
+  const box = (title, tab, parts, n) => { const left = parts.filter(([l]) => l !== "완료").reduce((x, p) => x + p[1], 0);
+    return `<div class="ov3" style="cursor:pointer" onclick="selTab('${tab}')"><div class="ov3-h">${title} <span class="muted" style="font-weight:500">전체 ${n}</span></div>${donut(parts, left, "남음")}</div>`; };
   return `<div class="ov3-wrap">` +
     box("업무", "tasks", of(ts, [["진행중", "#1d7afc", (x) => x.status === "진행중" && !isFutureTask(x)], ["대기", "#f18d13", (x) => x.status === "대기"], ["예정", "#8590a2", isFutureTask], ["완료", "#22a06b", (x) => x.status === "완료"]]), ts.length) +
     box("이슈 · 리스크", "risks", of(rs, [["오픈", "#e2483d", (x) => (x.status || "오픈") === "오픈"], ["진행", "#1d7afc", (x) => x.status === "진행"], ["완료", "#22a06b", (x) => x.status === "완료"]]), rs.length) +
@@ -1826,12 +1829,12 @@ function statusOverview(pid) {
 // 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
 function todayCard(pid, alerts) {
   const t = today();
-  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "개발 기한 지남", "승인 회신 없음", "테스트 대기", "결함 미전달", "재테스트 필요", "이슈·리스크 기한 지남", "WBS 지연", "산출물 일정 지연"].includes(a.kind));
+  const overdue = alerts.filter((a) => ["마감 지연", "정기 업무 지남", "데이터 미수신", "개발 기한 지남", "승인 회신 없음", "테스트 대기", "결함 미전달", "재테스트 필요", "이슈·리스크 기한 지남", "WBS 지연", "산출물 일정 지연"].includes(a.kind));
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
   const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `selProject('${a.pid}');editScreen('${id}')`, req: `editReq('${id}')`, risk: `editRisk('${id}')` }[type];
-    return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span><span class="nm">${esc(a.title)}</span></div>`; };
+    return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span>${a.due ? `<span class="td-due">${shortD(a.due).replace(/\(.\)$/, "")} ${a.dueL} · ${a.days}일</span>` : ""}<span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
   return `<div class="card td"><div class="card-h"><h3>오늘 할 일</h3><span class="sub">${t} (${wd(t)})</span>
@@ -2007,7 +2010,7 @@ let quickOpen = false;
 
 // ───────────── 바탕화면 알림 ─────────────
 // 앱이 열려 있는 동안 30분마다 '빨간 경고'를 확인해서, 오늘 아직 알리지 않은 것만 윈도우 알림으로 띄운다.
-const NOTIFY_KINDS = ["개발 기한 지남", "데이터 미수신", "승인 회신 없음", "이슈·리스크 기한 지남", "업무 마감 지남"];
+const NOTIFY_KINDS = ["개발 기한 지남", "데이터 미수신", "승인 회신 없음", "이슈·리스크 기한 지남", "마감 지연"];
 function enableNotify() {
   if (!("Notification" in window)) { toast("이 브라우저는 바탕화면 알림을 지원하지 않아"); return; }
   Notification.requestPermission().then((p) => { toast(p === "granted" ? "바탕화면 알림 켜짐" : "알림 권한이 거부됐어 — 브라우저 사이트 설정에서 허용해줘"); if (p === "granted") checkNotify(true); });
