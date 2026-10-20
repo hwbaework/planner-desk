@@ -152,7 +152,7 @@
   .tc-cell { white-space: pre-wrap; word-break: break-word; line-height: 1.55; }
   tr.tc-fail td { background: var(--dangerw); }
   select.scr-st.s-완료 { color: var(--ok); font-weight: 700; } select.scr-st.s-테스트 { color: var(--warn); font-weight: 700; } select.scr-st.s-개발 { color: var(--accent); font-weight: 600; }
-  .sc-doc { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+  .sc-doc { word-break: break-all; }
   .dbl-ta { resize: vertical; line-height: 1.5; white-space: pre-wrap; }
   .dbl-inp { width: 100%; box-sizing: border-box; font: inherit; padding: 1px 4px; margin: -2px 0; border: 1px solid var(--accent); border-radius: 4px; background: var(--bg, #fff); }
   .proj-period { margin-left: 12px; font-size: 13px; font-weight: 400; color: var(--faint); cursor: pointer; vertical-align: middle; }
@@ -3885,7 +3885,7 @@ function placeFunc(id, wid) {
 }
 // 문서 화면 (기능정의서 · 테스트 케이스): 맨 위 엑셀 위치, 아래 그 문서의 항목 구성 (내용은 엑셀에서 씀)
 const docLinkCell = (o, k, coll) => { const v = o[k] || "", web = /^https?:/i.test(v), nm = v.replace(/[\\/?#]+$/, "").split(/[\\/]/).pop();
-  return `<td class="nowrap dbl-edit sc-doc" ondblclick="dblEdit(this,'${o.id}','${k}','${coll}')">${v ? `<span class="link small" onclick="openPath(${esc(JSON.stringify(v))})" title="${esc(v)}">${web ? ICO_LINK : ICO_FOLDER} ${esc(nm)}</span>` : ""}</td>`; };
+  return `<td class="dbl-edit sc-doc" ondblclick="dblEdit(this,'${o.id}','${k}','${coll}')">${v ? `<span class="link small mono" onclick="openPath(${esc(JSON.stringify(v))})" title="${esc(nm)}">${web ? ICO_LINK : ICO_FOLDER} ${esc(v)}</span>` : ""}</td>`; };
 function renderDocMap(title, fileKey, doneKey, linkKey) {
   if (S.ui.pid === "all") return pageHead(title, "") + needProject(title);
   const pid = S.ui.pid, p = proj(pid), path = p[fileKey] || "", T = wbsTree(pid);
@@ -3898,12 +3898,12 @@ function renderDocMap(title, fileKey, doneKey, linkKey) {
   let body = "";
   const walk = (w) => {
     const ch = T.kids[w.code] || [], lv = T.level(w) - 1, g = grp(w), lf = g ? leafOf(w) : null;
-    body += `<tr class="${g ? "sc-grp" : ""}"><td class="mono small nowrap">${esc(w.wid || "")}</td><td style="padding-left:${8 + lv * 16}px">${esc(w.title)}</td>
+    body += `<tr class="${g ? "sc-grp" : w[doneKey] ? "sc-done" : ""}"><td class="mono small nowrap">${esc(w.wid || "")}</td><td style="padding-left:${8 + lv * 16}px">${esc(w.title)}</td>
       <td class="nowrap" style="text-align:center">${g ? (lf.length ? `<span class="small muted">${lf.filter((x) => x[doneKey]).length}/${lf.length}</span>` : "") : `<input type="checkbox" ${w[doneKey] ? "checked" : ""} onchange="setWBS('${w.id}','${doneKey}',this.checked)">`}</td>${docLinkCell(w, linkKey, "wbs")}</tr>`;
     ch.forEach(walk);
   };
   T.roots.forEach(walk);
-  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th style="width:1%">ID</th><th>WBS</th><th style="width:1%">완료</th><th style="width:1%">위치</th></tr></thead><tbody>${body || `<tr><td colspan="4" class="empty">메뉴별 WBS가 아직 없어</td></tr>`}</tbody></table></div></div>`;
+  h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th style="width:1%">ID</th><th style="width:30%">WBS</th><th style="width:1%">완료</th><th>위치</th></tr></thead><tbody>${body || `<tr><td colspan="4" class="empty">메뉴별 WBS가 아직 없어</td></tr>`}</tbody></table></div></div>`;
   return h;
 }
 function renderFuncs() { return renderDocMap("기능정의서", "fdFile", "fdDone", "fdLink"); }
