@@ -80,7 +80,7 @@
   }
   /* 검색창 왼쪽 끝을 본문 왼쪽 끝(사이드바 232 + 본문 여백 22)에 맞춤: 232 + 22 - 상단 여백 18 - 간격 12 */
   @media (min-width: 901px) { .top > :first-child { flex: none; width: 224px; } }
-  @media (min-width: 901px) { .top { flex-wrap: nowrap; } .top .save-ind { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+  @media (min-width: 901px) { .top { flex-wrap: nowrap; } .top .save-ind { white-space: nowrap; flex: none; } .top .save-dir { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; } }
   @media (min-width: 901px) and (max-width: 1250px) { .brand small, .top .save-ind { display: none; } .top .btn span { display: none; } .top .btn .ico + span { margin-left: 0; } }
   @media (max-width: 900px) { .gsearch { order: 5; flex: 1 1 100%; max-width: none; } }
   .save-ind { font-size: 12.5px; color: var(--faint); }
@@ -106,6 +106,20 @@
   /* ── Shell ── */
   .shell { display: grid; grid-template-columns: 232px 1fr; min-height: calc(100vh - 53px); }
   .side { border-right: 1px solid var(--line); background: var(--panel); padding: 14px 10px; position: sticky; top: var(--top-h, 53px); align-self: start; height: calc(100vh - var(--top-h, 53px)); overflow-y: auto; }
+  .side-h { display: flex; align-items: center; justify-content: space-between; }
+  .navi .nm-s { display: none; }
+  /* 접으면 좁게: 프로젝트는 색 점, 메뉴는 짧은 이름 */
+  @media (min-width: 901px) {
+    body.side-fold .shell { grid-template-columns: 64px minmax(0, 1fr); }
+    body.side-fold .side { padding: 12px 6px; }
+    body.side-fold .side-h { justify-content: center; margin: 4px 0 6px; }
+    body.side-fold .side-h-t, body.side-fold .side .proj .nm, body.side-fold .side .cnt, body.side-fold .side .add, body.side-fold .side .archived, body.side-fold .side-nav h3 { display: none; }
+    body.side-fold .side .proj { justify-content: center; padding: 9px 0; }
+    body.side-fold .side .proj .dot { width: 10px; height: 10px; }
+    body.side-fold .navi { justify-content: center; padding: 7px 0 !important; }
+    body.side-fold .navi .nm { display: none; } body.side-fold .navi .nm-s { display: block; font-size: 12px; text-align: center; }
+  }
+  @media (max-width: 900px) { .side-fold-btn { display: none; } }
   .side h3 { font-size: 12px; color: var(--faint); font-weight: 700; letter-spacing: .4px; margin: 4px 8px 6px; }
   .proj {
     display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 4px; cursor: pointer; color: var(--dim);
@@ -198,6 +212,7 @@
   .wbs-tree td:nth-child(3) { white-space: nowrap; }
   .wbs-tree tr.wbs-grp td { background: var(--sub); font-weight: 600; }
   .wbs-tree tr.wbs-done td { background: var(--okw); } .wbs-tree tr.wbs-done .frz { --fz: var(--okw); }
+  .wbs-tree tr.wbs-late td { background: var(--dangerw); } .wbs-tree tr.wbs-late .frz { --fz: var(--dangerw); }
   .wbs-tree td { padding-top: 4px; padding-bottom: 4px; }
   .wbs-tree tr.fn-row td { background: var(--sub); font-size: 13px; }
   .wbs-tree tr.wbs-menu td { background: var(--accentw); font-weight: 700; }
@@ -283,7 +298,8 @@
   .kpi.danger .v { color: var(--danger); }
   .kpi.warn .v { color: var(--warn); }
   .kpi.ok .v { color: var(--ok); }
-  .ok-t { color: var(--ok); font-weight: 700; } .danger-t { color: var(--danger); font-weight: 600; }
+  .ok-t { color: var(--ok); font-weight: 700; }
+  .no-due { color: var(--warn); font-weight: 600; } .danger-t { color: var(--danger); font-weight: 600; }
 
   .grid2 { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 14px; }
   .grid2 > .card + .card { margin-top: 0; }
@@ -655,11 +671,6 @@
   .note-box b { color: var(--text); }
   .note-box ol, .note-box ul { margin: 6px 0 0 18px; }
 
-  .mailcand { border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px; margin-bottom: 8px; }
-  .mailcand .subj { font-weight: 700; }
-  .mailcand .from { font-size: 12px; color: var(--dim); }
-  .mailcand .snip { font-size: 12px; color: var(--dim); white-space: pre-wrap; max-height: 64px; overflow: hidden; margin: 6px 0; }
-  .mailcand .row { display: grid; grid-template-columns: 1fr 150px 140px auto auto; gap: 6px; align-items: center; }
   .drop { border: 2px dashed var(--line2); border-radius: 5px; padding: 14px; text-align: center; color: var(--faint); font-size: 12.5px; margin-top: 8px; }
   .drop.over { border-color: var(--accent); color: var(--accent); background: var(--accentw); }
 
@@ -699,7 +710,7 @@
     .phases { grid-template-columns: repeat(3, minmax(0,1fr)); }
     .mx { grid-template-columns: 1fr; }
     .form { grid-template-columns: 1fr; }
-    .evform, .mailcand .row { grid-template-columns: 1fr 1fr; }
+    .evform { grid-template-columns: 1fr 1fr; }
     main { padding: 14px 16px 60px; }
   }
   @media (max-width: 600px) {
@@ -745,7 +756,7 @@
     <div id="gres" class="gres"></div>
   </div>
   <div class="spacer"></div>
-  <span class="save-ind" id="saveInd"></span>
+  <span class="save-ind" id="saveInd"></span><span class="save-ind save-dir" id="saveDir"></span>
   <button class="btn primary" onclick="quickCreate()" title="어디서든 바로 만들기 (C)"><svg class="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>만들기</span></button>
   <button class="btn" onclick="saveFile(false)" title="데이터를 내장한 HTML로 저장 (Ctrl+S). 저장 위치를 한 번 지정하면 이후 같은 파일에 자동 저장"><svg class="ico" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></svg><span>저장</span></button>
   <button class="btn" onclick="openReport()" title="주간보고 초안"><svg class="ico" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg><span>주간보고</span></button>
@@ -849,7 +860,7 @@ const MINE_EV = ["planned", "confirm", "sent", "answer", "nudge", "verified", "r
 const SCREEN_ST = ["작성중", "검토중", "확정", "변경중"];
 const SCREEN_ROW = { 작성중: "sc-draft", 검토중: "sc-review", 확정: "sc-done", 변경중: "sc-change" };
 const SCREEN_CLS = { "작성중": "blue", "검토중": "violet", "확정": "green", "변경중": "amber" };
-const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["reqs", "요구사항"], ["risks", "이슈·리스크"], ["screens", "화면설계서"], ["wbs", "WBS"], ["funcs", "기능정의서"], ["tc", "테스트 케이스"], ["mail", "메일 수신"], ["notes", "메모·회의록"]];
+const TABS = [["dash", "대시보드"], ["board", "보드"], ["cal", "캘린더"], ["timeline", "타임라인"], ["tasks", "업무"], ["data", "데이터 협의"], ["ho", "개발 전달·노티"], ["docs", "산출물"], ["reqs", "요구사항"], ["risks", "이슈·리스크"], ["screens", "화면설계서"], ["wbs", "WBS"], ["funcs", "기능정의서"], ["tc", "테스트 케이스"], ["notes", "메모·회의록"]];
 const PROJ_COLORS = ["#2563eb", "#d9473f", "#18864b", "#d47414", "#6d4fd8", "#0e8a9a", "#b5487a", "#5b6474"];
 // 참고: 내 업무는 아니지만 알고 있어야 하는 것 (할 일 개수·마감 경고에서 빠짐)
 const TASK_ST = ["진행중", "대기", "완료"];   // 대기 = 회신·자료 기다리는 중. 시작 전은 시작일로 '예정' 표시
@@ -1014,21 +1025,20 @@ function phaseColor(id) { return phase(id)?.color || "#8b93a1"; }
 function emptyState() {
   return {
     v: 1, updatedAt: null,
-    settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1",
-      mail: { provider: "hiworks", protocol: "pop3", host: "pop3s.hiworks.com", port: 995, user: "", folder: "INBOX", days: 14, devSenders: "", last: null } },
+    settings: { me: "", sign: "", ackDays: 2, approvalDays: 3, quietDays: 5, verifyDays: 2, theme: "light", hoPrefix: "HO", fontScale: "1" },
     ui: { tab: "dash", pid: "all", hoFilter: "open", noteId: null, taskFilter: "open", calMonth: "", calSel: "", calKinds: { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }, dataFilter: "open", dataOrg: "", board: "ho", boardGroup: "none", boardQ: "", tlZoom: "month", tlAnchor: "", tlHideDone: 1, tlMissing: 1, tlKinds: { wbs: 1, task: 1, ho: 1, data: 1, doc: 1 } },
     seq: { ho: 0, tc: 0, req: 0, risk: 0 },
-    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], reqs: [], risks: [], docs: [], handoffs: [], screens: [], wbs: [], funcs: [], mails: [], notes: [],
+    projects: [], tasks: [], events: [], recurring: [], datas: [], tcs: [], reqs: [], risks: [], docs: [], handoffs: [], screens: [], wbs: [], funcs: [], notes: [],
   };
 }
 function normalize(d) {
   const e = emptyState();
   const s = Object.assign(e, d || {});
   s.settings = Object.assign(emptyState().settings, d?.settings || {});
-  s.settings.mail = Object.assign(emptyState().settings.mail, d?.settings?.mail || {});
+  delete s.settings.mail; delete s.mails;
   s.ui = Object.assign(emptyState().ui, d?.ui || {});
   s.seq = Object.assign({ ho: 0, tc: 0, req: 0, risk: 0 }, d?.seq || {});
-  ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "funcs", "mails", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
+  ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "funcs", "notes"].forEach((k) => { if (!Array.isArray(s[k])) s[k] = []; });
   s.datas.forEach((x) => { x.log = x.log || []; });
   s.screens.forEach((x) => { x.history = x.history || []; if (x.hoId && x.lastSentVer === undefined) x.lastSentVer = x.version || ""; });
   ["tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "notes"].forEach((k) => s[k].forEach((x) => { if (x.createdAt === undefined) x.createdAt = ""; }));
@@ -1069,15 +1079,15 @@ function normalize(d) {
     if (t.status === "예정") t.status = "진행중";
     else if (t.status === "참고") { t.status = "완료"; t.completedAt = t.completedAt || ""; (t.log = t.log || []).push({ id: uid("l"), at: today(), ts: new Date().toISOString(), type: "status", text: "참고 → 완료 (상태 정리)" }); }
   });
-  // 요구사항은 업무로 합침 (구분 '요구사항'): 상태 → 단계, 출처 → 링크, 접수일 → 시작일, 상세 → 메모, 예전 번호는 '이전 번호'
+  // 요구사항은 업무로 합침 (구분 '요구사항'): 상태 → 단계, 출처 → 링크, 접수일 → 시작일, 상세 → 메모
   if ((s.reqs || []).length) {
     s.reqs.forEach((r) => {
       const tid = "t" + r.id; if (s.tasks.some((t) => t.id === tid)) return;
       const h = (s.handoffs || []).find((x) => (x.reqIds || []).includes(r.id));
-      const t = { id: tid, kind: "req", oldCode: r.code || "", projectId: r.projectId, title: r.title, priority: r.priority || "mid",
+      const t = { id: tid, kind: "req", projectId: r.projectId, title: r.title, priority: r.priority || "mid",
         status: r.status === "보류" ? "대기" : r.status === "제외" ? "완료" : "진행중", stage: r.status === "확정" ? "기획" : "협의",
         wbsId: r.wbsId || "", screenIds: r.screenIds || [], link: r.source || "", start: r.receivedAt || "", due: "", owner: "", memo: r.desc || "",
-        log: [...(r.log || []), { id: uid("l"), at: today(), ts: new Date().toISOString(), type: "comment", text: `요구사항에서 옮김 · 이전 번호 ${r.code || "-"} · 상태 ${r.status || "-"}` }],
+        log: [...(r.log || []), { id: uid("l"), at: today(), ts: new Date().toISOString(), type: "comment", text: `요구사항에서 옮김 · 상태 ${r.status || "-"}` }],
         createdAt: r.createdAt || "", confirmedAt: r.confirmedAt || "" };
       if (r.status === "제외") t.completedAt = today();
       if (h) { t.hoId = h.id; h.taskId = tid; }
@@ -1104,10 +1114,92 @@ function normalize(d) {
     if (n) s.tasks.forEach((t) => { if (/-T\d+$/.test(t.code || "")) t.code = ""; });
   }
   // 업무 번호는 한 번, 만든 순서대로 다시 매김 (예전 번호가 섞이고 띄엄띄엄이던 것 정리)
-  if (!s.settings.codesV2) { s.tasks.forEach((t) => { if (t.code && !t.oldCode && !/-T\d+$/.test(t.code)) t.oldCode = t.code; t.code = ""; }); s.handoffs.forEach((h) => (h.code = h.code && /^HO-/i.test(h.code) ? h.code : h.code)); s.settings.codesV2 = true; }
+  if (!s.settings.codesV2) { s.tasks.forEach((t) => { t.code = ""; }); s.handoffs.forEach((h) => (h.code = h.code && /^HO-/i.test(h.code) ? h.code : h.code)); s.settings.codesV2 = true; }
   (s.screens || []).forEach((sc) => ["fdLink", "tcLink"].forEach((k) => { if (!sc[k]) return;
     (s.wbs || []).filter((w) => (w.screenIds || []).includes(sc.id) && !w[k]).forEach((w) => (w[k] = sc[k])); delete sc[k]; }));
   (s.projects || []).forEach((p) => { delete p.fdCols; delete p.tcCols; });
+  // 인천 수정·요청사항 관리대장(10.13 기준) 12건에 업무를 맞춤: 없으면 만들고, 분류·요청일·관련 WBS는 빈 칸만 채움 (완료 업무는 그대로)
+  //  + 인천 개발 담당은 강태중 상무로
+  if (!s.settings.icLedger1013) {
+    const ic = (s.projects || []).find((p) => /인천/.test(p.name || ""));
+    if (ic) {
+      const L = [{"no": 1, "t": "대시보드 우측 하단 '가동 현황' 명칭 변경(구 고장코드 표기)", "cat": "화면 표기", "plan": "해당 영역 네이밍 변경", "st": "반영 예정", "memo": "화면 위치: 통합관제 \n\n오른쪽 아래 가동현황으로 되어있는데, 텍스트를 '구 고장코드' 로 텍스트 변경", "req": "", "wid": "KAN-101"}, {"no": 2, "t": "사이트·O&M 업체별 알림 매핑 → 담당 설비의 이상 알림만 해당 담당자·업체에 발송", "cat": "알림", "plan": "담당자별 설비 지정 권한 설정 기능 반영", "st": "반영 예정", "memo": "아래와 동일", "req": "2026-10-13", "wid": "KAN-603"}, {"no": 3, "t": "민간·공공 담당자 알림 수신 구분", "cat": "알림", "plan": "권한 분리 설정으로 반영", "st": "반영 예정", "memo": "화면 위치: 이상감지 > 알림 담당자\n담당자가 모든 알림을 받게 되어있어서 업체를 선청해서 알림을 받을수 있게 하고 싶어함\n\n기획서 전달 완료 (10.13)", "req": "2026-10-13", "wid": "KAN-603"}, {"no": 4, "t": "가독성 개선 → 수용·효율화 현황 글씨 크기 확대, 절감률 항목 간격 조정, 적산 영역 여백 활용, 색감 개선", "cat": "UI/UX", "plan": "의견 취합 후 화면 일괄 업데이트", "st": "반영 예정", "memo": "라이트 버전으로 변경", "req": "2026-10-13", "wid": ""}, {"no": 5, "t": "태양광·효율화장비 현장·설비 사진 표출", "cat": "UI/UX", "plan": "초기 1회 사진 등록 방식, 사용자 관리에서 표현", "st": "반영 예정", "memo": "화면 위치: 관리 > 수용가\n\n기획서 전달 완료 (10.13)", "req": "2026-10-13", "wid": ""}, {"no": 6, "t": "남동 물류센터 발전 데이터 미수신('26.8.26. 오전~)", "cat": "데이터", "plan": "KT 확인 요청 완료", "st": "조치 중", "memo": "RTU 현장의 문제로 파악완료\n대응 예정", "req": "", "wid": ""}, {"no": 7, "t": "장비 가동 시간 별도 집계", "cat": "기능", "plan": "현재 미수집 항목, 요청 확정 시 내부 개발 반영", "st": "필요 시", "memo": "클라우드 관련되어서 작업해야하는것\nNHN 내용인것으로 알고 있음", "req": "", "wid": ""}, {"no": 8, "t": "플랫폼 접속 IP 제한", "cat": "보안", "plan": "요청 시 지정 IP에서만 접속 가능하도록 적용", "st": "필요 시", "memo": "현재 관리자만 로그인이 되어있는데 해당 부분은 가입하고 등록할수 있을수 있으니 인천 산단을 통해서 전달 받은후에 업데이트 진행 예정", "req": "", "wid": ""}, {"no": 9, "t": "보고서 형식·내용 개선", "cat": "보고서", "plan": "세부 의견 수신 후 협의·반영", "st": "자료 의견 대기", "memo": "화면 위치: 통합관제 > 현황 보고서 (버튼)\n현재 보고서 내용 개선 및 변경 완료\n(10.01 개발 완료)\n\n참고사항: \n1. 태양광 공공: KT에서 데이터를 받아서 달마다 업데이트 해야함, 인천쪽에서 자동으로 업데이트 할수 있게 요구했음 \n(KT에서는 내부적으로 API를 제공할수 없다고 했었고 방안을 모색해달라고 9월초쯤 요청했었음)\n\n2. 민간, 에너지 효율화는 현재 자동으로 들어와야하는 값임\n", "req": "", "wid": "KAN-101"}, {"no": 10, "t": "재난 대응 매뉴얼 내부 규정 제공(현재 일반 절차 기준 반영)", "cat": "협조 요청", "plan": "규정 수신 시 대응 매뉴얼 교체 반영", "st": "필요 시", "memo": "화면 위치: DiSOP > 재난 상황판\n\n현재 대응 매뉴얼이 임시로 되어있으며 해당 재난 대응 매뉴얼은 인천이 가지고 있는 매뉴얼이 있어 받게되면 반영해야함", "req": "", "wid": "KAN-502"}, {"no": 11, "t": "풍력(유호스트) 데이터 연계", "cat": "데이터", "plan": "자료 수신 시 화면 기획·개발 반영", "st": "협의 중", "memo": "화면 위치: 풍력 발전 전체\n\n현재 데이터가 인천에서 데이터가 들어오고 있는것으로 알고 있으며, 어떤 데이터를 어떻게 보내줄지 정확한 정보가 없기 때문에 확정되면 기획을 통해서 개발 진행해야함", "req": "", "wid": "KAN-400"}, {"no": 12, "t": "태양광 현황판 추가 요청", "cat": "화면 표기", "plan": "-", "st": "반영 예정", "memo": "화면 위치: 통합관지 > 현황판 추가\n\n모든 기업의 현황을 알고 싶어하여서 해당 내용을 화면에 작업 완료\n\n기획서 전달 완료 (10.13)", "req": "2026-10-13", "wid": "KAN-100"}];
+      const norm = (x) => String(x || "").replace(/\s+/g, "");
+      const ST = { "반영 예정": ["진행중", "기획"], "조치 중": ["진행중", "기획"], "협의 중": ["진행중", "협의"], "자료 의견 대기": ["대기", "협의"], "자료·의견 대기": ["대기", "협의"], "필요 시": ["대기", "협의"] };
+      L.forEach((r) => {
+        let t = s.tasks.find((x) => x.projectId === ic.id && norm(x.title) === norm(r.t));
+        if (!t) {
+          const [st, stage] = ST[r.st] || ["진행중", "협의"];
+          t = { id: "t" + Date.now().toString(36) + r.no + Math.random().toString(36).slice(2, 6), kind: "req", projectId: ic.id, title: r.t, priority: "mid", status: st, stage, start: r.req, due: "", owner: "",
+            memo: `[구분] ${r.cat}\n[처리방안] ${r.plan || "-"}\n[관리대장 상태] ${r.st}${r.memo ? "\n\n[비고]\n" + r.memo : ""}`, log: [{ at: "2026-10-20", ts: new Date().toISOString(), type: "note", text: `관리대장 ${r.no}번에서 만듦` }], createdAt: new Date().toISOString() };
+          s.tasks.push(t);
+        }
+        if (t.status === "완료") return;
+        if (!t.start && r.req) t.start = r.req;
+        const w = r.wid && s.wbs.find((x) => x.projectId === ic.id && x.wid === r.wid);
+        if (w && !t.wbsId) t.wbsId = w.id;
+      });
+      const OLD = /이승렬\s*과장/;
+      if (OLD.test(ic.devLead || "")) ic.devLead = "강태중 상무";
+      s.handoffs.forEach((h) => { if (h.projectId === ic.id && OLD.test(h.to || "")) h.to = "강태중 상무"; });
+      s.screens.forEach((x) => { if (x.projectId === ic.id && (!x.dev || OLD.test(x.dev))) x.dev = "강태중 상무"; });
+    }
+    s.settings.icLedger1013 = true;
+  }
+  // 인천 10.20: 관리대장 2·3번은 같은 일 → 한 업무로 / 가독성 개선·사진 표출은 10.13 기획서 전달, 10.20 개발 착수
+  if (!s.settings.icLedger1020) {
+    const ic = (s.projects || []).find((p) => /인천/.test(p.name || ""));
+    if (ic) {
+      const norm = (x) => String(x || "").replace(/\s+/g, "");
+      const find = (t) => s.tasks.find((x) => x.projectId === ic.id && norm(x.title).startsWith(norm(t)));
+      const now = new Date().toISOString();
+      const a = find("사이트·O&M업체별알림매핑"), b = find("민간·공공담당자알림수신구분");
+      if (a && b && a.id !== b.id) {
+        a.memo = [a.memo, `[관리대장 3번 함께 — ${b.title}]\n${b.memo || ""}`.trim()].filter(Boolean).join("\n\n");
+        a.log = [...(a.log || []), ...(b.log || []), { at: "2026-10-20", ts: now, type: "note", text: `「${b.title}」은 같은 일이라 이 업무로 합침` }];
+        s.risks.forEach((r) => { if (r.taskId === b.id) r.taskId = a.id; });
+        s.handoffs.forEach((h) => { if (h.taskId === b.id) h.taskId = a.id; });
+        s.tasks = s.tasks.filter((x) => x.id !== b.id);
+      }
+      const startDev = (t) => {
+        if (!t) return;
+        let h = s.handoffs.find((x) => x.id === t.hoId || x.taskId === t.id);
+        if (!h) {
+          h = { id: "h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), code: t.code || "", projectId: ic.id, title: t.title, priority: t.priority || "mid", to: "강태중 상무", toEmail: "", cc: "",
+            sentAt: "2026-10-13", dueDate: "", docIds: [], screenIds: [], link: "", memo: "", status: "sent", taskId: t.id,
+            events: [{ id: "e" + Math.random().toString(36).slice(2, 10), at: "2026-10-13", ts: now, type: "sent", text: "기획서 전달 (관리대장 10.13 기준)" }] };
+          s.handoffs.push(h); t.hoId = h.id;
+        }
+        if (!(h.events || []).some((e) => e.type === "ack")) h.events.push({ id: "e" + Math.random().toString(36).slice(2, 10), at: "2026-10-20", ts: now, type: "ack", text: "개발 착수" });
+        if (["sent", "plan"].includes(h.status)) h.status = "ack";
+        if (t.stage !== "개발") t.stage = "개발";
+      };
+      startDev(find("가독성개선"));
+      startDev(find("태양광·효율화장비현장·설비사진표출"));
+    }
+    s.settings.icLedger1020 = true;
+  }
+  s.tasks.forEach((t) => {
+    delete t.oldCode; delete t.epic;
+    (t.log || []).forEach((e) => { if (e.text && e.text.includes("이전 번호")) e.text = e.text.replace(/\s*·\s*이전 번호 [^·]*/g, ""); });
+  });
+  // 개발 전달 하나에 업무가 둘 이상 붙어 있으면(같은 일) 하나로: 전달이 가리키는 업무(없으면 요구사항 업무)를 남기고 나머지는 메모·기록을 옮긴 뒤 지움
+  if (!s.settings.hoDedupe1) {
+    s.handoffs.forEach((h) => {
+      const ts = s.tasks.filter((t) => t.hoId === h.id); if (ts.length < 2) return;
+      const keep = ts.find((t) => t.id === h.taskId) || ts.find((t) => t.kind === "req") || ts[0];
+      ts.filter((t) => t !== keep).forEach((t) => {
+        if (t.memo && !(keep.memo || "").includes(t.memo)) keep.memo = [keep.memo, `[같은 일 — ${t.title}]\n${t.memo}`].filter(Boolean).join("\n\n");
+        keep.log = [...(keep.log || []), ...(t.log || [])];
+        s.risks.forEach((r) => { if (r.taskId === t.id) r.taskId = keep.id; });
+        s.tasks = s.tasks.filter((x) => x.id !== t.id);
+      });
+      h.taskId = keep.id;
+    });
+    s.settings.hoDedupe1 = true;
+  }
+  if (!s.settings.saveDir && !s.settings.saveDir1) s.settings.saveDir = "C:\\Users\\RMS\\Desktop\\java\\planner-desk";
+  s.settings.saveDir1 = true;
   if (!s.settings.fdCols1) {
     const u = (s.projects || []).find((p) => /울산/.test(p.name || ""));
     if (u) {
@@ -1238,10 +1330,18 @@ async function saveFile(pick) {
 }
 function updateSaveInd() {
   const el = $("saveInd"); if (!el) return;
+  updateSaveDir();
   const t = lastFileSave ? lastFileSave.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : null;
   if (!fileHandle && savedHandle) { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = `${savedHandle.name} · [저장]으로 이어서 저장`; return; }
   if (fileHandle) { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = `${fileHandle.name} · ${dirty ? "저장 대기…" : "자동저장 " + t}`; }
   else { el.className = "save-ind" + (dirty ? " dirty" : ""); el.textContent = dirty ? "브라우저에 저장됨 · 파일 미저장" : t ? `파일 저장 ${t}` : "브라우저에 자동 저장 중"; }
+}
+// 왼쪽 메뉴바 접기 (접은 상태는 기억)
+function toggleSide() { S.ui.sideFold = S.ui.sideFold ? 0 : 1; persistUI(); render(); }
+function updateSaveDir() {
+  const el = $("saveDir"); if (!el) return;
+  const d = (S.settings && S.settings.saveDir) || "";
+  el.innerHTML = d ? `<span class="link" onclick="openPath(${esc(JSON.stringify(d))})" title="탐색기로 열기">${ICO_FOLDER} ${esc(d)}</span>` : "";
 }
 function importFile(ev) {
   const f = ev.target.files[0]; ev.target.value = "";
@@ -1259,7 +1359,6 @@ function importFile(ev) {
       m = txt.match(/var EMBEDDED_BACKUP_DATA = ([\s\S]+?); \/\*EMBEDDED_BACKUP_PLACEHOLDER\*\//);
       if (m && m[1].trim() !== "null") { importLegacy(JSON.parse(m[1])); return; }
       const d = JSON.parse(txt);
-      if (Array.isArray(d.mails) && !d.projects) { importMailJson(d); return; }
       if (d.tasks && !d.handoffs) { importLegacy(d); return; }
       if (!confirm("JSON 데이터를 불러올까? 현재 데이터는 덮어씌워져.")) return;
       S = normalize(d); commit(); toast("불러오기 완료");
@@ -1440,7 +1539,8 @@ function docStats(pid, phId) {
 // ───────────── render: shell ─────────────
 function render() {
   if (noteFlush) noteFlush();   // 메모 입력 중 화면을 바꾸면 먼저 저장
-  setTimeout(setTopH, 30);
+  setTimeout(setTopH, 30); updateSaveDir();
+  document.body.classList.toggle("side-fold", !!S.ui.sideFold);
   if (S.ui.pid !== "all" && !proj(S.ui.pid)) S.ui.pid = "all";
   document.documentElement.setAttribute("data-theme", S.settings.theme === "dark" ? "dark" : "light");
   document.body.style.zoom = Number(S.settings.fontScale) || 1;
@@ -1450,10 +1550,9 @@ function render() {
   $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
   renderBanner(); renderSide(); renderTabs();
   if (S.ui.tab === "board") S.ui.tab = "tasks";   // 보드 메뉴 없앰 (업무 단계 보드로)
-  const v = { funcs: renderFuncs, dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderTasks, docs: renderDocs, reqs: renderReqs, risks: renderRisks, screens: renderScreens, wbs: renderWBS, tc: renderTC, mail: renderMail, notes: renderNotes }[S.ui.tab] || renderDash;
+  const v = { funcs: renderFuncs, dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderTasks, docs: renderDocs, reqs: renderReqs, risks: renderRisks, screens: renderScreens, wbs: renderWBS, tc: renderTC, notes: renderNotes }[S.ui.tab] || renderDash;
   $("view").innerHTML = v();
   if (S.ui.tab === "wbs") wbsFreeze();
-  if (S.ui.tab === "mail") bindDrop();
   if (S.ui.tab === "notes") bindNoteEditor();
   updateSaveInd();
 }
@@ -1475,9 +1574,9 @@ function useEmbedded() { if (!confirm("브라우저의 현재 데이터를 이 �
 function renderSide() {
   const all = computeAlerts(null);
   const cntOf = (pid) => all.filter((a) => a.pid === pid && a.level === "danger").length;
-  const item = (id, name, color, n) => `<div class="proj ${S.ui.pid === id ? "active" : ""}" onclick="selProject('${id}')">
+  const item = (id, name, color, n) => `<div class="proj ${S.ui.pid === id ? "active" : ""}" title="${esc(name)}" onclick="selProject('${id}')">
       <span class="dot" style="${color ? "background:" + color : ""}"></span><span class="nm">${esc(name)}</span>${n ? `<span class="cnt">${n}</span>` : ""}</div>`;
-  let h = `<h3>프로젝트</h3><div class="proj-list">` + item("all", "전체 보기 (PMO)", "", all.filter((a) => a.level === "danger").length);
+  let h = `<h3 class="side-h"><span class="side-h-t">프로젝트</span><button class="ico-btn side-fold-btn" onclick="toggleSide()" title="${S.ui.sideFold ? "메뉴 펴기" : "메뉴 접기"}"><svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px;margin:0"><path d="${S.ui.sideFold ? "m9 18 6-6-6-6" : "m15 18-6-6 6-6"}"/></svg></button></h3><div class="proj-list">` + item("all", "전체 보기 (PMO)", "", all.filter((a) => a.level === "danger").length);
   activeProjects().forEach((p) => {
     h += item(p.id, p.name, p.color, cntOf(p.id));
   });
@@ -1488,14 +1587,14 @@ function renderSide() {
   }
   $("side").innerHTML = h + `<div id="sideNav" class="side-nav"></div>`;
 }
-const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline"]], ["관리", ["tasks", "risks", "docs"]], ["WBS", ["wbs", "funcs", "screens", "tc"]], ["기록", ["mail", "notes"]]];
+const NAV_SHORT = { dash: "대시", cal: "일정", timeline: "타임", tasks: "업무", risks: "이슈", docs: "산출", wbs: "WBS", funcs: "기능", screens: "화면", tc: "테스트", notes: "메모" };
+const NAV_GROUPS = [["한눈에", ["dash", "cal", "timeline"]], ["관리", ["tasks", "risks", "docs"]], ["WBS", ["wbs", "funcs", "screens", "tc"]], ["기록", ["notes"]]];
 const NAV_ALERT = { risks: ["risk"], reqs: ["req"], screens: ["screen"], tasks: ["task", "recur", "ho", "req"], data: ["data"], docs: ["doc"], wbs: ["wbs"], tc: ["tc"] };
 function renderTabs() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
   const alerts = computeAlerts(pid);
   const label = Object.fromEntries(TABS);
   const count = (k) => {
-    if (k === "mail") return [S.mails.filter((m) => m.state === "pending").length, false];
     // 업무 옆 숫자 = 지금 챙길 것만: 마감 지난 업무·정기 업무, 기한 지난 개발, 개발 끝나서 내가 확인할 것(테스트 대기)
     const a = alerts.filter((x) => (NAV_ALERT[k] || []).includes(x.ref[0]) && (k !== "tasks" || ["업무 마감 지남", "정기 업무 지남", "개발 기한 지남", "테스트 대기"].includes(x.kind)));
     return [a.length, a.some((x) => x.level === "danger")];
@@ -1503,7 +1602,7 @@ function renderTabs() {
   const sc = (x) => (pid ? x.projectId === pid : !proj(x.projectId)?.archived);
   const has = { tasks: S.tasks, data: S.datas, ho: S.handoffs, risks: S.risks, docs: S.docs, reqs: reqTasks(), screens: S.screens, wbs: S.wbs, funcs: S.funcs, notes: S.notes };
   const empty = (k) => has[k] && !has[k].some(sc) && S.ui.tab !== k;
-  const navItem = (k, none) => { const [n, red] = count(k); return `<div class="navi ${S.ui.tab === k ? "active" : ""} ${none ? "none" : ""} ${["funcs", "screens", "tc"].includes(k) ? "sub" : ""}" title="${none ? "아직 항목 없음" : ""}" onclick="selTab('${k}')"><span class="nm">${label[k]}</span>${k === "tasks" ? taskNavCnt(n) : n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`; };
+  const navItem = (k, none) => { const [n, red] = count(k); return `<div class="navi ${S.ui.tab === k ? "active" : ""} ${none ? "none" : ""} ${["funcs", "screens", "tc"].includes(k) ? "sub" : ""}" title="${none ? "아직 항목 없음" : ""}" onclick="selTab('${k}')" data-tip="${label[k]}"><span class="nm">${label[k]}</span><span class="nm-s">${NAV_SHORT[k] || label[k]}</span>${k === "tasks" ? taskNavCnt(n) : n ? `<span class="cnt ${red ? "" : "gray"}">${n}</span>` : ""}</div>`; };
   // 업무: 회색 = 진행 중인 일 수, 빨강 = 지금 챙길 것 (마감 지남·개발 기한 지남·테스트 대기)
   const taskNavCnt = (n) => { const open = workItems(pid).filter((w) => w.open).length;
     return `${open ? `<span class="cnt gray" title="진행 중">${open}</span>` : ""}${n ? `<span class="cnt" title="챙길 것 (마감 지남·확인 필요)">${n}</span>` : ""}`; };
@@ -1636,7 +1735,8 @@ function projDash(pid) {
   h += `<div class="card" style="margin-top:14px"><div class="card-h"><h3>메뉴별 화면</h3><span class="sub">${all.length}개 화면</span><div class="actions"><button class="btn sm" onclick="selTab('wbs')">WBS</button></div></div>
     <div class="tbl-wrap"><table class="t"><thead><tr><th style="width:1%">ID</th><th>메뉴</th><th style="width:30%">진척</th><th class="nowrap" style="width:1%">화면설계 확정</th><th class="nowrap" style="width:1%">기능정의서</th><th class="nowrap" style="width:1%">테스트 케이스</th></tr></thead><tbody>` +
     (T.roots.map((w) => { const l = leafOf(w), pc = avg(l);
-      return `<tr><td class="mono small nowrap">${esc(w.wid || "")}</td><td><b>${esc(w.title)}</b> <span class="small muted">${l.length}</span></td>
+      const late = l.filter((x) => x.end && x.end < today() && wbsLeafProg(x).progress < 100).length;
+      return `<tr><td class="mono small nowrap">${esc(w.wid || "")}</td><td><b>${esc(w.title)}</b> <span class="small muted">${l.length}</span>${late ? ` <span class="badge b-red">지연 ${late}</span>` : ""}</td>
         <td><div style="display:flex;align-items:center;gap:8px"><span class="ov-bar"><i style="width:${pc}%"></i></span><span class="small" style="width:36px;text-align:right">${pc}%</span></div></td>
         <td class="nowrap small" style="text-align:center">${cnt(l, (x) => scOf(x)?.status === "확정")}</td>
         <td class="nowrap small" style="text-align:center;cursor:pointer" onclick="selTab('funcs')">${cnt(l, (x) => x.fdDone)}</td>
@@ -1690,7 +1790,7 @@ function statusOverview(pid) {
 // 아침에 열면 바로 보는 칸: 지난 것 / 오늘 / 이번 주
 function todayCard(pid, alerts) {
   const t = today();
-  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "개발 기한 지남", "승인 회신 없음", "테스트 대기", "결함 미전달", "재테스트 필요", "이슈·리스크 기한 지남"].includes(a.kind));
+  const overdue = alerts.filter((a) => ["업무 마감 지남", "정기 업무 지남", "데이터 미수신", "개발 기한 지남", "승인 회신 없음", "테스트 대기", "결함 미전달", "재테스트 필요", "이슈·리스크 기한 지남", "WBS 지연", "산출물 일정 지연"].includes(a.kind));
   const todays = calItems(t, t, pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 1 }).filter((i) => !i.done);
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
@@ -2657,8 +2757,8 @@ function workItems(pid) {
     next: x.stage ? flowNextBtn("task", x) : "", st: x.status, open: isOpenTask(x), pri: x.priority, start: x.start, due: x.due, who: x.owner,
     stage: "", stSel: `${isFutureTask(x) ? `<span class="chip-ref" title="시작 전">예정 ${shortD(x.start)}</span>` : ""}<select class="inline" onchange="setTask('${x.id}','status',this.value)">${TASK_ST.map((s) => `<option ${s === x.status ? "selected" : ""}>${s}</option>`).join("")}</select>`,
     priSel: "",
-    click: `editTask('${x.id}')`, text: (x.memo || "") + (x.epic || "") + (x.oldCode || "") }));
-  S.handoffs.filter(sc).forEach((x) => out.push({ kind: "ho", x, title: x.title, code: x.code, flow: hoFlow(x), next: isOpenHO(x) ? flowNextBtn("ho", x) : "", st: hoStLabel(x.status), open: isOpenHO(x), pri: x.priority, start: x.sentAt, due: x.dueDate, who: x.to,
+    click: `editTask('${x.id}')`, text: (x.memo || "") + (x.epic || "") }));
+  S.handoffs.filter(sc).forEach((x) => out.push({ kind: "ho", x, title: x.title, code: x.code, flow: hoFlow(x), next: isOpenHO(x) ? flowNextBtn("ho", x) : "", st: hoStLabel(x.status), open: isOpenHO(x), pri: x.priority, start: x.sentAt, due: x.dueDate || taskOfHO(x)?.due || "", who: x.to || taskOfHO(x)?.owner || "",
     stage: "", stSel: "",
     priSel: "", click: taskOfHO(x) ? `editTask('${taskOfHO(x).id}')` : `adoptHO('${x.id}')`, text: x.memo || "" }));
   out.filter((w) => w.kind === "ho").forEach((w) => { const x = w.x, cur = x.status === "hold" ? "보류" : flowSteps()[hoFlow(x)]; w.st = cur;
@@ -2744,7 +2844,7 @@ function flowBoard(list, pid) {
     return `<div class="col" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');const d=event.dataTransfer.getData('text/plain').split(':');if(d.length===2)flowMove(d[0],d[1],${i})"><div class="col-h"><b>${l}</b> <span class="muted small">${items.length + recs.length}</span></div>` + items.map((w) => {
       const x = w.x, late = w.open && w.due && w.due < t, icon = stageIcon(w);
       return `<div class="kcard ${i === FL.length - 1 ? "is-done" : ""}" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.kind}:${x.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drop-before')" ondragleave="this.classList.remove('drop-before')" ondrop="event.preventDefault();event.stopPropagation();this.classList.remove('drop-before');this.closest('.col').classList.remove('drop-to');const d=event.dataTransfer.getData('text/plain').split(':');if(d.length===2&&!(d[0]==='${w.kind}'&&d[1]==='${x.id}'))flowDropBefore(d[0],d[1],${i},'${w.kind}','${x.id}')" onclick="${w.click}">${pid ? "" : `<div class="small">${projTag(x.projectId)}</div>`}<div class="tt">${typeIcon(icon)} ${codeTag(w.code)} ${esc(w.title)}</div>
-        <div class="small muted">${esc(w.st || "")}${w.who ? " · <b>" + esc(w.who) + "</b>" : ""}${w.due ? ` · <span style="${late ? "color:var(--danger);font-weight:700" : ""}">${shortD(w.due)}</span>` : ""}</div>
+        <div class="small muted">${esc(w.st || "")}${w.who ? " · <b>" + esc(w.who) + "</b>" : ""}${w.due ? ` · <span style="${late ? "color:var(--danger);font-weight:700" : ""}">${shortD(w.due)}</span>` : w.open ? ` · <span class="no-due">마감 없음</span>` : ""}</div>
         ${w.next && w.open ? `<div style="margin-top:6px" onclick="event.stopPropagation()">${w.next}</div>` : ""}</div>`;
     }).join("") + recs.map((r) => {
       const late = r.nextDue && r.nextDue < t;
@@ -2758,7 +2858,7 @@ function renderTasks() {
   const pid = S.ui.pid === "all" ? null : S.ui.pid;
   // 목록은 진행 중인 일만 (끝난 일은 단계 보드 완료 칸)
   const f = "open", q = (S.ui.taskQ || "").toLowerCase(), t = today();
-  const kinds = Object.assign({ req: 1, task: 1, ho: 1, data: 1 }, S.ui.workKinds || {});
+  const kinds = { req: 1, task: 1, ho: 1, data: 1 };
   const alerts = computeAlerts(pid);
   const wk = (w) => (w.kind === "task" && w.x.kind === "req" ? "req" : w.kind);
   let all = workItems(pid).filter((w) => kinds[wk(w)] !== 0);
@@ -2767,27 +2867,20 @@ function renderTasks() {
   TASK_ST.forEach((st) => (cnt[st] = tasksOnly.filter((w) => w.x.status === st).length));
   // 진행 전체 / 끝난 것 / 전체 는 모든 유형에, 진행중·대기·예정은 업무 상태 기준
   let list = all.filter((w) => (f === "all" ? true : f === "open" ? w.open : f === "done" ? !w.open : w.kind === "task" && w.x.status === f));
-  if (S.ui.taskEpic) list = list.filter((w) => w.kind === "task" && (w.x.epic || "") === (S.ui.taskEpic === "(없음)" ? "" : S.ui.taskEpic));
   if (q) list = list.filter((w) => ((w.code || "") + w.title + (w.who || "") + w.text).toLowerCase().includes(q));
   const pr = { high: 0, mid: 1, low: 2 };
   list.sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999") || (pr[a.pri] ?? 1) - (pr[b.pri] ?? 1));
   // 끝난 일: 보드 완료 칸과 같게 아래에 최근 순 12개 (검색하면 전부)
   let doneL = all.filter(workDone);
-  if (S.ui.taskEpic) doneL = doneL.filter((w) => w.kind === "task" && (w.x.epic || "") === (S.ui.taskEpic === "(없음)" ? "" : S.ui.taskEpic));
   if (q) doneL = doneL.filter((w) => ((w.code || "") + w.title + (w.who || "") + w.text).toLowerCase().includes(q));
   doneL = doneL.sort((a, b) => workDoneAt(b).localeCompare(workDoneAt(a)));
   list = list.concat(q ? doneL : doneL.slice(0, 12));
   const chip = (k, l) => `<button class="chip ${f === k ? "active" : ""}" onclick="S.ui.taskFilter='${k}';render()">${l} ${cnt[k]}</button>`;
-  const kchip = ([k, l]) => `<button class="chip kchip ${kinds[k] ? "active" : ""}" onclick="S.ui.workKinds=Object.assign({req:1,task:1,ho:1,data:1},S.ui.workKinds||{});S.ui.workKinds.${k}=S.ui.workKinds.${k}?0:1;persistUI();render()">${typeIcon(k === "risk" ? "bug" : k === "req" ? "doc" : k)}${l} ${workItems(pid).filter((w) => (w.kind === "task" && w.x.kind === "req" ? "req" : w.kind) === k && w.open).length}</button>`;
   let h = pageHead("업무 관리", `${pid ? esc(projName(pid)) : "전체 프로젝트"}`, `${(() => { const n = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length).length; return n ? `<button class="btn" onclick="splitAllMemos()" title="메모의 '6월 9일 기준 …' 줄을 날짜별 진행 기록으로">메모 → 진행 기록 (${n}건)</button>` : ""; })()}${S.reqs.some(inScope) ? `<button class="btn" onclick="selTab('reqs')">요구사항 추적표</button>` : ""}<button class="btn primary" onclick="editTask()">+ 업무 추가</button>`);
   h += `<div class="filters"><div class="seg">${[["list", "목록"], ["flow", "단계 보드"]].map(([k, l]) => `<button class="${view === k ? "on" : ""}" onclick="S.ui.workView='${k}';persistUI();render()">${l}</button>`).join("")}</div>
-    <input class="search" placeholder="업무 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)">
-    <span class="f-right">${WORK_KINDS.map(kchip).join("")}</span></div>`;
-  const eps = epicsOf(pid);
-  if (eps.length) h += `<div class="filters"><span class="small muted">분류</span><button class="chip ${!S.ui.taskEpic ? "active" : ""}" onclick="S.ui.taskEpic='';render()">전체</button>${eps.map((e) => `<button class="chip ${S.ui.taskEpic === e ? "active" : ""}" onclick="S.ui.taskEpic=${esc(JSON.stringify(e))};render()">${esc(e)}</button>`).join("")}</div>`;
+    <input class="search" placeholder="업무 검색" value="${esc(S.ui.taskQ || "")}" oninput="S.ui.taskQ=this.value;clearTimeout(window._q);window._q=setTimeout(()=>{render();const s=document.querySelector('.search');s.focus();s.setSelectionRange(s.value.length,s.value.length)},250)"></div>`;
   if (view === "flow") {   // 보드는 위 상태 필터와 상관없이 완료까지 보여줌 (분류·검색만)
     let bl = all;
-    if (S.ui.taskEpic) bl = bl.filter((w) => w.kind === "task" && (w.x.epic || "") === (S.ui.taskEpic === "(없음)" ? "" : S.ui.taskEpic));
     if (q) bl = bl.filter((w) => (w.title + (w.who || "") + w.text).toLowerCase().includes(q));
     h += flowBoard(bl, pid);
   }
@@ -2799,7 +2892,7 @@ function renderTasks() {
         (dw ? `<span class="late-tag" style="cursor:pointer" onclick="openData('${dw.id}')" title="${esc(dw.org || "")} · ${esc(dw.status)}">데이터 대기</span>` : "");
       const icon = stageIcon(w);
       return `<tr class="row-click ${workDone(w) ? "is-done" : ""}" onclick="rowClick(event,()=>{${w.click}})" style="${!w.open ? "opacity:.55" : ""}">${pid ? "" : `<td class="nowrap">${projTag(x.projectId)}</td>`}
-        <td class="tc-title"><div class="link" onclick="${w.click}">${typeIcon(icon)}${codeTag(w.code)}${w.x.kind === "req" ? '<span class="chip-ref">요구사항</span>' : ""}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(w.title)}</span></div>${w.flow >= 0 ? " " + flowPipe(w.flow) : ""}${w.stage ? ` <span class="chip-ref">${esc(w.stage)}</span>` : ""}${w.kind === "task" ? taskViaHtml(x) : ""}${w.kind === "ho" ? reqChips(x.reqIds) + hoTcChip(x) : w.kind === "data" ? reqChips(x.reqId ? [x.reqId] : []) : ""}${warn}${w.kind === "task" && x.wbsId ? (() => { const wb = S.wbs.find((z) => z.id === x.wbsId); return wb ? ` <span class="chip-ref" style="cursor:pointer" onclick="editWBS('${wb.id}')" title="관련 WBS">${esc(wb.code)} ${esc(wb.title)}</span>` : ""; })() : ""}${w.kind === "task" && x.epic ? `<div style="margin-top:2px">${epicTag(x.epic)}</div>` : ""}</td>
+        <td class="tc-title"><div class="link" onclick="${w.click}">${typeIcon(icon)}${codeTag(w.code)}${w.x.kind === "req" ? '<span class="chip-ref">요구사항</span>' : ""}<span class="tlabel">${x.extKey ? `<span class="mono small muted">${esc(x.extKey)}</span> ` : ""}${esc(w.title)}</span></div>${w.flow >= 0 ? " " + flowPipe(w.flow) : ""}${w.stage ? ` <span class="chip-ref">${esc(w.stage)}</span>` : ""}${w.kind === "task" ? taskViaHtml(x) : ""}${w.kind === "ho" ? reqChips(x.reqIds) + hoTcChip(x) : w.kind === "data" ? reqChips(x.reqId ? [x.reqId] : []) : ""}${warn}${w.kind === "task" && x.wbsId ? (() => { const wb = S.wbs.find((z) => z.id === x.wbsId); return wb ? ` <span class="chip-ref" style="cursor:pointer" onclick="editWBS('${wb.id}')" title="관련 WBS">${esc(wb.code)} ${esc(wb.title)}</span>` : ""; })() : ""}</td>
         <td>${w.stSel}</td>
         <td class="nowrap small tc-opt">${w.pri ? priIcon(w.pri) : ""}${w.priSel || (w.pri ? ({ high: "높음", mid: "보통", low: "낮음" }[w.pri] || "") : "")}</td>
         <td class="nowrap tc-opt">${w.start ? `${shortD(w.start)}${w.open ? ` <span class="muted small">${calDays(w.start)}일째</span>` : ""}` : '<span class="muted">-</span>'}</td>
@@ -2906,7 +2999,6 @@ function editTask(id, preset) {
   const devHO = id && x.hoId ? S.handoffs.find((h) => h.id === x.hoId) : null;
   openForm(id ? "업무" : "업무 추가", [
     ...(id && x.code ? [{ k: "_code", l: "번호", t: "ro", v: x.code }] : []),
-    ...(id && x.oldCode ? [{ k: "_old", l: "이전 번호", t: "ro", v: x.oldCode }] : []),
     { k: "kind", l: "구분", t: "select", opts: [["task", "업무"], ["req", "요구사항"], ...(id ? [] : [["recur", "정기 업무"]])], v: x.kind || "task" },
     ...(id ? [] : [{ k: "_issue", l: "이슈로도 등록", t: "check" }]),
     { k: "title", l: "업무", t: "text", full: true, req: true, ph: "예: 협력사 자료 회신 확인" },
@@ -2945,13 +3037,12 @@ function editTask(id, preset) {
     delete v._issue;
     v.updatedAt = new Date().toISOString();
     if (id) {
-      const prev = x.status, chg = [["owner", "담당"], ["due", "마감"], ["link", "링크"], ["stage", "단계"]].filter(([k]) => (x[k] || "") !== (v[k] || "")).map(([k, l]) => `${l}: ${x[k] || "없음"} → ${v[k] || "없음"}`);
+      const prev = x.status, chg = [["owner", "담당"], ["due", "마감"], ["link", "링크"], ["stage", "단계"]].filter(([k]) => k in v && (x[k] || "") !== (v[k] || "")).map(([k, l]) => `${l}: ${x[k] || "없음"} → ${v[k] || "없음"}`);
       if (chg.length) logTask(x, "status", chg.join(" · "));
       Object.assign(x, v); markDone(x, prev); if (prev !== x.status) logTask(x, "status", `${prev} → ${x.status}`); const pend = $("tlText")?.value.trim(); if (pend) logTask(x, "comment", pend, $("tlAt")?.value || today(), tlExtra()); } else { const n = Object.assign({ id: uid("t") }, v); markDone(n, ""); const pend = $("tlText")?.value.trim(); if (pend) logTask(n, "comment", pend, $("tlAt")?.value || today(), tlExtra()); S.tasks.push(n); }
     if (issueR) issueR.taskId = (S.tasks.find((t) => t.riskId === issueR.id) || {}).id || "";
     commit();
-  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } },
-            { l: "전환", cls: "left", fn: () => formSaveThen(() => convertTaskMenu(id)) }] : [],
+  }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("업무를 삭제할까?")) { S.tasks = S.tasks.filter((t) => t.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : [],
   // 진행 기록: 입력은 왼쪽(업무 정보 아래), 쌓인 기록은 오른쪽 (길어져도 따로 스크롤)
   {
     main: (x.riskId && S.risks.some((r) => r.id === x.riskId) ? (() => { const r = S.risks.find((z) => z.id === x.riskId); return `<div class="small" style="margin-top:12px">출처 이슈: <a href="#" onclick="closeModal();editRisk('${r.id}');return false">${esc(r.code)} ${esc(r.title)}</a> ${devImpactBadge(r)}</div>`; })() : "") + (fromNote ? `<div class="small" style="margin-top:12px">출처 회의록: <a href="#" onclick="closeModal();S.ui.pid='${fromNote.projectId}';S.ui.noteId='${fromNote.id}';selTab('notes');return false">${esc(fromNote.title || fromNote.date)}</a></div>` : "") + `<div class="sec-t log-h">진행 기록${id ? `<button class="btn sm" onclick="toggleLogPane()" title="오른쪽 기록 접기/펴기">${S.ui.logFold ? "기록 펴기" : "기록 접기"}</button><button class="btn sm" onclick="addTaskLog('${x.id}')" title="적은 내용을 기록에 추가">+ 추가</button><button class="btn primary sm" onclick="formSaveThen(() => flowNext('${x.id}'))" title="저장하고 다음 단계로">${flowNextLabel(x)}</button>` : ""}</div>
@@ -2959,40 +3050,6 @@ function editTask(id, preset) {
       (id && memoDated(x.memo).length ? `<div class="small muted" style="margin:-6px 0 8px">메모에 날짜별 진행사항이 ${memoDated(x.memo).length}줄 있어. <a href="#" onclick="formSaveThen(() => splitMemoToLog('${x.id}'));return false">진행 기록으로 옮기기</a></div>` : ""),
     side: `<div class="sec-t">기록</div>` + (id ? `<ul class="tl" id="taskLog">${taskLogHtml(x)}</ul>` : `<div class="muted small">저장하면 여기에 쌓여</div>`),
   }, "side");
-}
-// 업무로 적어둔 것을 맞는 항목으로 옮긴다 (기록·메모는 함께 가져가고 업무는 지움, Ctrl+Z로 되돌림)
-function convertTaskMenu(id) {
-  const x = S.tasks.find((t) => t.id === id); if (!x) return;
-  const opt = (k, l, d) => `<button class="btn" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px" onclick="convertTask('${id}','${k}')"><b>${l}</b><div class="small muted">${d}</div></button>`;
-  openModal("다른 항목으로 전환", `<div class="small muted" style="margin-bottom:10px">${esc(x.title)} — 진행 기록과 메모는 그대로 옮겨가고 이 업무는 지워져. (Ctrl+Z로 되돌릴 수 있어)</div>` +
-    opt("ho", "개발 전달", "개발에 넘길 기획 건이라면. 기획중 상태로 만들고, 기록은 내부 메모로만 남겨 (전달 메일에는 안 들어가)"), [{ l: "취소", fn: closeModal }]);
-}
-function convertTask(id, kind) {
-  const x = S.tasks.find((t) => t.id === id); if (!x) return;
-  // 진행 기록 + 메모의 날짜 줄을 함께 기록으로 가져간다
-  const dated = memoDated(x.memo);
-  const logs = [...(x.log || []).filter((e) => e.type === "comment"), ...dated.map((r) => ({ at: r.at, ts: "", text: r.text }))]
-    .sort((a, b) => (a.at + (a.ts || "")).localeCompare(b.at + (b.ts || "")));
-  const restMemo = removeLines(x.memo, dated);
-  const memo = [x.memo || "", ...(x.log || []).filter((e) => e.type === "comment").map((e) => `${e.at} ${e.text}`)].filter(Boolean).join("\n");
-  let open;
-  if (kind === "ms") {
-    const ev = { id: uid("ev"), projectId: x.projectId, title: x.title, type: "마일스톤", start: x.due || x.start || today(), end: "", location: "", memo };
-    S.events.push(ev); open = () => editEvent(ev.id);
-  } else if (kind === "data") {
-    const d = { id: uid("da"), projectId: x.projectId, org: "", name: x.title, contact: x.owner || "", method: "미정", cycle: "미정", status: x.status === "완료" ? "수신 완료" : "협의 중", requestedAt: x.start || today(), dueDate: x.due || "", memo: restMemo,
-      log: logs.map((e) => ({ id: uid("l"), at: e.at, ts: e.ts || new Date().toISOString(), type: "기타", text: e.text })) };
-    d.log.push({ id: uid("l"), at: today(), ts: new Date().toISOString(), type: "기타", text: "업무에서 전환" });
-    S.datas.push(d); S.ui.dataFilter = "open"; S.ui.dataOrg = ""; open = () => openData(d.id);
-  } else {
-    // 요청사항(memo)은 개발자 메일에 들어가므로 비워 두고, 내부 기록은 메모 이벤트로만 남긴다
-    const h = { id: uid("h"), code: x.code || nextHOCode(x.projectId), projectId: x.projectId, title: x.title, status: "plan", docIds: [], screenIds: [], priority: x.priority || "mid", sentAt: "", dueDate: x.due && x.due >= today() ? x.due : "", to: "", toEmail: "", cc: "", link: "", memo: "",
-      events: [...logs, ...(restMemo ? [{ at: today(), text: "업무 메모: " + restMemo }] : [])].map((e) => ({ id: uid("e"), at: e.at, ts: e.ts || new Date().toISOString(), type: "note", text: e.text })) };
-    S.handoffs.push(h); S.ui.hoFilter = "open"; open = () => openHO(h.id);
-  }
-  S.tasks = S.tasks.filter((t) => t.id !== id);
-  commit(); closeModal(); open();
-  toast({ ms: "마일스톤", data: "데이터 협의", ho: "개발 전달" }[kind] + "으로 전환했어", true);
 }
 function taskLogHtml(x) {
   const l = [...(x.log || [])].sort((a, b) => (b.at + (b.ts || "")).localeCompare(a.at + (a.ts || "")));
@@ -3198,7 +3255,6 @@ function renderHO() {
       <td class="nowrap"><button class="btn sm" onclick="openHO('${x.id}')">기록</button></td></tr>`;
   }).join("") || `<tr><td colspan="9" class="empty">해당하는 전달 건이 없어</td></tr>`;
   h += `</tbody></table></div></div>`;
-  h += `<div class="note-box" style="margin-top:12px"><b>운영 규칙</b> — 전달할 때 메일 제목에 <b>[코드]</b>를 붙이고(전달 메일 작성 버튼이 자동으로 붙여줌) 회신에도 유지해달라고 하면, [메일 수신] 탭에서 회신 메일을 붙여넣을 때 자동으로 해당 건에 연결돼.</div>`;
   return h;
 }
 // 업무 번호: 프로젝트 ID 키 + T + 세 자리 (KAN-T001). 개발로 넘어가도 이 번호를 그대로 씀
@@ -3231,6 +3287,9 @@ function syncCodes() {
     const t = taskOfHO(h);
     const want = t ? t.code : /^HO-\d+$/i.test(h.code || "") || !h.code || /^[A-Z]+-\d{3}-\d{2}$/.test(h.code) ? nextTaskCode(h.projectId) : h.code;
     if (h.code !== want) h.code = want;
+    if (t && t.title && h.title !== t.title) h.title = t.title;   // 개발 전달 제목 = 업무 이름 (업무에서 바꾸면 따라감)
+    if (t && t.due && h.dueDate !== t.due) h.dueDate = t.due;   // 업무 마감 = 개발 완료 예정일
+    if (t && t.owner && h.to !== t.owner) h.to = t.owner;   // 업무 담당 = 개발 전달 받는 사람
   });
 }
 const codeTag = (c) => (c ? `<span class="code-tag">${esc(c)}</span>` : "");
@@ -3302,7 +3361,7 @@ function openHO(id, presetType) {
     </div>
     <div class="sec-t">진행 기록</div>
     <ul class="tl">${evs.map((e) => `<li class="${RESP_EV.includes(e.type) ? "resp" : e.type === "reject" ? "bad" : "mine"}">
-      <div class="h"><b>${evLabel(e.type)}</b> · ${e.at} (${wd(e.at)})${e.via === "mail" ? (S.mails.some((m) => m.id === e.mailId) ? ` <button class="btn sm" style="padding:0 6px" onclick="openMail('${e.mailId}')" title="연결된 메일 보기">메일 보기</button>` : " · 메일") : ""}
+      <div class="h"><b>${evLabel(e.type)}</b> · ${e.at} (${wd(e.at)})
       <button class="ico-btn del" onclick="delEvent('${x.id}','${e.id}')" title="삭제" aria-label="삭제">${ICO_DEL}</button></div>
       ${e.text ? `<div class="x">${esc(e.text)}</div>` : ""}</li>`).join("")}</ul>`;
   openModal(`[${x.code}] ${x.title}`, memoSplit(body, "handoffs", x, "전달 내용 / 요청사항"), [
@@ -3665,7 +3724,7 @@ function renderReqs() {
   if (S.ui.pid === "all") return pageHead("요구사항 추적표", "") + needProject("요구사항");
   const pid = S.ui.pid, q = (S.ui.reqQ || "").toLowerCase();
   let list = reqTasks(pid).map((t) => Object.assign({}, t, { screenIds: reqScreens(t) }));
-  if (q) list = list.filter((r) => ((r.code || "") + (r.oldCode || "") + r.title + (r.memo || "") + (r.link || "")).toLowerCase().includes(q));
+  if (q) list = list.filter((r) => ((r.code || "") + r.title + (r.memo || "") + (r.link || "")).toLowerCase().includes(q));
   list.sort((a, b) => String(a.code).localeCompare(String(b.code), "ko", { numeric: true }));
   const stName = (t) => { const w = workItems(pid).find((x) => x.kind === "task" ? x.x.id === t.id : x.kind === "ho" && x.x.id === t.hoId); return w ? (workDone(w) ? "완료" : w.flow < 0 ? "일반" : flowSteps()[w.flow]) : t.stage || "-"; };
   let h = pageHead("요구사항 추적표", esc(projName(pid)), `<button class="btn" onclick="selTab('tasks')">← 업무</button><button class="btn" onclick="exportReqCsv()">CSV</button><button class="btn primary" onclick="editTask(null,{kind:'req'})">+ 요구사항</button>`);
@@ -3673,7 +3732,7 @@ function renderReqs() {
   h += `<div class="card"><div class="tbl-wrap"><table class="t"><thead><tr><th>요구사항</th><th>단계</th><th>관련 WBS</th><th>반영 화면</th><th>테스트</th></tr></thead><tbody>` +
     (list.map((r) => {
       const tr = reqTrace(r), w = r.wbsId && S.wbs.find((x) => x.id === r.wbsId);
-      return `<tr class="row-click" onclick="rowClick(event,()=>editTask('${r.id}'))"><td>${codeTag(r.code)}<span class="link" onclick="editTask('${r.id}')">${esc(r.title)}</span>${r.oldCode ? ` <span class="small muted">(이전 ${esc(r.oldCode)})</span>` : ""}</td>
+      return `<tr class="row-click" onclick="rowClick(event,()=>editTask('${r.id}'))"><td>${codeTag(r.code)}<span class="link" onclick="editTask('${r.id}')">${esc(r.title)}</span></td>
         <td class="small nowrap">${esc(stName(r))}</td>
         <td class="small nowrap">${w ? `${esc(w.wid || w.code)} ${esc(w.title)}` : '<span class="muted">-</span>'}</td>
         <td>${tr.screens.map((sc) => `<span class="chip-ref">${esc(sc.code)}</span>`).join("") || '<span class="muted">-</span>'}</td>
@@ -3703,8 +3762,8 @@ function bulkReqs() {
   ]);
 }
 function exportReqCsv() {
-  const rows = [["번호", "요구사항", "이전 번호", "단계", "출처", "반영 화면", "테스트 케이스", "Pass", "Fail"]];
-  reqTasks(S.ui.pid).forEach((r0) => { const r = Object.assign({}, r0, { screenIds: reqScreens(r0) }), t = reqTrace(r); rows.push([r.code, r.title, r.oldCode || "", r.stage || "", r.link || "", t.screens.map((x) => x.code).join(" "), t.tcs.map((c) => c.code).join(" "), t.pass, t.fail]); });
+  const rows = [["번호", "요구사항", "단계", "출처", "반영 화면", "테스트 케이스", "Pass", "Fail"]];
+  reqTasks(S.ui.pid).forEach((r0) => { const r = Object.assign({}, r0, { screenIds: reqScreens(r0) }), t = reqTrace(r); rows.push([r.code, r.title, r.stage || "", r.link || "", t.screens.map((x) => x.code).join(" "), t.tcs.map((c) => c.code).join(" "), t.pass, t.fail]); });
   download(fileName("csv", projName(S.ui.pid), "요구사항추적표"), "﻿" + rows.map((r) => r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
 
@@ -4052,7 +4111,7 @@ function renderWBS() {
       const isLate = r.end && r.end < today() && r.progress < 100;
       const color = lv === 1 ? "#2f5d8a" : lv === 2 ? "#3a97b0" : "#4688ec";
       const fb = ch.length ? `<button class="tl-fold" onclick="wbsFold('${fk}')" title="${folded ? "펼치기" : "접기"}"><svg class="ico" viewBox="0 0 24 24" style="width:16px;height:16px;margin:0"><path d="${folded ? "m9 18 6-6-6-6" : "m6 9 6 6 6-6"}"/></svg></button>` : `<span style="display:inline-block;width:24px"></span>`;
-      h += `<tr class="${ch.length ? "wbs-grp" : ""} ${lv === 1 ? "wbs-menu" : ""} ${!ch.length && lv > 1 && r.progress >= 100 ? "wbs-done" : ""} row-click" onclick="rowClick(event,()=>editWBS('${w.id}'))" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');wbsDropBefore(event.dataTransfer.getData('text/plain'),'${w.id}')"><td class="mono small nowrap">${esc(w.code)}</td><td class="mono small nowrap">${esc(w.wid || "")}</td>
+      h += `<tr class="${ch.length ? "wbs-grp" : ""} ${lv === 1 ? "wbs-menu" : ""} ${!ch.length && lv > 1 ? (r.progress >= 100 ? "wbs-done" : isLate ? "wbs-late" : "") : ""} row-click" onclick="rowClick(event,()=>editWBS('${w.id}'))" draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${w.id}');this.classList.add('dragging')" ondragend="this.classList.remove('dragging')" ondragover="event.preventDefault();this.classList.add('drop-to')" ondragleave="this.classList.remove('drop-to')" ondrop="event.preventDefault();this.classList.remove('drop-to');wbsDropBefore(event.dataTransfer.getData('text/plain'),'${w.id}')"><td class="mono small nowrap">${esc(w.code)}</td><td class="mono small nowrap">${esc(w.wid || "")}</td>
         <td style="padding-left:${8 + (lv - 1) * 16}px">${fb}<span class="link" onclick="editWBS('${w.id}')">${esc(w.title)}</span>${w.note ? ` <span class="chip-ref">${esc(w.note)}</span>` : ""}<span class="wbs-act"><button class="ico-btn" onclick="wbsAddChild('${w.id}')" title="하위 추가">+</button><button class="ico-btn" onclick="wbsOutdent('${w.id}')" title="한 단계 올리기">←</button><button class="ico-btn" onclick="wbsIndent('${w.id}')" title="한 단계 내리기">→</button></span></td>
 ` +
         fpCell(w, r, !ch.length) + cfCells(w) + (ch.length ? `<td class="nowrap dbl-edit" ondblclick="dblEdit(this,'${w.id}','owner','wbs')">${esc(w.owner || "")}</td><td class="nowrap small">${r.start || ""}</td><td class="nowrap small" style="${isLate ? "color:var(--danger);font-weight:600" : ""}">${r.end || ""}</td><td class="nowrap small"><b>${r.progress}%</b></td>` : leafCells(w, isLate, r)) +
@@ -4488,308 +4547,6 @@ function exportTCCsv(stage, pid = S.ui.pid) {
   download(fileName("csv", projName(pid), `${stage || "통합"}테스트결과`), "﻿" + rows.map((r) => r.map((x) => `"${String(x ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n"), "text/csv");
 }
 
-// ───────────── 메일 수신 (붙여넣기 / .eml) ─────────────
-function renderMail() {
-  const pending = S.mails.filter((m) => m.state === "pending");
-  const done = S.mails.filter((m) => m.state !== "pending").sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  const hoOpts = (sel) => `<option value="">— 연결 안 함 —</option>` + S.handoffs.filter((h) => !proj(h.projectId)?.archived).sort((a, b) => isOpenHO(b) - isOpenHO(a)).map((h) => `<option value="${h.id}" ${sel === h.id ? "selected" : ""}>${esc(h.code)} ${esc(h.title.slice(0, 34))}${isOpenHO(h) ? "" : " (종료)"}</option>`).join("");
-  let h = pageHead("메일 수신", "개발자 회신 메일을 붙여넣거나 .eml 파일을 끌어다 놓으면, [코드]·보낸 사람·제목으로 전달 건을 찾아 타임라인에 반영해.");
-  h += `<div class="grid2"><div>
-    <div class="card"><div class="card-h"><h3>메일 붙여넣기</h3><span class="sub">Outlook 등에서 본문 전체 복사(Ctrl+A, Ctrl+C) → 붙여넣기</span></div><div class="card-b">
-      <textarea id="mailPaste" style="min-height:150px" placeholder="보낸 사람: 김개발 <dev@company.com>&#10;보낸 날짜: 2026년 10월 15일 수요일 오후 3:20&#10;받는 사람: ...&#10;제목: RE: [HO-003] 회원가입 화면설계서 개발 전달&#10;&#10;확인했습니다. 10/20까지 반영 예정입니다."></textarea>
-      <div style="display:flex;gap:6px;margin-top:8px"><button class="btn primary" onclick="parseMailPaste()">분석</button><span class="muted small" style="align-self:center">여러 통은 하나씩 넣어줘 (스레드면 맨 위 최신 메일만 읽음)</span></div>
-      <div class="drop" id="dropZone">.eml 파일을 여기로 끌어다 놓기 (여러 개 가능) · 또는 <a href="#" onclick="document.getElementById('emlFile').click();return false">파일 선택</a></div>
-      <input type="file" id="emlFile" accept=".eml,.txt" multiple style="display:none" onchange="readEmlFiles(this.files);this.value=''">
-    </div></div>
-    ${mailSettingsCard()}
-    <div class="card"><div class="card-h"><h3>반영 대기</h3><span class="sub">${pending.length}통 · 확인 후 [반영]</span>
-      ${pending.some((m) => m.hoId) ? `<div class="actions"><button class="btn sm" onclick="applyAllMatched()">자동 매칭 ${pending.filter((m) => m.hoId).length}통 모두 반영</button></div>` : ""}</div><div class="card-b">` +
-      (pending.map((m) => `<div class="mailcand" id="ml_${m.id}">
-        <div class="subj" style="cursor:pointer" onclick="openMail('${m.id}')" title="전체 본문 보기">${esc(m.subject || "(제목 없음)")}</div>
-        <div class="from">${esc(m.from || "")} · ${esc(m.date || "")}${m.why ? ` · <span style="color:var(--ok)">자동 매칭: ${esc(m.why)}</span>` : ` · <span style="color:var(--warn)">매칭 못함 — 직접 선택</span>`}</div>
-        <div class="snip">${esc((m.body || "").slice(0, 400))}</div>
-        <div class="row">
-          <select id="mh_${m.id}">${hoOpts(m.hoId)}</select>
-          <select id="mt_${m.id}">${EV_TYPES.map(([k, l]) => `<option value="${k}" ${m.type === k ? "selected" : ""}>${l}</option>`).join("")}</select>
-          <input type="date" id="md_${m.id}" value="${esc(m.date || today())}">
-          <button class="btn primary sm" onclick="applyMail('${m.id}')">반영</button>
-          <button class="btn sm ghost" onclick="dropMail('${m.id}')">무시</button>
-        </div></div>`).join("") || `<div class="empty">대기 중인 메일 없음</div>`) +
-    `</div></div></div>
-    <div>
-    <div class="card"><div class="card-h"><h3>수신 로그</h3><span class="sub">${done.length}통</span></div>` +
-      (done.slice(0, 40).map((m) => { const ho = S.handoffs.find((x) => x.id === m.hoId);
-        return `<div class="alert" id="ml_${m.id}"><span class="ic" style="background:${m.state === "applied" ? "var(--ok)" : "var(--line2)"}"></span><div class="body"><div class="tt" onclick="openMail('${m.id}')" title="메일 보기">${esc(m.subject || "(제목 없음)")}</div><div class="d">${esc(m.date || "")} · ${esc((m.from || "").replace(/<.*>/, ""))} ${ho ? `→ <span class="chip-ref" style="cursor:pointer" onclick="openHO('${ho.id}')" title="연결된 전달 건 보기">${esc(ho.code)}</span> ${evLabel(m.type)}` : "· 무시됨"}</div></div></div>`; }).join("") || `<div class="empty">아직 없음</div>`) +
-    `</div>
-    <div class="note-box" style="margin-top:14px"><b>처음 연결하는 순서</b>
-      <ol>
-        <li>메일 환경설정에서 ${S.settings.mail.protocol === "imap" ? "IMAP" : "POP3"} 사용 켜기 (관리자가 막았으면 IT팀 요청)</li>
-        <li>왼쪽 [메일 연동 설정]에서 계정 입력 → [설정 파일 저장]으로 <span class="mono">tools</span> 폴더에 <span class="mono">mail_config.json</span> 저장</li>
-        <li><span class="mono">tools\sync_mail.bat --test</span> 실행 → 비밀번호 입력 → "로그인 OK" 확인</li>
-        <li><span class="mono">tools\sync_mail.bat</span> 실행 → [동기화 파일 불러오기] → 확인 후 반영</li>
-      </ol>
-      비밀번호는 이 화면과 설정 파일에 저장하지 않아. 실행할 때만 입력해. 메일을 지우거나 읽음 처리하지 않아.</div>
-    </div></div>`;
-  return h;
-}
-function bindDrop() {
-  const z = $("dropZone"); if (!z) return;
-  z.ondragover = (e) => { e.preventDefault(); z.classList.add("over"); };
-  z.ondragleave = () => z.classList.remove("over");
-  z.ondrop = (e) => { e.preventDefault(); z.classList.remove("over"); readEmlFiles(e.dataTransfer.files); };
-}
-function readEmlFiles(files) {
-  const arr = [...files]; if (!arr.length) return;
-  let n = 0;
-  arr.forEach((f) => {
-    if (/\.msg$/i.test(f.name)) { toast(".msg(Outlook 형식)는 아직 못 읽어 — 본문 복사 붙여넣기로 해줘"); return; }
-    const r = new FileReader();
-    r.onload = () => { queueMail(parseEml(r.result)); if (++n === arr.length) { commit(); toast(`${n}통 분석됨`); } };
-    r.readAsText(f);
-  });
-}
-function parseMailPaste() {
-  const t = $("mailPaste").value.trim(); if (!t) return;
-  const m = /^(Received|Return-Path|MIME-Version|Message-ID):/im.test(t) ? parseEml(t) : parseOutlookText(t);
-  queueMail(m); commit(); toast("분석 완료 — 반영 대기 확인");
-}
-function queueMail(m) {
-  const match = matchHandoff(m);
-  S.mails.push(Object.assign({ id: uid("m"), state: "pending", hoId: match?.h.id || "", why: match?.why || "", type: guessType(m.subject + "\n" + m.body) }, m, { body: (m.body || "").slice(0, 4000) }));
-}
-function applyMail(mid) {
-  const m = S.mails.find((x) => x.id === mid);
-  const hid = $("mh_" + mid).value, type = $("mt_" + mid).value, at = $("md_" + mid).value || today();
-  if (!hid) { toast("연결할 전달 건을 골라줘"); return; }
-  const h = S.handoffs.find((x) => x.id === hid);
-  pushEvent(h, { type, at, via: "mail", mailId: m.id, text: mailEventText(m) });
-  Object.assign(m, { state: "applied", hoId: hid, type, date: at });
-  commit(); toast(`[${h.code}] ${evLabel(type)} 반영`);
-}
-// 메일 한 통 보기. 연결된 전달 건과 진행 기록 사이를 오갈 수 있게
-function openMail(mid) {
-  const m = S.mails.find((x) => x.id === mid); if (!m) { toast("메일을 찾을 수 없어"); return; }
-  const ho = S.handoffs.find((x) => x.id === m.hoId);
-  const st = { pending: "반영 대기", applied: "반영됨", ignored: "무시됨" }[m.state] || m.state;
-  const body = `<div class="info">
-      <div class="l">보낸 사람</div><div>${esc(m.from || "-")}</div>
-      <div class="l">날짜</div><div>${esc(m.date || "-")}</div>
-      <div class="l">상태</div><div>${st}${m.state === "applied" ? " · " + evLabel(m.type) : ""}</div>
-      <div class="l">전달 건</div><div>${ho ? `<span class="chip-ref" style="cursor:pointer" onclick="openHO('${ho.id}')">${esc(ho.code)} ${esc(ho.title)}</span>` : '<span class="muted">연결 안 됨</span>'}</div>
-    </div>
-    <div class="sec-t">본문</div>
-    <div style="white-space:pre-wrap;font-size:13px;line-height:1.6;max-height:50vh;overflow:auto;border:1px solid var(--line);border-radius:5px;padding:10px 12px">${esc(m.body || "(본문 없음)")}</div>`;
-  openModal(m.subject || "(제목 없음)", body, [
-    ...(ho ? [{ l: `${ho.code} 전달 건 보기`, cls: "left", fn: () => openHO(ho.id) }] : []),
-    { l: "메일 수신 화면에서 보기", fn: () => goMail(m.id) },
-    { l: "닫기", cls: "primary", fn: closeModal },
-  ], true);
-}
-function goMail(mid) {
-  closeModal(); S.ui.tab = "mail"; persistUI(); render();
-  const el = $("ml_" + mid);
-  if (el) { el.scrollIntoView({ block: "center" }); el.style.outline = "2px solid var(--accent)"; setTimeout(() => (el.style.outline = ""), 2000); }
-}
-function mailEventText(m) {
-  const body = (m.body || "").trim().split(/\n/).filter((l) => l.trim()).slice(0, 6).join("\n");
-  return `${m.subject}\n${(m.from || "").replace(/<.*>/, "").trim()}: ${body}`.slice(0, 600);
-}
-const MAIL_PRESETS = {
-  hiworks: { l: "하이웍스", protocol: "pop3", host: "pop3s.hiworks.com", port: 995 },
-  gmail: { l: "Gmail / Google Workspace", protocol: "imap", host: "imap.gmail.com", port: 993 },
-  naver: { l: "네이버 메일", protocol: "imap", host: "imap.naver.com", port: 993 },
-  custom: { l: "직접 입력 (다른 회사 메일)", protocol: "imap", host: "", port: 993 },
-};
-function mailSettingsCard() {
-  const m = S.settings.mail, last = m.last;
-  const senders = String(m.devSenders || "").split(/[\s,;]+/).filter(Boolean);
-  return `<div class="card"><div class="card-h"><h3>메일 연동 설정</h3><span class="sub">${m.user ? "연결 계정 등록됨" : "계정 미등록"}</span>
-      <div class="actions"><button class="btn sm" onclick="editMailSettings()">설정 변경</button></div></div>
-    <div class="card-b"><div class="info">
-      <div class="l">메일</div><div>${esc((MAIL_PRESETS[m.provider] || MAIL_PRESETS.custom).l)}</div>
-      <div class="l">계정</div><div>${m.user ? esc(m.user) : `<span style="color:var(--warn)">미입력</span>`}</div>
-      <div class="l">서버</div><div class="mono">${esc(String(m.protocol).toUpperCase())} · ${esc(m.host || "-")}:${esc(m.port)}${m.protocol === "imap" ? ` · ${esc(m.folder || "INBOX")}` : ""}</div>
-      <div class="l">가져오는 메일</div><div>제목에 [업무 번호]가 있는 메일${senders.length ? ` + 개발자 ${senders.length}명이 보낸 메일` : ""} · 최근 ${esc(m.days)}일</div>
-      <div class="l">마지막 동기화</div><div>${last ? `${esc((last.at || "").replace("T", " ").slice(0, 16))} · ${esc(last.account || "")} · ${esc(last.count)}통` : `<span class="muted">아직 없음</span>`}</div>
-    </div>
-    <div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap">
-      <button class="btn" onclick="saveMailConfig()">설정 파일 저장</button>
-      <button class="btn primary" onclick="pickMailJson()">동기화 파일 불러오기</button>
-    </div></div></div>`;
-}
-function editMailSettings() {
-  const m = S.settings.mail;
-  openForm("메일 연동 설정", [
-    { k: "provider", l: "메일 서비스", t: "select", opts: Object.entries(MAIL_PRESETS).map(([k, v]) => [k, v.l]) },
-    { k: "user", l: "메일 주소 (로그인 아이디)", t: "text", ph: "me@company.co.kr" },
-    { k: "protocol", l: "방식", t: "select", opts: [["pop3", "POP3 (보안 연결)"], ["imap", "IMAP (보안 연결)"]] },
-    { k: "host", l: "메일 서버 주소", t: "text", ph: "pop3s.hiworks.com" },
-    { k: "port", l: "포트", t: "number", hint: "POP3 보안 995 · IMAP 보안 993" },
-    { k: "folder", l: "메일함 (IMAP만)", t: "text", ph: "INBOX" },
-    { k: "days", l: "최근 며칠치 가져오기", t: "number" },
-    { k: "devSenders", l: "개발자 메일 주소 (코드 없는 메일도 가져올 사람)", t: "textarea", full: true, ph: "dev1@company.co.kr\ndev2@partner.com", hint: "한 줄에 한 명" },
-  ], m, (v) => {
-    v.port = Number(v.port) || (v.protocol === "imap" ? 993 : 995);
-    v.days = Math.max(1, Math.min(90, Number(v.days) || 14));
-    Object.assign(S.settings.mail, v); commit(); toast("메일 연동 설정 저장 — [설정 파일 저장]으로 tools 폴더에 반영해줘");
-  });
-  const sel = document.querySelector('#fForm [data-k="provider"]');
-  sel.addEventListener("change", () => {
-    const p = MAIL_PRESETS[sel.value]; if (!p) return;
-    document.querySelector('#fForm [data-k="protocol"]').value = p.protocol;
-    document.querySelector('#fForm [data-k="host"]').value = p.host;
-    document.querySelector('#fForm [data-k="port"]').value = p.port;
-  });
-}
-// tools/mail_sync.py 가 읽는 mail_config.json (비밀번호는 넣지 않음)
-async function saveMailConfig() {
-  const m = S.settings.mail;
-  if (!m.user || !m.host) { toast("메일 주소와 서버를 먼저 입력해줘"); editMailSettings(); return; }
-  const cfg = { provider: m.provider, protocol: m.protocol, host: m.host, port: Number(m.port), user: m.user, folder: m.folder || "INBOX", days: Number(m.days) || 14,
-    code_prefix: S.settings.hoPrefix || "HO", dev_senders: String(m.devSenders || "").split(/[\s,;]+/).filter(Boolean), scan_limit: 400, output: "../mail_inbox.json" };
-  const text = JSON.stringify(cfg, null, 2);
-  if (window.showSaveFilePicker) {
-    try {
-      const h = await window.showSaveFilePicker({ suggestedName: "mail_config.json", types: [{ description: "JSON", accept: { "application/json": [".json"] } }] });
-      const w = await h.createWritable(); await w.write(text); await w.close();
-      toast("저장 완료 — planner-desk\\tools 폴더에 저장했는지 확인해줘"); return;
-    } catch (e) { if (e.name === "AbortError") return; }
-  }
-  download("mail_config.json", text, "application/json");
-  toast("다운로드한 mail_config.json을 planner-desk\\tools 폴더로 옮겨줘");
-}
-let mailFileHandle = null;
-async function pickMailJson() {
-  if (window.showOpenFilePicker) {
-    try {
-      if (!mailFileHandle) [mailFileHandle] = await window.showOpenFilePicker({ types: [{ description: "mail_inbox.json", accept: { "application/json": [".json"] } }] });
-      importMailJson(JSON.parse(await (await mailFileHandle.getFile()).text()));
-      return;
-    } catch (e) { if (e.name === "AbortError") return; mailFileHandle = null; }
-  }
-  const inp = document.createElement("input"); inp.type = "file"; inp.accept = ".json";
-  inp.onchange = () => inp.files[0].text().then((t) => importMailJson(JSON.parse(t)));
-  inp.click();
-}
-// tools/hiworks_mail_sync.py 가 만든 mail_inbox.json → 반영 대기에 추가 (messageId로 중복 제외)
-function importMailJson(d) {
-  const known = new Set(S.mails.map((m) => m.messageId).filter(Boolean));
-  let n = 0;
-  (d.mails || []).forEach((m) => {
-    if (m.messageId && known.has(m.messageId)) return;
-    queueMail({ messageId: m.messageId || "", from: m.from || "", subject: m.subject || "", date: m.date || today(), body: m.body || "" });
-    known.add(m.messageId); n++;
-  });
-  S.settings.mail.last = { at: d.exportedAt || new Date().toISOString(), account: d.account || "", host: d.host || "", count: (d.mails || []).length, added: n };
-  S.ui.tab = "mail"; commit();
-  toast(n ? `새 메일 ${n}통 — 매칭 확인 후 반영해줘` : "새 메일 없음");
-}
-function applyAllMatched() {
-  const list = S.mails.filter((m) => m.state === "pending" && m.hoId);
-  list.forEach((m) => {
-    const h = S.handoffs.find((x) => x.id === m.hoId); if (!h) return;
-    const type = $("mt_" + m.id)?.value || m.type, at = $("md_" + m.id)?.value || m.date || today();
-    pushEvent(h, { type, at, via: "mail", mailId: m.id, text: mailEventText(m) });
-    Object.assign(m, { state: "applied", type, date: at });
-  });
-  commit(); toast(`${list.length}통 반영`);
-}
-function dropMail(mid) { const m = S.mails.find((x) => x.id === mid); m.state = "ignored"; commit(); }
-
-function guessType(t) {
-  const s = t.replace(/(완료|배포|반영|적용|처리)\s*(예정|목표|일정|요청|부탁)/g, "");   // "완료 예정"은 완료가 아님
-  if (/완료|배포(했|하였|됐|되었)|반영(했|하였|됐|되었)|적용(했|하였|됐|되었)|처리(했|하였|됐|되었)|개발 ?끝/.test(s)) return "done";
-  if (/컨펌|승인(합니다|했|드립니다|드려요)|진행하셔도|진행해 ?주세요/.test(s)) return "confirm";
-  if (/\?|문의|질문|궁금|확인 ?부탁|어떻게|맞나요|인지요/.test(s)) return "question";
-  if (/접수|확인했|확인하였|확인 ?했습니다|검토하겠|확인하겠|받았습니다|수신했/.test(s)) return "ack";
-  if (/진행 ?중|작업 ?중|개발 ?중|예정입니다|까지/.test(s)) return "progress";
-  return "note";
-}
-function matchHandoff(m) {
-  const text = `${m.subject}\n${m.body}`;
-  const up = text.toUpperCase();
-  const byCode = S.handoffs.filter((x) => x.code && up.includes(x.code.toUpperCase())).sort((a, b) => b.code.length - a.code.length)[0];
-  if (byCode) return { h: byCode, why: "번호 " + byCode.code };
-  const em = ((m.from || "").match(/[\w.+-]+@[\w.-]+/) || [""])[0].toLowerCase();
-  const subj = (m.subject || "").replace(/^(re|fw|fwd|회신|전달|답장)\s*:\s*/gi, "").toLowerCase();
-  let best = null, score = 0;
-  S.handoffs.filter(isOpenHO).forEach((h) => {
-    let s = 0;
-    if (em && (h.toEmail || "").toLowerCase().includes(em)) s += 2;
-    const toks = h.title.toLowerCase().split(/[\s,·/()\[\]-]+/).filter((w) => w.length >= 2);
-    const hit = toks.filter((w) => subj.includes(w)).length;
-    s += Math.min(3, hit);
-    if (s > score) { score = s; best = h; }
-  });
-  return score >= 2 ? { h: best, why: em && (best.toEmail || "").toLowerCase().includes(em) ? "보낸 사람·제목" : "제목 유사" } : null;
-}
-function parseKDate(s) {
-  if (!s) return today();
-  let m = s.match(/(\d{4})\s*[년.\-/]\s*(\d{1,2})\s*[월.\-/]\s*(\d{1,2})/);
-  if (m) return `${m[1]}-${pad(m[2])}-${pad(m[3])}`;
-  const d = new Date(s); return isNaN(d) ? today() : fmtD(d);
-}
-function parseOutlookText(t) {
-  const lines = t.replace(/\r/g, "").split("\n");
-  const hd = {}; let i = 0, sawHeader = false;
-  const keys = { from: /^(보낸 ?사람|From|발신자?)\s*:\s*(.*)$/i, date: /^(보낸 ?날짜|날짜|Sent|Date|발신일시?)\s*:\s*(.*)$/i, subject: /^(제목|Subject)\s*:\s*(.*)$/i, to: /^(받는 ?사람|To|수신자?|참조|Cc)\s*:\s*(.*)$/i };
-  for (; i < Math.min(lines.length, 14); i++) {
-    const l = lines[i].trim(); if (!l) { if (sawHeader && hd.subject !== undefined) { i++; break; } continue; }
-    let hit = false;
-    for (const [k, re] of Object.entries(keys)) { const m = l.match(re); if (m) { if (hd[k] === undefined) hd[k] = m[2].trim(); hit = sawHeader = true; break; } }
-    if (!hit && sawHeader) break;
-    if (!hit && !sawHeader) { if (hd.subject === undefined) hd.subject = l; sawHeader = true; i++; break; }
-  }
-  let body = lines.slice(i).join("\n");
-  const cut = body.search(/\n\s*(-{2,}\s*(Original Message|원본 메시지)\s*-{2,}|보낸 ?사람\s*:|From\s*:)/i);
-  if (cut > 0) body = body.slice(0, cut);
-  return { from: hd.from || "", subject: hd.subject || "", date: parseKDate(hd.date), body: body.trim() };
-}
-// ── 최소 .eml 파서 (헤더 디코딩 + text/plain 우선, multipart 재귀) ──
-function decodeWords(s) {
-  return String(s || "").replace(/\?=\s+=\?/g, "?==?").replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (m, cs, enc, txt) => {
-    try {
-      let bin = enc.toUpperCase() === "B" ? atob(txt) : txt.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
-      return new TextDecoder(cs).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
-    } catch (e) { return m; }
-  });
-}
-function splitMsg(raw) {
-  const idx = raw.search(/\r?\n\r?\n/);
-  const head = idx < 0 ? raw : raw.slice(0, idx), body = idx < 0 ? "" : raw.slice(idx).replace(/^\r?\n\r?\n/, "");
-  const h = {};
-  head.replace(/\r?\n[ \t]+/g, " ").split(/\r?\n/).forEach((l) => { const m = l.match(/^([\w-]+):\s*(.*)$/); if (m) { const k = m[1].toLowerCase(); if (!(k in h)) h[k] = m[2]; } });
-  return { h, body };
-}
-function decodeBody(body, cte, charset) {
-  cte = (cte || "").toLowerCase(); charset = charset || "utf-8";
-  let bin;
-  if (cte.includes("base64")) { try { bin = atob(body.replace(/\s+/g, "")); } catch (e) { return body; } }
-  else if (cte.includes("quoted-printable")) bin = body.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (x, h) => String.fromCharCode(parseInt(h, 16)));
-  else return body;
-  try { return new TextDecoder(charset).decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))); } catch (e) { return bin; }
-}
-function partText(h, body) {
-  const ct = h["content-type"] || "text/plain";
-  const bm = ct.match(/boundary="?([^";]+)"?/i);
-  if (/multipart\//i.test(ct) && bm) {
-    const parts = body.split("--" + bm[1]).slice(1).filter((p) => !p.startsWith("--")).map((p) => splitMsg(p.replace(/^\r?\n/, "")));
-    const pick = parts.find((p) => /text\/plain/i.test(p.h["content-type"] || "")) || parts.find((p) => /multipart/i.test(p.h["content-type"] || "")) || parts.find((p) => /text\/html/i.test(p.h["content-type"] || ""));
-    return pick ? partText(pick.h, pick.body) : "";
-  }
-  const cs = (ct.match(/charset="?([^";]+)"?/i) || [])[1];
-  let txt = decodeBody(body, h["content-transfer-encoding"], cs);
-  if (/text\/html/i.test(ct)) txt = txt.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<br\s*\/?>|<\/p>|<\/div>/gi, "\n").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-  return txt;
-}
-function parseEml(raw) {
-  const { h, body } = splitMsg(raw);
-  let text = partText(h, body).replace(/\r/g, "");
-  const cut = text.search(/\n\s*(-{2,}\s*(Original Message|원본 메시지)\s*-{2,}|보낸 ?사람\s*:|From\s*:|.*wrote:\s*\n|>)/i);
-  if (cut > 0) text = text.slice(0, cut);
-  return { from: decodeWords(h.from), subject: decodeWords(h.subject), date: parseKDate(h.date), body: text.trim() };
-}
-
 // ───────────── 메모·회의록 ─────────────
 function renderNotes() {
   const list = S.notes.filter((n) => S.ui.pid === "all" ? !proj(n.projectId)?.archived : n.projectId === S.ui.pid).sort((a, b) => (b.date || "").localeCompare(a.date || "") || (b.updatedAt || "").localeCompare(a.updatedAt || ""));
@@ -5045,6 +4802,7 @@ function openSettings() {
     { k: "quietDays", l: "진행 공유 없음 기준 (영업일)", t: "number" },
     { k: "verifyDays", l: "테스트 대기 알림 (개발 완료 후 일)", t: "number" },
     { k: "reportWeek", l: "주간보고 기간", t: "select", opts: [["rolling", "오늘 기준 최근 7일"], ["mon", "월요일~일요일 (이번 주)"]] },
+    { k: "saveDir", l: "저장 폴더", t: "text", full: true },
     { k: "fontScale", l: "글자 크기", t: "select", opts: [["1", "보통"], ["1.1", "크게"], ["1.2", "아주 크게"]] },
     { k: "theme", l: "화면 테마", t: "select", opts: [["light", "화이트"], ["dark", "다크"]] },
     { k: "flowText", l: "업무 흐름 단계 (협의·기획·개발·완료는 고정, 사이에 추가)", t: "text", full: true, v: flowSteps().join(" > ") },
@@ -5057,6 +4815,7 @@ function openSettings() {
       if (st.filter((x) => FLOW_FIXED.includes(x)).join() !== FLOW_FIXED.join() || st[0] !== "협의" || st[st.length - 1] !== "완료" || new Set(st).size !== st.length) { toast("협의 > 기획 > 개발 > 완료 순서는 그대로 두고 사이에만 넣어줘"); return false; }
       v.flowSteps = st; delete v.flowText;
     }
+    if (v.saveDir !== undefined) v.saveDir = String(v.saveDir).trim().replace(/^"|"$/g, "").replace(/\\+$/, "");
     const turnOn = v.desktopNotify === "on" && S.settings.desktopNotify !== "on";
     Object.assign(S.settings, v); commit();
     if (turnOn) enableNotify();
@@ -5082,7 +4841,6 @@ function openHelp() {
     <div class="sec-t">데이터</div>
     ${row("자동 저장", "브라우저에 바로 저장")}
     ${row("파일 저장", "저장 → 데이터가 든 HTML (다른 PC에서도 그대로)")}
-    ${row("메일 연동", "메일 수신 → 메일 연동 설정 → tools\\sync_mail.bat")}
     <div class="sec-t">경고가 뜨는 경우</div>
     <div class="small muted">개발 기한 지남 · 테스트 대기 · 승인 회신 없음(${S.settings.approvalDays}일) · 데이터 미수신 · 결함 미전달 · 재테스트 필요 · 화면 미반영 요구사항 · 마감 지남. 기준일은 설정에서 바꿀 수 있어.</div>`,
     [{ l: "닫기", cls: "primary", fn: closeModal }]);
@@ -5323,8 +5081,7 @@ let lastTick = { date: today(), n: computeAlerts(null).length };
 function tick() {
   checkNotify();
   const a = document.activeElement, typing = a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-  const pendingPaste = $("mailPaste") && $("mailPaste").value.trim();
-  if (document.hidden || typing || pendingPaste || $("modalBg").classList.contains("open")) return;
+  if (document.hidden || typing || $("modalBg").classList.contains("open")) return;
   const now = { date: today(), n: computeAlerts(null).length };
   if (now.date !== lastTick.date || now.n !== lastTick.n) { lastTick = now; render(); }
 }
