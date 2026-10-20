@@ -1834,7 +1834,7 @@ function todayCard(pid, alerts) {
   const week = calItems(addDays(t, 1), addDays(t, 7), pid, { event: 1, task: 1, data: 1, ho: 1, doc: 1, recur: 1, wbs: 0 }).filter((i) => !i.done);
   const m = missingDates(pid), miss = m.task.length + m.wbs.length + m.doc.length;
   const al = (a) => { const [type, id] = a.ref; const open = { ho: `openHO('${id}')`, doc: `editDoc('${id}')`, wbs: `editWBS('${id}')`, task: `editTask('${id}')`, recur: `editRecur('${id}')`, data: `openData('${id}')`, tc: `editTC('${id}')`, screen: `selProject('${a.pid}');editScreen('${id}')`, req: `editReq('${id}')`, risk: `editRisk('${id}')` }[type];
-    return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${esc(a.kind)}</span>${a.due ? `<span class="td-due">${shortD(a.due).replace(/\(.\)$/, "")} ${a.dueL} · ${a.days}일</span>` : ""}<span class="nm">${esc(a.title)}</span></div>`; };
+    return `<div class="td-i" onclick="${open}"><span class="td-k ${a.level}">${a.due ? "지연" : esc(a.kind)}</span>${a.due ? `<span class="td-due">${shortD(a.due).replace(/\(.\)$/, "")} ${a.dueL} · ${a.days}일</span>` : ""}<span class="nm">${esc(a.title)}</span></div>`; };
   const it = (i, d) => `<div class="td-i" onclick="${i.click}">${typeIcon(i.icon || i.kind)}<span class="nm">${d ? `<b>${shortD(i.date)}</b> ` : ""}${esc(i.title)}</span></div>`;
   const col = (title, n, body, empty) => `<div class="td-col"><div class="td-h">${title} <span class="cnt ${n ? "" : "gray"}">${n}</span></div>${body || `<div class="small muted" style="padding:6px 0">${empty}</div>`}</div>`;
   return `<div class="card td"><div class="card-h"><h3>오늘 할 일</h3><span class="sub">${t} (${wd(t)})</span>
