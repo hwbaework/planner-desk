@@ -2356,7 +2356,7 @@ function calItems(from, to, pid, kinds = calViewKinds()) {
   });
   // 지연: 날짜가 지났는데 아직 안 끝난 마감성 항목 (일정·WBS 시작은 제외)
   const t = today();
-  out.forEach((i) => (i.late = !i.done && i.date < t && i.kind !== "event" && i.edge !== "start"));
+  out.forEach((i) => (i.late = !i.done && i.date < t && i.kind !== "event" && i.kind !== "recur" && i.edge !== "start"));
   const order = { event: 0, recur: 1, task: 2, data: 3, ho: 4, doc: 5, wbs: 6 };
   return out.sort((a, b) => a.date.localeCompare(b.date) || b.late - a.late || order[a.kind] - order[b.kind]);
 }
