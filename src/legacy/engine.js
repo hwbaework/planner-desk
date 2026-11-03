@@ -738,11 +738,6 @@ function render() {
   if (S.ui.pid !== "all" && !proj(S.ui.pid)) S.ui.pid = "all";
   document.documentElement.setAttribute("data-theme", S.settings.theme === "dark" ? "dark" : "light");
   document.body.style.zoom = Number(S.settings.fontScale) || 1;
-  $("themeBtn").innerHTML = S.settings.theme === "dark"
-    ? '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
-    : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
-  $("todayLabel").textContent = `오늘 ${today()} (${wd(today())})`;
-  renderBanner(); renderSide(); renderTabs();
   if (S.ui.tab === "board") S.ui.tab = "tasks";   // 보드 메뉴 없앰 (업무 단계 보드로)
   const v = { funcs: renderFuncs, dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderTasks, docs: renderDocs, reqs: renderReqs, risks: renderRisks, screens: renderScreens, wbs: renderWBS, tc: renderTC, notes: renderNotes }[S.ui.tab] || renderDash;
   const _react = window.__reactTabs?.has(S.ui.tab);
@@ -1142,7 +1137,7 @@ const QUICK = [
   ["req", "요구사항", "REQ 등록", () => editReq()],
   ["note", "메모·회의록", "양식 고르기", () => { selTab("notes"); newNote(); }],
 ];
-function quickCreate() {
+function quickCreate() { if (window.__reactModals?.quickCreate) return window.__reactModals.quickCreate(...arguments);
   if (!activeProjects().length) { editProject(); return; }
   const icon = { ms: "event", risk: "bug", req: "doc", note: "doc" };
   openModal("만들기", `<div class="small muted" style="margin-bottom:8px">${S.ui.pid !== "all" ? esc(projName(S.ui.pid)) + "에" : "첫 프로젝트에 (창에서 바꿀 수 있어)"} 만들어. 단축키: 화면 어디서든 <b>C</b></div>` +
@@ -1457,7 +1452,7 @@ document.addEventListener("mousedown", (e) => {
   document.addEventListener("mousemove", move); document.addEventListener("mouseup", up);
 });
 // 타임라인에서 바로 추가 · 삭제
-function tlAdd(pid) {
+function tlAdd(pid) { if (window.__reactModals?.tlAdd) return window.__reactModals.tlAdd(...arguments);
   pid = pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id);
   if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
   const go = (fn) => `closeModal();S.ui.pid='${pid}';${fn}`;
@@ -1610,7 +1605,7 @@ function calToIssue(kind, id, date) {
   editRisk(null, { type: "이슈", impact: "M", prob: "H", projectId: x.projectId, srcRef: `${kind}:${id}`,
     title: `${label} 지연: ${name}`, desc: `${shortD(date)} 예정이던 ${label} 항목이 ${calDays(date)}일 지났어` });
 }
-function editEvent(id, date) {
+function editEvent(id, date) { if (window.__reactModals?.editEvent) return window.__reactModals.editEvent(...arguments);
   const e = id ? S.events.find((x) => x.id === id) : { start: date || today(), type: "회의", projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id };
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   openForm(id ? "일정" : "일정 추가", [
@@ -1687,7 +1682,7 @@ function dataFields(x) {
     { k: "memo", l: "메모 / 이슈", t: "textarea", side: true },
   ];
 }
-function editData(id, preset) {
+function editData(id, preset) { if (window.__reactModals?.editData) return window.__reactModals.editData(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const x = id ? S.datas.find((d) => d.id === id) : Object.assign({ status: "협의 전", method: "미정", cycle: "미정", requestedAt: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id, org: S.ui.dataOrg || "" }, preset || {});
   openForm(id ? "데이터 항목 편집" : "데이터 항목 추가", dataFields(x), x, (v) => {
@@ -1696,7 +1691,7 @@ function editData(id, preset) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("데이터 항목을 삭제할까?")) { S.datas = S.datas.filter((d) => d.id !== id); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
-function openData(id) {
+function openData(id) { if (window.__reactModals?.openData) return window.__reactModals.openData(...arguments);
   const x = S.datas.find((d) => d.id === id); if (!x) return;
   const notes = S.notes.filter((n) => n.projectId === x.projectId).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   const logs = [...x.log].sort((a, b) => (b.at + (b.ts || "")).localeCompare(a.at + (a.ts || "")));
@@ -1743,7 +1738,7 @@ function addDataLog(id) {
   commit(); openData(id); toast("진행 기록 추가");
 }
 function delDataLog(id, lid) { const x = S.datas.find((d) => d.id === id); if (!confirm("이 기록을 지울까?")) return; x.log = x.log.filter((l) => l.id !== lid); commit(); openData(id); }
-function bulkData() {
+function bulkData() { if (window.__reactModals?.bulkData) return window.__reactModals.bulkData(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
   openModal("데이터 항목 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사 (탭 구분): <b>제공 기관 · 데이터 항목 · 담당자 · 제공 방식 · 주기 · 수신 예정일</b>. 뒤쪽 열은 생략 가능. 프로젝트: <b>${esc(projName(pid))}</b></p>
@@ -2138,7 +2133,7 @@ function pickTaskCsv() {
   inp.onchange = () => inp.files[0] && inp.files[0].arrayBuffer().then((buf) => importTaskCsv(decodeText(buf)));
   inp.click();
 }
-function importTaskCsv(text) {
+function importTaskCsv(text) { if (window.__reactModals?.importTaskCsv) return window.__reactModals.importTaskCsv(...arguments);
   const { items, cols } = csvToTasks(text);
   const has = (k) => cols[k] !== undefined;
   if (!items.length) { toast("업무를 못 찾았어 — 첫 줄에 Summary/요약 같은 열 이름이 있어야 해"); return; }
@@ -2171,7 +2166,7 @@ function logTask(x, type, text, at, extra) { x.log = x.log || []; x.log.push(Obj
 // 진행 기록 입력칸의 '누구에게'·'링크'
 function tlExtra() { const to = $("tlTo")?.value.trim(), link = $("tlLink")?.value.trim(); return Object.assign({}, to ? { to } : {}, link ? { link } : {}); }
 function setTask(id, k, v) { const x = S.tasks.find((t) => t.id === id); const prev = x.status; x[k] = v; x.updatedAt = new Date().toISOString(); if (k === "status") { markDone(x, prev); if (prev !== v) logTask(x, "status", `${prev} → ${v}`); } commit(); if (k === "status" && v === "완료") toast("완료 처리"); }
-function editTask(id, preset) {
+function editTask(id, preset) { if (window.__reactModals?.editTask) return window.__reactModals.editTask(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const x = id ? S.tasks.find((t) => t.id === id) : Object.assign({ status: "진행중", priority: "mid", start: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
   const fromNote = x.noteId && S.notes.find((n) => n.id === x.noteId);
@@ -2301,7 +2296,7 @@ function memoPick(mode) {
   document.querySelectorAll(".mchk").forEach((c) => (c.checked = mode === "all" ? true : mode === "none" ? false : c.dataset.plan !== "1" && c.checked));
 }
 // 일괄 변환은 미리보기에서 줄마다 고른 뒤 실행
-function splitAllMemos() {
+function splitAllMemos() { if (window.__reactModals?.splitAllMemos) return window.__reactModals.splitAllMemos(...arguments);
   const list = S.tasks.filter((t) => inScope(t) && memoDated(t.memo).length);
   if (!list.length) { toast("옮길 날짜 줄이 없어"); return; }
   const total = list.reduce((a, t) => a + memoDated(t.memo).length, 0);
@@ -2367,7 +2362,7 @@ function recurDates(r, from, to) {
 }
 // 다음 예정 = 오늘 이후 첫 회차 (정기 업무는 항목으로만: 완료 체크 없음)
 function recurNext(r) { return recurDates(r, today(), addDays(today(), 400))[0] || ""; }
-function editRecur(id) {
+function editRecur(id) { if (window.__reactModals?.editRecur) return window.__reactModals.editRecur(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const r = id ? S.recurring.find((x) => x.id === id) : { freq: "weekly", day: 3, projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id };
   const view = Object.assign({}, r, { wday: r.freq === "weekly" ? String(r.day) : "3", mday: r.freq === "monthly" ? r.day : 1 });
@@ -2485,7 +2480,7 @@ function hoFields(x) {
     { k: "memo", l: "전달 내용 / 요청사항", t: "textarea", side: true },
   ];
 }
-function editHO(id, preset) {
+function editHO(id, preset) { if (window.__reactModals?.editHO) return window.__reactModals.editHO(...arguments);
   const x = id ? S.handoffs.find((h) => h.id === id) : Object.assign({ docIds: [], screenIds: [] }, preset || {});
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   openForm(id ? `전달 건 편집 · ${x.code}` : "개발 전달 등록", hoFields(x), x, (v) => {
@@ -2502,7 +2497,7 @@ function editHO(id, preset) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("이 전달 건을 삭제할까?")) { S.handoffs = S.handoffs.filter((h) => h.id !== id); relinkScreens(); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
-function openHO(id, presetType) {
+function openHO(id, presetType) { if (window.__reactModals?.openHO) return window.__reactModals.openHO(...arguments);
   const x = S.handoffs.find((h) => h.id === id); if (!x) return;
   const refs = x.docIds.map((i) => S.docs.find((d) => d.id === i)).filter(Boolean).map((d) => `<span class="chip-ref" style="cursor:pointer" onclick="editDoc('${d.id}')">문서 ${esc(d.name)} ${esc(d.version || "")}</span>`).join("") +
     x.screenIds.map((i) => S.screens.find((s) => s.id === i)).filter(Boolean).map((s) => `<span class="chip-ref">화면 ${esc(s.code)} ${esc(s.name)}</span>`).join("");
@@ -2735,7 +2730,7 @@ function applyRevise(d, why) {
   d.version = nv; d.status = "작성중"; d.requestedAt = ""; d.approvedAt = "";
   commit(); toast(`${d.name} ${nv}`);
 }
-function editDoc(id, phaseId, status) {
+function editDoc(id, phaseId, status) { if (window.__reactModals?.editDoc) return window.__reactModals.editDoc(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id;
   const d = id ? S.docs.find((x) => x.id === id) : { phase: phaseId || "P1", status: status || "미착수", version: "v0.1", projectId: pid, history: [] };
@@ -2801,7 +2796,7 @@ function renderRisks() {
   return h;
 }
 function setRisk(id, k, v) { const r = S.risks.find((x) => x.id === id); if (k === "status" && r.status !== v) logTask(r, "status", `${r.status} → ${v}`); r[k] = v; if (k === "status" && v === "완료") r.closedAt = today(); commit(); }
-function editRisk(id, preset) {
+function editRisk(id, preset) { if (window.__reactModals?.editRisk) return window.__reactModals.editRisk(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const r = id ? S.risks.find((x) => x.id === id) : Object.assign({ type: "이슈", status: "오픈", level: "중", raisedAt: today(), projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
   openForm(id ? "이슈" : "이슈 등록", [
@@ -2915,7 +2910,7 @@ function renderReqs() {
 }
 function setReqUnused() {}
 function editReq(id) { if (id && S.tasks.some((t) => t.id === id)) editTask(id); else editTask(null, { kind: "req" }); }
-function bulkReqs() {
+function bulkReqs() { if (window.__reactModals?.bulkReqs) return window.__reactModals.bulkReqs(...arguments);
   const pid = S.ui.pid;
   openModal("요구사항 붙여넣기", `<p class="small muted" style="margin-bottom:8px">요구사항 정의서 엑셀에서 열 순서대로 복사 (탭 구분): <b>REQ ID · 요구사항 · 구분 · 출처 · 반영 화면ID(쉼표로 여러 개)</b>. REQ ID를 비우면 자동 번호. 같은 REQ ID는 갱신.</p>
     <textarea id="bulkText" style="min-height:220px" class="mono"></textarea>`, [
@@ -3030,7 +3025,7 @@ function dblEdit(td, id, k, coll = "screens") {
 }
 function setScreen(id, k, v) { const s = S.screens.find((x) => x.id === id); s[k] = v; commit(); }
 // 화면은 메뉴(WBS) 아래에만 있음: 새 화면 = 고른 메뉴 아래 WBS 항목 + 화면, ID는 WBS ID 그대로
-function editScreen(id) {
+function editScreen(id) { if (window.__reactModals?.editScreen) return window.__reactModals.editScreen(...arguments);
   const pid = S.ui.pid;
   const s = id ? S.screens.find((x) => x.id === id) : { status: "작성중", owner: S.settings.me };
   const w = id ? S.wbs.find((x) => (x.screenIds || []).includes(id)) : null;
@@ -3058,7 +3053,7 @@ function editScreen(id) {
     commit();
   }, id ? [{ l: "삭제", cls: "danger left", fn: () => { if (confirm("화면을 삭제할까?")) { S.screens = S.screens.filter((x) => x.id !== id); S.wbs.forEach((x) => { if (x.screenIds) x.screenIds = x.screenIds.filter((y) => y !== id); }); commit(); closeModal(); toast("삭제했어", true); } } }] : []);
 }
-function bulkScreens() {
+function bulkScreens() { if (window.__reactModals?.bulkScreens) return window.__reactModals.bulkScreens(...arguments);
   openModal("화면 목록 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사해 붙여넣기 (탭 구분): <b>화면ID · 화면명 · 메뉴경로 · 기획담당 · 개발담당</b> — 뒤쪽 열은 생략 가능. 같은 화면ID는 갱신.</p>
     <textarea id="bulkText" style="min-height:240px" class="mono" placeholder="SCR-001\t로그인\t공통 > 로그인\nSCR-002\t회원가입\t회원 > 가입"></textarea>`, [
     { l: "취소", fn: closeModal },
@@ -3137,7 +3132,7 @@ function wbsScreenChips(w) {
 }
 function wbsFoldKey(pid, code) { return `${pid}:${code}`; }
 function openFuncs(wid) { S.ui.funcWbs = wid; selTab("funcs"); }
-function editFunc(id, wid) {
+function editFunc(id, wid) { if (window.__reactModals?.editFunc) return window.__reactModals.editFunc(...arguments);
   let f = id ? S.funcs.find((x) => x.id === id) : null;
   const pid = id ? f.projectId : S.ui.pid;
   const w0 = S.wbs.find((x) => x.id === (id ? f.wbsId : wid));
@@ -3481,7 +3476,7 @@ function badPeriod(x, k, v) {
 }
 function setWBS(id, k, v) { const w = S.wbs.find((x) => x.id === id); if (badPeriod(w, k, v)) return; w[k] = v; commit(); }
 const WBS_MAX_DEPTH = 4;
-function editWBS(id, phaseId, pid, parentCode) {
+function editWBS(id, phaseId, pid, parentCode) { if (window.__reactModals?.editWBS) return window.__reactModals.editWBS(...arguments);
   const w = id ? S.wbs.find((x) => x.id === id) : { phase: phaseId ?? "", progress: 0, projectId: pid || (S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id) };
   const hasKids = !!(w.code && S.wbs.some((x) => x.projectId === w.projectId && x.code && wbsParentCode(x.code) === w.code));
   const menuWbs = !id || !!w.code;
@@ -3645,7 +3640,7 @@ function setTC(id, k, v) {
   commit();
   if (k === "result" && v === "Fail" && !c.hoId) toast("Fail — [결함 전달]로 개발에 넘길 수 있어");
 }
-function editTC(id, preset) {
+function editTC(id, preset) { if (window.__reactModals?.editTC) return window.__reactModals.editTC(...arguments);
   if (!activeProjects().length) { toast("프로젝트를 먼저 만들어줘"); return; }
   const c = id ? S.tcs.find((x) => x.id === id) : Object.assign({ result: "미수행", projectId: S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0].id }, preset || {});
   openForm(id ? `테스트 케이스 · ${c.code}` : "테스트 케이스 추가", [
@@ -3670,7 +3665,7 @@ function editTC(id, preset) {
           ...(["Fail", "Block"].includes(c.result) && !c.hoId ? [{ l: "결함 전달", cls: "left", fn: () => { closeModal(); tcDefect(c.id); } }] : [])] : []);
 }
 // Fail TC → 개발 전달(결함) 생성. 수신자는 화면의 개발 담당자.
-function tcDefect(id) {
+function tcDefect(id) { if (window.__reactModals?.tcDefect) return window.__reactModals.tcDefect(...arguments);
   const c = S.tcs.find((x) => x.id === id), sc = S.screens.find((x) => x.id === c.screenId);
   const last = S.handoffs.filter((h) => h.projectId === c.projectId && h.to && (h.screenIds || []).includes(sc?.id)).pop();
   openForm(`결함 전달 · ${c.code}`, [
@@ -3713,7 +3708,7 @@ function genReqTCs() {
     pre: "", steps: "", expected: r.desc || `${r.title} — 요구사항대로 동작`, result: "미수행" }));
   commit(); toast(`${target.length}개 생성 — 절차를 채워줘`);
 }
-function bulkTC() {
+function bulkTC() { if (window.__reactModals?.bulkTC) return window.__reactModals.bulkTC(...arguments);
   const pid = S.ui.pid;
   openModal("테스트 케이스 붙여넣기", `<p class="small muted" style="margin-bottom:8px">엑셀에서 열 순서대로 복사 (탭 구분): <b>화면ID · 시나리오 · 사전 조건 · 절차 · 예상 결과</b>. 화면ID가 화면 목록에 있으면 자동 연결.</p>
     <textarea id="bulkText" style="min-height:220px" class="mono"></textarea>`, [
@@ -3788,7 +3783,7 @@ const NOTE_TEMPLATES = {
   consortium: ["컨소시엄 회의", "일시: {date} \n주관: \n참석 기관: \n\n[기관별 진행 현황]\n- \n\n[결정]\n- \n\n[액션]\n- \n\n[리스크]\n- \n\n[다음 회의]\n- "],
   review: ["기획 리뷰(화면설계)", "일시: {date} \n대상 화면: \n참석: \n\n[피드백]\n- \n\n[결정]\n- \n\n[액션]\n- 기획: 화면설계서 수정 (~MM/DD)\n- 개발: 영향도 회신\n\n[이슈]\n- "],
 };
-function newNote(tpl) {
+function newNote(tpl) { if (window.__reactModals?.newNote) return window.__reactModals.newNote(...arguments);
   const pid = S.ui.pid !== "all" ? S.ui.pid : activeProjects()[0]?.id;
   if (!pid) { toast("프로젝트를 먼저 만들어줘"); return; }
   if (!tpl) {
@@ -3862,7 +3857,7 @@ function noteSections(text) {
   });
   return out;
 }
-function noteToTasks(nid) {
+function noteToTasks(nid) { if (window.__reactModals?.noteToTasks) return window.__reactModals.noteToTasks(...arguments);
   if (noteFlush) noteFlush();
   const n = S.notes.find((x) => x.id === nid);
   const explicit = noteActions(n.content).map((a) => Object.assign(a, { type: "업무" }));
@@ -3897,7 +3892,7 @@ function noteTasksHtml(n) {
 function delNote(id) { if (!confirm("메모를 삭제할까?")) return; S.notes = S.notes.filter((n) => n.id !== id); commit(); toast("메모를 삭제했어", true); }
 
 // ───────────── 프로젝트 / 설정 / 보고 ─────────────
-function editProject(id) {
+function editProject(id) { if (window.__reactModals?.editProject) return window.__reactModals.editProject(...arguments);
   const p = id ? proj(id) : { archived: false };
   const pyRows = (p.years || []).map((y) => pyRow(y.start, y.end)).join("");
   const lnRows = (p.links || []).map(lnRow).join("");
@@ -3987,7 +3982,7 @@ function dataInfo() {
   return `<div class="note-box" style="margin-top:14px">데이터 ${n.toLocaleString()}건 · 약 ${kb.toLocaleString()}KB (브라우저 저장 한도는 보통 5MB)
     · 마지막 파일 저장 ${S.fileSavedAt ? S.fileSavedAt.slice(0, 16).replace("T", " ") : "없음"}</div>`;
 }
-function openSettings() {
+function openSettings() { if (window.__reactModals?.openSettings) return window.__reactModals.openSettings(...arguments);
   openForm("설정", [
     { k: "me", l: "내 이름 (메일 문구에 사용)", t: "text", ph: "예: 홍길동 매니저" },
     { k: "sign", l: "메일 서명", t: "textarea", full: true, ph: "홍길동 | PMO\n010-0000-0000" },
@@ -4017,7 +4012,7 @@ function openSettings() {
    { l: "불러오기", cls: "left", fn: () => { closeModal(); $("importFile").click(); } },
    { l: "JSON 내보내기", cls: "left", fn: () => download(fileName("json", projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") }], dataInfo());
 }
-function openHelp() {
+function openHelp() { if (window.__reactModals?.openHelp) return window.__reactModals.openHelp(...arguments);
   const row = (k, v) => `<div class="mrow"><span class="nm"><b>${k}</b></span><span class="small muted" style="text-align:right">${v}</span></div>`;
   openModal("사용 안내", `
     <div class="sec-t">하루 흐름</div>
@@ -4114,7 +4109,7 @@ function printReport(text) {
     <div style="margin-top:24px;font-size:11px;color:#626f86">Planner Desk · ${new Date().toLocaleString("ko-KR")}</div></body></html>`);
   w.document.close(); w.focus(); setTimeout(() => w.print(), 300);
 }
-function openReport(wk = 0) {
+function openReport(wk = 0) { if (window.__reactModals?.openReport) return window.__reactModals.openReport(...arguments);
   const pids = S.ui.pid === "all" ? activeProjects().map((p) => p.id) : [S.ui.pid];
   const txt = buildReport(pids, wk);
   openModal("주간보고 초안", `<div class="seg" style="margin-bottom:10px">${[[0, "이번 주"], [-1, "지난 주"]].map(([k, l]) => `<button class="${k === wk ? "on" : ""}" onclick="openReport(${k})">${l}</button>`).join("")}</div>
@@ -4158,7 +4153,7 @@ function tryCloseModal() {
   if (window._modalSnap != null && modalSnap() !== window._modalSnap && !confirm("작성 중인 내용이 있어. 저장하지 않고 닫을까?")) return;
   closeModal();
 }
-function closeModal() { quickOpen = false; closeModalInner(); const b = window._modalBack; window._modalBack = null; if (b) setTimeout(b, 0); }
+function closeModal() { window.__closeReactModal?.(); quickOpen = false; closeModalInner(); const b = window._modalBack; window._modalBack = null; if (b) setTimeout(b, 0); }
 function closeModalInner() { $("modalBg").classList.remove("open"); }
 // 업무 창 오른쪽 기록 칸 접기/펴기 (기억)
 function toggleLogPane() {
@@ -4265,7 +4260,7 @@ document.addEventListener("keydown", (e) => {
   }
   const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
   if (!inField && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    const open = $("modalBg").classList.contains("open");
+    const open = $("modalBg").classList.contains("open") || !!window.__reactModalOpen;
     if (!open && (e.code === "KeyC" || e.key.toLowerCase() === "c" || e.key === "ㅊ")) { e.preventDefault(); quickCreate(); return; }
     if (open && quickOpen && $("modalTitle").textContent === "만들기" && /^[1-8]$/.test(e.key)) { e.preventDefault(); closeModal(); QUICK[Number(e.key) - 1][3](); return; }
   }
@@ -4280,7 +4275,7 @@ let lastTick = { date: "", n: -1 };
 function tick() {
   checkNotify();
   const a = document.activeElement, typing = a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-  if (document.hidden || typing || $("modalBg").classList.contains("open")) return;
+  if (document.hidden || typing || $("modalBg").classList.contains("open") || window.__reactModalOpen) return;
   const now = { date: today(), n: computeAlerts(null).length };
   if (now.date !== lastTick.date || now.n !== lastTick.n) { lastTick = now; render(); }
 }
@@ -4305,7 +4300,7 @@ desk.onRemote((kind) => {
   if (!_booted || kind === "snapshot") { _booted = true; boot(); }
   // 입력 중이거나 창이 열려 있으면 다시 그리지 않음 (닫을 때 그려짐)
   const a = document.activeElement, typing = a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-  if (typing || $("modalBg")?.classList.contains("open")) return;
+  if (typing || $("modalBg")?.classList.contains("open") || window.__reactModalOpen) return;
   render();
 });
 setTimeout(() => checkNotify(), 3000);

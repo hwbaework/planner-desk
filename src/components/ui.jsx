@@ -31,9 +31,12 @@ export function PageHead({ title, meta, actions }) {
 // value가 바깥에서 바뀌면 다시 그린다(key). select·checkbox는 React onChange를 그대로 써도 된다.
 export function ChangeInput({ value, onCommit, as: Tag = "input", ...rest }) {
   const v = value ?? "";
+  // 날짜 칸은 오프라인판처럼 달력에서 고르는 순간 저장 (브라우저 change 와 같음)
+  const isDate = rest.type === "date";
   return (
     <Tag key={String(v)} defaultValue={v} {...rest}
-      onBlur={(e) => { rest.onBlur?.(e); if (e.target.value !== String(v)) onCommit(e.target.value, e); }}
+      onChange={isDate ? (e) => { rest.onChange?.(e); if (e.target.value !== String(v)) onCommit(e.target.value, e); } : rest.onChange}
+      onBlur={(e) => { rest.onBlur?.(e); if (!isDate && e.target.value !== String(v)) onCommit(e.target.value, e); }}
       onKeyDown={(e) => { rest.onKeyDown?.(e); if (Tag === "input" && e.key === "Enter") e.currentTarget.blur(); }} />
   );
 }

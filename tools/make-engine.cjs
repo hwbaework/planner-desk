@@ -57,6 +57,9 @@ const REPLACE = {
 }`,
 };
 
+// React로 옮긴 창(src/modals)이 있으면 그쪽을 연다: 함수 맨 앞에 넘김 한 줄
+const MODAL_FNS = ["quickCreate", "tlAdd", "editEvent", "editData", "openData", "bulkData", "importTaskCsv", "editTask", "splitAllMemos", "editRecur", "editHO", "openHO", "editDoc", "editRisk", "bulkReqs", "editScreen", "bulkScreens", "editFunc", "editWBS", "editTC", "tcDefect", "bulkTC", "newNote", "noteToTasks", "editProject", "openSettings", "openHelp", "openReport"];
+
 // 맨 위에서 바로 실행되던 문장 중 뺄 것 (부팅은 boot()로, 화면 그리기는 React가)
 const DROP = [/^setTopH\(\)/, /^addEventListener\("resize", setTopH\)/, /^new ResizeObserver\(setTopH\)/, /^window\.addEventListener\("beforeunload"/,
   /^load\(\)/, /^lastJson = snapshot\(\)/, /^lastCount = itemCount\(\)/, /^restoreHandle\(\)/, /^render\(\)/, /^autoLoadDataFile\(\)/,
@@ -64,6 +67,17 @@ const DROP = [/^setTopH\(\)/, /^addEventListener\("resize", setTopH\)/, /^new Re
 
 // 문구·버튼 중 웹판에 안 맞는 것
 const POST = [
+  // React 창이 열려 있어도 '창 열림'으로 봄 (단축키 C, 30분 갱신)
+  ['    const open = $("modalBg").classList.contains("open");', '    const open = $("modalBg").classList.contains("open") || !!window.__reactModalOpen;'],
+  ['  if (document.hidden || typing || $("modalBg").classList.contains("open")) return;', '  if (document.hidden || typing || $("modalBg").classList.contains("open") || window.__reactModalOpen) return;'],
+  ['function closeModal() { quickOpen = false;', 'function closeModal() { window.__closeReactModal?.(); quickOpen = false;'],
+  // 상단 테마 버튼·오늘 날짜·왼쪽 메뉴·경로는 React가 그림 (src/components)
+  [`  $("themeBtn").innerHTML = S.settings.theme === "dark"
+    ? '<svg class="ico" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>'
+    : '<svg class="ico" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>';
+  $("todayLabel").textContent = \`오늘 \${today()} (\${wd(today())})\`;
+  renderBanner(); renderSide(); renderTabs();
+`, ""],
   // React로 옮긴 화면(window.__reactTabs)은 비워 두고 React가 그림. 다시 그릴 때 React에도 알림
   [`  $("view").innerHTML = v();
   if (S.ui.tab === "wbs") wbsFreeze();
@@ -89,6 +103,10 @@ for (const n of ast.body) {
   if (n.type === "FunctionDeclaration") {
     names.push(n.id.name);
     if (n.id.name in REPLACE) rep = REPLACE[n.id.name];
+    else if (MODAL_FNS.includes(n.id.name)) {
+      const b = n.body.start - n.start + 1, k = n.id.name;
+      rep = text.slice(0, b) + ` if (window.__reactModals?.${k}) return window.__reactModals.${k}(...arguments);` + text.slice(b);
+    }
   } else if (n.type === "VariableDeclaration") {
     n.declarations.forEach((d) => { if (d.id.type === "Identifier") { names.push(d.id.name); if (n.kind !== "const") lets.add(d.id.name); } });
     if (/^let lastTick = /.test(text)) rep = `let lastTick = { date: "", n: -1 };`;
@@ -113,7 +131,7 @@ desk.onRemote((kind) => {
   if (!_booted || kind === "snapshot") { _booted = true; boot(); }
   // 입력 중이거나 창이 열려 있으면 다시 그리지 않음 (닫을 때 그려짐)
   const a = document.activeElement, typing = a && a !== document.body && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName);
-  if (typing || $("modalBg")?.classList.contains("open")) return;
+  if (typing || $("modalBg")?.classList.contains("open") || window.__reactModalOpen) return;
   render();
 });
 setTimeout(() => checkNotify(), 3000);

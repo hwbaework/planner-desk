@@ -37,18 +37,27 @@ const only = process.argv.slice(3);
 // 탭을 주면 그 탭의 화면 파일만 묶음 (다른 화면이 작업 중이어도 영향 없게)
 const tabsOf = (f) => (fs.readFileSync("src/views/" + f, "utf8").match(/export const tabs = \[([^\]]*)\]/)?.[1] || "").match(/[\w-]+/g) || [];
 const viewFiles = fs.readdirSync("src/views").filter((f) => f.endsWith(".jsx") && (!only.length || tabsOf(f).some((t) => only.includes(t))));
+// 창: "m:함수이름" 을 주면 그 창 파일만 (예: m:editTask)
+const opensOf = (f) => (fs.readFileSync("src/modals/" + f, "utf8").match(/export const opens = \[([^\]]*)\]/)?.[1] || "").match(/[\w-]+/g) || [];
+const modalFiles = fs.readdirSync("src/modals").filter((f) => f.endsWith(".jsx") && (!only.length || opensOf(f).some((n) => only.includes("m:" + n))));
 const entry = path.join(os.tmpdir(), `pd-smoke-entry-${process.pid}.jsx`);
 fs.writeFileSync(entry, [
   `export * as E from "${root}/src/legacy/engine.js";`,
   `export { renderToString } from "react-dom/server";`,
   `export { createElement } from "react";`,
+  `export { default as Side, Crumbs } from "${root}/src/components/Side.jsx";`,
+  `export { default as TopBar } from "${root}/src/components/TopBar.jsx";`,
   ...viewFiles.map((f, i) => `import * as V${i} from "${root}/src/views/${f}";`),
   `export const VIEWS = [${viewFiles.map((f, i) => `["${f}", V${i}]`).join(", ")}];`,
+  `export { ModalHost } from "${root}/src/components/Modal.jsx";`,
+  `export { closeModal as closeReactModal, openModal as openReactModal } from "${root}/src/lib/modal.js";`,
+  ...modalFiles.map((f, i) => `import * as M${i} from "${root}/src/modals/${f}";`),
+  `export const MODALS = [${modalFiles.map((f, i) => `["${f}", M${i}]`).join(", ")}];`,
 ].join("\n"));
 const out = path.join(os.tmpdir(), `pd-smoke-${process.pid}.mjs`);
 await build({ entryPoints: [entry], bundle: true, format: "esm", platform: "browser", jsx: "automatic", outfile: out, logLevel: "error", nodePaths: [root + "/node_modules"], define: { "process.env.NODE_ENV": '"production"' } });
 w.__reactTabs = new Set();
-const { E, renderToString, createElement, VIEWS } = await import(pathToFileURL(out).href + "?" + Date.now());
+const { E, renderToString, createElement, VIEWS, Side, Crumbs, TopBar, ModalHost, closeReactModal, openReactModal, MODALS } = await import(pathToFileURL(out).href + "?" + Date.now());
 
 const errors = [];
 const run = (label, fn) => { try { fn(); } catch (e) { errors.push(`${label}: ${e.message}\n   ${(e.stack || "").split("\n")[1]?.trim()}`); } };
@@ -80,7 +89,7 @@ run("commit", () => {
 });
 // React 화면 비교: 오프라인판 함수의 글자 내용과 같아야 함
 const LEGACY = { funcs: "renderFuncs", dash: "renderDash", board: "renderBoard", timeline: "renderTimeline", cal: "renderCal", tasks: "renderTasks", data: "renderData", ho: "renderTasks", docs: "renderDocs", reqs: "renderReqs", risks: "renderRisks", screens: "renderScreens", wbs: "renderWBS", tc: "renderTC", notes: "renderNotes" };
-const textOf = (html) => { const d = w.document.createElement("div"); d.innerHTML = html; return d.textContent.replace(/\s+/g, " ").trim(); };
+const textOf = (html) => { const d = w.document.createElement("div"); d.innerHTML = html; return d.textContent.replace(/\s+/g, ""); };   // 띄어쓰기는 비교하지 않음 (템플릿 줄바꿈 공백 차이)
 let compared = 0;
 for (const [file, mod] of VIEWS) {
   for (const tab of mod.tabs || []) {
@@ -99,6 +108,44 @@ for (const [file, mod] of VIEWS) {
     }
   }
 }
+// 상단바·왼쪽 메뉴·경로 (React)
+for (const pid of ["all", ...S.projects.map((p) => p.id)]) {
+  S.ui.pid = pid; S.ui.tab = "tasks";
+  for (const [n, C] of [["TopBar", TopBar], ["Side", Side], ["Crumbs", Crumbs]]) run(`${n} @${pid}`, () => renderToString(createElement(C)));
+  // 오프라인판 renderSide·renderTabs 와 글자 비교
+  run(`Side 비교 @${pid}`, () => {
+    E.renderSide(); E.renderTabs();
+    const a = textOf(w.document.getElementById("side").innerHTML) + " | " + textOf(w.document.getElementById("tabs").innerHTML);
+    const b = textOf(renderToString(createElement(Side))) + " | " + textOf(renderToString(createElement(Crumbs)));
+    if (a !== b) throw new Error(`다름
+   오프라인: ${a}
+   React   : ${b}`);
+  });
+}
+// React 창 비교: 창 파일의 samples(S) 가 준 인자로 오프라인판 창과 React 창을 열어 글자 내용 비교
+//  (창 파일: export const samples = (S) => [["editTask", S.tasks[0]?.id], …]  — [함수 이름, 인자 …])
+let comparedM = 0;
+const legacyModalText = () => textOf(["modalTitle", "modalBody", "modalFoot"].map((id) => w.document.getElementById(id).innerHTML).join(""));
+for (const [file, mod] of MODALS) {
+  const cases = (mod.samples?.(S) || []).filter((c) => (mod.opens || []).includes(c[0]) && c.slice(1).every((a) => a !== undefined));
+  if (!cases.length) errors.push(`${file}: samples 없음 (비교 못 함)`);
+  for (const [name, ...args] of cases) {
+    const label = `${file} ${name}(${args.map((a) => JSON.stringify(a)).join(", ")})`;
+    let a, b;
+    w.__reactModals = {};
+    try { E[name](...args); a = legacyModalText(); E.closeModal(); } catch (e) { errors.push(`${label} 오프라인판: ${e.message}`); continue; }
+    w.__reactModals = { [name]: (...x) => openReactModal(mod.default, { args: x, name }) };
+    try { E[name](...args); b = textOf(renderToString(createElement(ModalHost))); closeReactModal(); }
+    catch (e) { errors.push(`${label} React: ${e.message}\n   ${(e.stack || "").split("\n").slice(1, 3).join(" ")}`); closeReactModal(); continue; }
+    finally { w.__reactModals = {}; }
+    comparedM++;
+    if (a !== b) {
+      let i = 0; while (i < a.length && a[i] === b[i]) i++;
+      errors.push(`${label} 내용 다름 (${i}번째 글자부터)\n   오프라인: …${a.slice(Math.max(0, i - 40), i + 80)}\n   React   : …${b.slice(Math.max(0, i - 40), i + 80)}`);
+    }
+  }
+}
+if (comparedM) console.log(`React 창 비교 ${comparedM}건`);
 if (compared) console.log(`React 화면 비교 ${compared}건`);
 console.log(`프로젝트 ${S.projects.length} · 업무 ${S.tasks.length} · WBS ${S.wbs.length}`);
 console.log(errors.length ? `오류 ${errors.length}건\n` + errors.join("\n") : "오류 없음");
