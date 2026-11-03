@@ -39,7 +39,7 @@ const tabsOf = (f) => (fs.readFileSync("src/views/" + f, "utf8").match(/export c
 const viewFiles = fs.readdirSync("src/views").filter((f) => f.endsWith(".jsx") && (!only.length || tabsOf(f).some((t) => only.includes(t))));
 // 창: "m:함수이름" 을 주면 그 창 파일만 (예: m:editTask)
 const opensOf = (f) => (fs.readFileSync("src/modals/" + f, "utf8").match(/export const opens = \[([^\]]*)\]/)?.[1] || "").match(/[\w-]+/g) || [];
-const modalFiles = fs.readdirSync("src/modals").filter((f) => f.endsWith(".jsx") && (!only.length || opensOf(f).some((n) => only.includes("m:" + n))));
+const modalFiles = fs.readdirSync("src/modals").filter((f) => f.endsWith(".jsx") && opensOf(f).length && (!only.length || opensOf(f).some((n) => only.includes("m:" + n))));
 const entry = path.join(os.tmpdir(), `pd-smoke-entry-${process.pid}.jsx`);
 fs.writeFileSync(entry, [
   `export * as E from "${root}/src/legacy/engine.js";`,
