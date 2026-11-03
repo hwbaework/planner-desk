@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { closeModal, useModal } from "../lib/modal.js";
+import { useModal } from "../lib/modal.js";
+import * as E from "../legacy/engine.js";
 
 // 지금 열린 React 창
 export function ModalHost() {
@@ -19,7 +20,7 @@ export function Modal({ title, wide = false, buttons = [], children, bodyRef }) 
   const values = () => [...(ref.current?.querySelectorAll("input, textarea, select") || [])].map((el) => (el.type === "checkbox" ? el.checked : el.value)).join("");
   const tryClose = () => {
     if (snap.current != null && values() !== snap.current && !confirm("작성 중인 내용이 있어. 저장하지 않고 닫을까?")) return;
-    closeModal();
+    E.closeModal();   // 오프라인판 closeModal: React 창도 닫고, 이 창을 연 앞 창(예: WBS)이 있으면 다시 엶
   };
   // 열 때 한 번만 입력값을 기억 (닫을 때 이것과 다르면 물어봄)
   useEffect(() => {
