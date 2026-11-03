@@ -21,8 +21,12 @@ export function Modal({ title, wide = false, buttons = [], children, bodyRef }) 
     if (snap.current != null && values() !== snap.current && !confirm("작성 중인 내용이 있어. 저장하지 않고 닫을까?")) return;
     closeModal();
   };
+  // 열 때 한 번만 입력값을 기억 (닫을 때 이것과 다르면 물어봄)
   useEffect(() => {
     const t = setTimeout(() => (snap.current = values()), 60);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") { e.preventDefault(); tryClose(); }
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
@@ -31,7 +35,7 @@ export function Modal({ title, wide = false, buttons = [], children, bodyRef }) 
       }
     };
     addEventListener("keydown", onKey);
-    return () => { clearTimeout(t); removeEventListener("keydown", onKey); };
+    return () => removeEventListener("keydown", onKey);
   });
   const isLeft = (b) => /\bleft\b/.test(b.cls || "");
   return (
