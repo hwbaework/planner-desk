@@ -854,10 +854,10 @@ function renderDash() {
   if (zero.length) h += `<div class="small muted" style="margin:-6px 0 12px">없음: ${zero.map((k) => k[3]).join(" · ")}</div>`;
   const wk = weekSummary(pid);
   h += `<div class="week">
-    <div class="wk"><span class="wk-i">${typeIcon("task")}</span><div><b>${wk.done}개 완료함</b><div class="small muted">지난 7일간</div></div></div>
-    <div class="wk"><span class="wk-i">${typeIcon("wbs")}</span><div><b>${wk.upd}개 업데이트함</b><div class="small muted">지난 7일간</div></div></div>
-    <div class="wk"><span class="wk-i">${typeIcon("doc")}</span><div><b>${wk.made}개 만듦</b><div class="small muted">지난 7일간</div></div></div>
-    <div class="wk" style="cursor:pointer" onclick="selTab('cal')"><span class="wk-i">${typeIcon("event")}</span><div><b>${wk.due}개 마감 예정</b><div class="small muted">다음 7일 이내</div></div></div></div>`;
+    <div class="wk"><span class="wk-i">${typeIcon("task")}</span><div><b>${wk.done}건 완료</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk"><span class="wk-i">${typeIcon("wbs")}</span><div><b>${wk.upd}건 업데이트</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk"><span class="wk-i">${typeIcon("doc")}</span><div><b>${wk.made}건 생성</b><div class="small muted">지난 7일간</div></div></div>
+    <div class="wk" style="cursor:pointer" onclick="selTab('cal')"><span class="wk-i">${typeIcon("event")}</span><div><b>${wk.due}건 마감 예정</b><div class="small muted">다음 7일 이내</div></div></div></div>`;
 
   if (pid && !proj(pid).notLead) {
     const cur = currentPhase(pid);

@@ -1,4 +1,7 @@
-@import "tailwindcss";
+/* Tailwind 기본 초기화(preflight)는 쓰지 않음: 오프라인판 CSS가 자체 초기화를 하고, preflight가 아이콘 svg를 block으로 바꿔 버튼이 깨짐 */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
 @import "./legacy/legacy.css" layer(components);
 
 /* 다크는 <html data-theme="dark">로만 전환 (컴퓨터 설정 자동 추종 안 함) */

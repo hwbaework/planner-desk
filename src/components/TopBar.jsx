@@ -3,13 +3,13 @@ import { today, wd } from "../lib/date.js";
 import * as E from "../legacy/engine.js";
 import Search from "./Search.jsx";
 
-const CONN = { online: ["서버에 저장됨", ""], connecting: ["연결 중", ""], reconnecting: ["다시 연결 중", "dirty"], offline: ["연결 끊김 · 다시 연결되면 저장", "dirty"] };
 
 // 상단바: 오프라인판과 같은 자리·모양 (id는 오프라인판 코드가 찾는 이름 그대로)
 export default function TopBar() {
   const { S, conn, pending } = useStore();
   const dark = S.settings.theme === "dark";
-  const [label, cls] = pending && conn === "online" ? ["저장 중", ""] : CONN[conn] || CONN.offline;
+  // 저장 상태는 평소엔 안 보이고, 서버 연결이 끊겼을 때만 알림
+  const lost = conn === "offline" || conn === "reconnecting";
   return (
     <header className="top">
       <div>
@@ -20,7 +20,7 @@ export default function TopBar() {
       </div>
       <Search />
       <div className="spacer"></div>
-      <span className={`save-ind ${cls}`}>{label}{pending && conn !== "online" ? ` · ${pending}건 대기` : ""}</span>
+      {lost && <span className="save-ind dirty">연결 끊김{pending ? ` · ${pending}건 저장 대기` : ""}</span>}
       <button className="btn primary" onClick={() => E.quickCreate()} title="어디서든 바로 만들기 (C)">
         <svg className="ico" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg><span>만들기</span>
       </button>

@@ -76,10 +76,10 @@ export default function Dashboard() {
       ) : null}
       {zero.length ? <div className="small muted mt-[-6px] mb-3">없음: {zero.map((k) => k[3]).join(" · ")}</div> : null}
       <div className="week">
-        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="task" /></span><div><b>{wk.done}개 완료함</b><div className="small muted">지난 7일간</div></div></div>
-        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="wbs" /></span><div><b>{wk.upd}개 업데이트함</b><div className="small muted">지난 7일간</div></div></div>
-        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="doc" /></span><div><b>{wk.made}개 만듦</b><div className="small muted">지난 7일간</div></div></div>
-        {" "}<div className="wk cursor-pointer" onClick={() => selTab("cal")}><span className="wk-i"><TypeIcon kind="event" /></span><div><b>{wk.due}개 마감 예정</b><div className="small muted">다음 7일 이내</div></div></div>
+        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="task" /></span><div><b>{wk.done}건 완료</b><div className="small muted">지난 7일간</div></div></div>
+        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="wbs" /></span><div><b>{wk.upd}건 업데이트</b><div className="small muted">지난 7일간</div></div></div>
+        {" "}<div className="wk"><span className="wk-i"><TypeIcon kind="doc" /></span><div><b>{wk.made}건 생성</b><div className="small muted">지난 7일간</div></div></div>
+        {" "}<div className="wk cursor-pointer" onClick={() => selTab("cal")}><span className="wk-i"><TypeIcon kind="event" /></span><div><b>{wk.due}건 마감 예정</b><div className="small muted">다음 7일 이내</div></div></div>
       </div>
       <ProjTable />
       <div className="grid2 mt-[14px]">
