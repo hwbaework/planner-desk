@@ -1,10 +1,11 @@
 import { useEffect } from "react";
-import { onToast, useStore } from "./lib/store.js";
+import { useStore } from "./lib/store.js";
 import { VIEWS } from "./views/index.js";
 import * as E from "./legacy/engine.js";
 import TopBar from "./components/TopBar.jsx";
 import Side, { Crumbs } from "./components/Side.jsx";
 import { ModalHost } from "./components/Modal.jsx";
+import Toast from "./components/Toast.jsx";
 import "./modals/index.js";
 
 // React로 옮긴 화면: 오프라인판 render()가 #view를 비워 두면 여기서 그림
@@ -19,7 +20,6 @@ function ReactView() {
 export default function App() {
   useEffect(() => {
     E.boot(); E.render();
-    return onToast((t) => E.toast(t.text));
   }, []);
 
   return (
@@ -47,7 +47,7 @@ export default function App() {
         </div>
       </div>
       <ModalHost />
-      <div id="toast"></div>
+      <Toast />
     </>
   );
 }

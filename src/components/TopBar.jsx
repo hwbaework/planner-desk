@@ -1,6 +1,7 @@
 import { useStore } from "../lib/store.js";
 import { today, wd } from "../lib/date.js";
 import * as E from "../legacy/engine.js";
+import Search from "./Search.jsx";
 
 const CONN = { online: ["서버에 저장됨", ""], connecting: ["연결 중", ""], reconnecting: ["다시 연결 중", "dirty"], offline: ["연결 끊김 · 다시 연결되면 저장", "dirty"] };
 
@@ -17,12 +18,7 @@ export default function TopBar() {
         </div>
         <div className="today" id="todayLabel">오늘 {today()} ({wd(today())})</div>
       </div>
-      <div className="gsearch">
-        <svg className="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-        <input id="gq" type="text" placeholder="검색 (Ctrl+K) — 업무·전달·산출물·데이터·화면·테스트·메모" autoComplete="off"
-          onInput={(e) => E.gSearch(e.target.value)} onKeyDown={(e) => E.gKey(e.nativeEvent)} onFocus={(e) => E.gSearch(e.target.value)} />
-        <div id="gres" className="gres"></div>
-      </div>
+      <Search />
       <div className="spacer"></div>
       <span className={`save-ind ${cls}`}>{label}{pending && conn !== "online" ? ` · ${pending}건 대기` : ""}</span>
       <button className="btn primary" onClick={() => E.quickCreate()} title="어디서든 바로 만들기 (C)">

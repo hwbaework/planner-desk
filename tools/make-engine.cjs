@@ -12,6 +12,7 @@ const ast = acorn.parse(src, { ecmaVersion: "latest" });
 const REPLACE = {
   setTopH: `function setTopH() { const t = document.querySelector(".top"); if (t) document.documentElement.style.setProperty("--top-h", t.getBoundingClientRect().height + "px"); }`,
   load: "function load() {}",
+  toast: "function toast(msg, withUndo) { desk.toast(String(msg), { withUndo: !!withUndo }); }",
   writeLocal: "function writeLocal(trackUndo) { desk.commit(!!trackUndo && !suppressUndo); }",
   persist: `function persist() {
   syncFuncTCs(); syncCodes(); syncScreens();

@@ -214,10 +214,7 @@ function dday(s) {
   const n = calDays(today(), s);
   return n === 0 ? "D-day" : n > 0 ? `D-${n}` : `D+${-n}`;
 }
-function toast(msg, withUndo) {
-  const t = $("toast"); t.innerHTML = esc(msg) + (withUndo ? ` <button class="btn sm" style="margin-left:10px" onclick="undo()">되돌리기</button>` : "");
-  t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => (t.style.display = "none"), withUndo ? 6000 : 2600);
-}
+function toast(msg, withUndo) { desk.toast(String(msg), { withUndo: !!withUndo }); }
 async function copyText(text, msg = "클립보드에 복사됨") {
   try { await navigator.clipboard.writeText(text); }
   catch (e) { const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
