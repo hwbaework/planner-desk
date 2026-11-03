@@ -1,62 +1,40 @@
-import { useEffect, useState } from "react";
-import { useStore, setUI, undo } from "./lib/store.js";
-import { TABS, proj } from "./lib/model.js";
+import { useEffect } from "react";
+import { onToast } from "./lib/store.js";
+import * as E from "./legacy/engine.js";
 import TopBar from "./components/TopBar.jsx";
-import Side from "./components/Side.jsx";
-import Settings from "./components/Settings.jsx";
-import Toasts from "./components/Toasts.jsx";
 
-const LABEL = Object.fromEntries(TABS);
-
-// 아직 옮기지 않은 화면
-function NotYet({ tab }) {
-  return (
-    <div className="card p-6 text-dim">
-      <b className="text-text">{LABEL[tab]}</b> 화면은 아직 옮기는 중이에요.
-    </div>
-  );
-}
-
+// 화면 틀. 왼쪽 메뉴·경로·본문·창(모달)은 오프라인판 코드(src/legacy/engine.js)가 id로 찾아 그린다.
+// React는 이 틀을 한 번만 그리고 그 안(#side, #view …)은 건드리지 않는다.
 export default function App() {
-  const { S, ui } = useStore();
-  const [settings, setSettings] = useState(false);
-  const pid = ui.pid !== "all" && proj(S, ui.pid) ? ui.pid : null;
-
   useEffect(() => {
-    document.documentElement.dataset.theme = S.settings.theme === "dark" ? "dark" : "light";
-    document.body.style.zoom = Number(S.settings.fontScale) || 1;
-  }, [S.settings.theme, S.settings.fontScale]);
-
-  // 되돌리기 (Ctrl+Z, 입력 중이 아닐 때)
-  useEffect(() => {
-    const onKey = (e) => {
-      const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
-      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !typing) { e.preventDefault(); undo(); }
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
+    E.boot(); E.render();
+    return onToast((t) => E.toast(t.text));
   }, []);
-
-  const tab = LABEL[ui.tab] ? ui.tab : "dash";
 
   return (
     <>
-      <TopBar onSettings={() => setSettings(true)} />
-      <div className={`grid min-h-[calc(100vh-53px)] ${ui.sideFold ? "grid-cols-[64px_minmax(0,1fr)]" : "grid-cols-[232px_minmax(0,1fr)]"}`}>
-        <Side />
-        <main className="min-w-0 px-[22px] pt-3.5 pb-10">
-          <nav className="mb-3 flex items-center gap-1.5 text-[13px] text-faint">
-            <span className="cursor-pointer hover:underline" onClick={() => setUI({ pid: "all" })}>프로젝트</span>
-            <span>/</span>
-            <span className="cursor-pointer hover:underline" onClick={() => setUI({ tab: "dash" })}>{pid ? proj(S, pid).name : "전체 보기"}</span>
-            <span>/</span>
-            <b className="text-text">{LABEL[tab]}</b>
-          </nav>
-          <NotYet tab={tab} />
+      <TopBar />
+      <div className="shell">
+        <aside className="side" id="side"></aside>
+        <main>
+          <div id="bannerArea"></div>
+          <nav className="tabs" id="tabs"></nav>
+          <section id="view"></section>
         </main>
       </div>
-      {settings && <Settings onClose={() => setSettings(false)} />}
-      <Toasts />
+      <div className="modal-bg" id="modalBg" onMouseDown={(e) => { if (e.target === e.currentTarget) E.tryCloseModal(); }}>
+        <div className="modal" id="modal">
+          <div className="modal-h">
+            <h2 id="modalTitle"></h2>
+            <button className="btn ghost icon" onClick={() => E.tryCloseModal()} title="닫기 (Esc)">
+              <svg className="ico" viewBox="0 0 24 24"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+            </button>
+          </div>
+          <div className="modal-b" id="modalBody"></div>
+          <div className="modal-f" id="modalFoot"></div>
+        </div>
+      </div>
+      <div id="toast"></div>
     </>
   );
 }

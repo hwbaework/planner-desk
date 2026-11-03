@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "deploy": "vite build && wrangler deploy"
+    "deploy": "vite build && wrangler deploy",
+    "engine": "node tools/make-engine.cjs",
+    "smoke": "node tools/smoke.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",
