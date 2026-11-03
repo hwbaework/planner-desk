@@ -1,12 +1,12 @@
 // 커밋 전 검사: index.html · tests/selftest.html 의 <script>가 문법 오류 없이 읽히는지,
-// 이모지가 들어가지 않았는지 확인한다.  실행: node tools/check.js
+// 이모지가 들어가지 않았는지 확인한다.  실행: node tools/check.cjs
 const fs = require("fs");
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
 let failed = false;
 
-for (const file of ["index.html", "tests/selftest.html"]) {
+for (const file of ["offline/index.html", "offline/tests/selftest.html"]) {
   const html = fs.readFileSync(path.join(root, file), "utf8");
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   scripts.forEach((code, i) => {

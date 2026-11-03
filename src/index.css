@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* 다크는 <html data-theme="dark">로만 전환 (컴퓨터 설정 자동 추종 안 함) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ── 색: reference/index.html 토큰 그대로 (화이트 기본) ── */
+:root {
+  color-scheme: light;
+  --bg: #f7f8f9; --panel: #ffffff; --sub: #f1f2f4; --hover: #f7f8f9;
+  --line: #dcdfe4; --line2: #b3b9c4;
+  --text: #172b4d; --dim: #44546f; --faint: #626f86;
+  --accent: #0c66e4; --accentw: #e9f2ff;
+  --danger: #ae2e24; --dangerw: #ffeceb;
+  --warn: #a54800; --warnw: #fff7d6;
+  --ok: #216e4e; --okw: #dcfff1;
+  --violet: #5e4db2; --violetw: #f3f0ff;
+  --shadow: 0 1px 2px rgba(16,24,40,.05), 0 1px 3px rgba(16,24,40,.06);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1d2125; --panel: #22272b; --sub: #2c333a; --hover: #282e33;
+  --line: #38414a; --line2: #454f59;
+  --text: #dee4ea; --dim: #b6c2cf; --faint: #8c9bab;
+  --accent: #579dff; --accentw: #1c2b41;
+  --danger: #ff6b60; --dangerw: #3a1b19;
+  --warn: #f0b54a; --warnw: #352a12;
+  --ok: #4fd28a; --okw: #123122;
+  --violet: #a08bff; --violetw: #2a2346;
+  --shadow: none;
+}
+
+/* Tailwind 유틸리티 이름으로 연결: bg-panel, text-dim, border-line, shadow-card … */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-sub: var(--sub);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-line2: var(--line2);
+  --color-text: var(--text);
+  --color-dim: var(--dim);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accentw: var(--accentw);
+  --color-danger: var(--danger);
+  --color-dangerw: var(--dangerw);
+  --color-warn: var(--warn);
+  --color-warnw: var(--warnw);
+  --color-ok: var(--ok);
+  --color-okw: var(--okw);
+  --color-violet: var(--violet);
+  --color-violetw: var(--violetw);
+  --shadow-card: var(--shadow);
+  --font-sans: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+}
+
+@layer base {
+  body { @apply bg-bg text-text font-sans text-[15px] leading-[1.55]; }
+  a { @apply text-accent; }
+  button { font-family: inherit; line-height: normal; cursor: pointer; }
+}
+
+/* 오프라인판과 같은 버튼·카드 모양 */
+@layer components {
+  .btn { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded border border-line2 bg-panel px-3 py-[7px] text-[13.5px] font-medium text-text hover:bg-sub; }
+  .btn.primary { @apply border-accent bg-accent text-white hover:brightness-110; }
+  .btn.ghost { @apply border-transparent bg-transparent text-dim hover:bg-sub hover:text-text; }
+  .btn.danger { @apply border-danger bg-transparent text-danger; }
+  .btn.sm { @apply px-[9px] py-1 text-[13px]; }
+  .card { @apply rounded-md border border-line bg-panel shadow-card; }
+  .ico { @apply size-[18px] flex-none fill-none stroke-current stroke-2; stroke-linecap: round; stroke-linejoin: round; }
+}

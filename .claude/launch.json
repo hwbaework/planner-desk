@@ -2,9 +2,15 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "planner-desk",
+      "name": "planner-desk-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 5181
+    },
+    {
+      "name": "planner-desk-offline",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "http-server@14.1.1", "-p", "5178", "-c-1", "--silent"],
+      "runtimeArgs": ["--yes", "http-server@14.1.1", "offline", "-p", "5178", "-c-1", "--silent"],
       "port": 5178
     }
   ]

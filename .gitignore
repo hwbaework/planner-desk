@@ -23,3 +23,9 @@ __pycache__/
 통합테스트결과_*.csv
 단위테스트결과_*.csv
 요구사항추적표_*.csv
+
+# React 웹판 빌드·로컬 서버
+dist/
+.wrangler/
+.dev.vars
+.idea/

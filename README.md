@@ -1,10 +1,46 @@
 # Planner Desk · 기획 데스크
 
-IT 기획자 / PMO용 프로젝트 관리 화면. **HTML 파일 하나**로 동작하고, DB 없이 데이터를 HTML 안에 넣어 저장한다. 디자인은 Jira(색 #0C66E4, 유형 아이콘, 보드·타임라인 구조)를 참고했다.
+IT 기획자 / PMO용 프로젝트 관리 화면. 혼자 쓰는 웹사이트로 옮기는 중이다.
+
+- 주소: https://planner-desk.pairworks.net
+- 화면: React 19 + Vite + Tailwind CSS 4 (`src/`)
+- 서버: Cloudflare Workers + Durable Object(SQLite) + WebSocket (`worker/index.js`)
+- 오프라인판(예전 HTML 한 파일): `offline/index.html` — 더 고치지 않음. 웹판으로 다 옮기면 지운다.
+
+## 웹판 개발 · 배포
+
+```bash
+npm install
+npm run dev        # http://localhost:5181 (화면과 서버가 같이 뜸)
+npm run deploy     # 빌드 후 planner-desk.pairworks.net 으로 배포
+```
+
+- 데이터는 서버 하나(Durable Object "main")에 항목별로 저장된다. 화면은 상태를 고친 뒤 바뀐 항목만 보낸다 (`src/lib/store.js`).
+- 연결이 끊겨도 고친 내용은 브라우저에 보관했다가 다시 연결되면 보낸다.
+- 보던 탭·프로젝트 같은 화면 상태는 서버에 저장하지 않고 그 브라우저에만 둔다.
+
+## 데이터 옮기기 (오프라인판 → 웹판)
+
+1. 오프라인판에서 **설정 → JSON 내보내기** (또는 저장한 HTML 파일 그대로)
+2. 웹판에서 **설정 → 가져오기** 로 그 파일을 고른다. 서버 데이터가 통째로 바뀐다.
+
+## 접속 제한 (배포 전에 꼭)
+
+Cloudflare 대시보드 → **Zero Trust → Access → Applications → Add an application → Self-hosted**
+
+- Application domain: `planner-desk.pairworks.net`
+- Policy: Action **Allow**, Include → **Emails** → 내 메일 주소 하나
+- 로그인 방식: One-time PIN
+
+추가로 서버에서도 확인하려면 `npx wrangler secret put OWNER_EMAIL` 로 같은 메일을 넣는다 (그 메일이 아니면 403).
+
+---
+
+# 오프라인판 (예전 설명)
 
 ## 쓰는 법
 
-1. `index.html`을 Chrome/Edge로 연다 (더블클릭).
+1. `offline/index.html`을 Chrome/Edge로 연다 (더블클릭).
 2. 입력한 내용은 브라우저에 자동 저장된다.
 3. **저장 (Ctrl+S)** → 현재 데이터가 들어간 HTML 파일로 저장된다.
    - 저장 위치를 한 번 정하면 그 뒤로는 같은 파일에 자동 저장된다.
@@ -79,7 +115,7 @@ npx --yes http-server@14.1.1 -p 5178 -c-1
 
 ## 커밋 전 검사
 
-`node tools/check.js`가 `index.html`과 `tests/selftest.html`의 스크립트 문법 오류와 이모지를 확인한다. 저장소를 받은 뒤 한 번 아래를 실행하면 커밋할 때마다 자동으로 돈다.
+`node tools/check.cjs`가 `index.html`과 `tests/selftest.html`의 스크립트 문법 오류와 이모지를 확인한다. 저장소를 받은 뒤 한 번 아래를 실행하면 커밋할 때마다 자동으로 돈다.
 
 ```bash
 git config core.hooksPath .githooks
