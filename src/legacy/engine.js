@@ -4007,7 +4007,8 @@ function openSettings() { if (window.__reactModals?.openSettings) return window.
   },
   [{ l: "사용 안내", cls: "left", fn: () => { closeModal(); openHelp(); } },
    { l: "불러오기", cls: "left", fn: () => { closeModal(); $("importFile").click(); } },
-   { l: "JSON 내보내기", cls: "left", fn: () => download(fileName("json", projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") }], dataInfo());
+   { l: "JSON 내보내기", cls: "left", fn: () => download(fileName("json", projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") },
+   { l: "오프라인 HTML 내보내기", cls: "left", fn: () => window.__exportOffline?.() }], dataInfo());
 }
 function openHelp() { if (window.__reactModals?.openHelp) return window.__reactModals.openHelp(...arguments);
   const row = (k, v) => `<div class="mrow"><span class="nm"><b>${k}</b></span><span class="small muted" style="text-align:right">${v}</span></div>`;

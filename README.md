@@ -1,13 +1,13 @@
 # Planner Desk · 기획 데스크
 
-IT 기획자 / PMO용 프로젝트 관리 화면. 혼자 쓰는 웹사이트로 옮기는 중이다.
+IT 기획자 / PMO용 프로젝트 관리 화면. 혼자 쓰는 웹사이트.
 
 - 주소: https://planner-desk.pairworks.net
-- 화면: React 19 + Vite + Tailwind CSS 4 (`src/`)
+- 화면: React 19 + Vite + Tailwind CSS 4
 - 서버: Cloudflare Workers + Durable Object(SQLite) + WebSocket (`worker/index.js`)
-- 오프라인판(예전 HTML 한 파일): `offline/index.html` — 더 고치지 않음. 웹판으로 다 옮기면 지운다.
+- 오프라인판(예전 HTML 한 파일): `offline/index.html` — 더 고치지 않음. 설정 → **오프라인 HTML 내보내기**가 이 파일에 지금 데이터를 넣어 내려받는다.
 
-## 웹판 개발 · 배포
+## 개발 · 배포
 
 ```bash
 npm install
@@ -15,9 +15,26 @@ npm run dev        # http://localhost:5181 (화면과 서버가 같이 뜸)
 npm run deploy     # 빌드 후 planner-desk.pairworks.net 으로 배포
 ```
 
-- 데이터는 서버 하나(Durable Object "main")에 항목별로 저장된다. 화면은 상태를 고친 뒤 바뀐 항목만 보낸다 (`src/lib/store.js`).
-- 연결이 끊겨도 고친 내용은 브라우저에 보관했다가 다시 연결되면 보낸다.
-- 보던 탭·프로젝트 같은 화면 상태는 서버에 저장하지 않고 그 브라우저에만 둔다.
+## 구조
+
+| 위치 | 내용 |
+|---|---|
+| `src/views/` | 화면 (대시보드·캘린더·타임라인·업무·이슈·산출물·WBS·기능정의서·화면설계서·테스트·메모·요구사항) |
+| `src/modals/` | 창 (업무·WBS·개발 전달·산출물·설정·주간보고 …). `opens`에 적은 오프라인판 함수를 부르면 이 창이 열림 |
+| `src/components/` | 상단바·검색·왼쪽 메뉴·창 틀·알림·공통 부품 |
+| `src/legacy/engine.js` | 계산·저장 로직 (오프라인판 코드에서 `tools/make-engine.cjs`로 만든 것). 화면·창은 React가 그리고 여기 함수를 부름 |
+| `src/lib/store.js` | 상태 `S` 하나. 고친 뒤 바뀐 항목만 서버로 보내고, 끊기면 모아 두었다가 다시 보냄. 보던 탭·필터(`S.ui`)는 이 브라우저에만 |
+| `worker/index.js` | 서버: 항목별 저장, 다른 창에 바로 반영, `/api/export` 전체 백업 |
+
+옮긴 규칙과 확인 방법은 `docs/react-port.md`.
+
+## 확인
+
+```bash
+npm i --no-save jsdom acorn
+node tools/smoke.mjs "<데이터 파일>"     # 모든 화면·창을 실제 데이터로 그려서 오프라인판과 글자 비교
+node tools/server-test.mjs               # npm run dev 상태에서 서버 저장·순서·내보내기 확인 (로컬 데이터 비움)
+```
 
 ## 데이터 옮기기 (오프라인판 → 웹판)
 

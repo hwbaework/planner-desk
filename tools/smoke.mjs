@@ -55,7 +55,7 @@ fs.writeFileSync(entry, [
   `export const MODALS = [${modalFiles.map((f, i) => `["${f}", M${i}]`).join(", ")}];`,
 ].join("\n"));
 const out = path.join(os.tmpdir(), `pd-smoke-${process.pid}.mjs`);
-await build({ entryPoints: [entry], bundle: true, format: "esm", platform: "browser", jsx: "automatic", outfile: out, logLevel: "error", nodePaths: [root + "/node_modules"], define: { "process.env.NODE_ENV": '"production"' } });
+await build({ entryPoints: [entry], bundle: true, format: "esm", platform: "browser", jsx: "automatic", external: ["*?raw"], outfile: out, logLevel: "error", nodePaths: [root + "/node_modules"], define: { "process.env.NODE_ENV": '"production"' } });
 w.__reactTabs = new Set();
 const { E, renderToString, createElement, VIEWS, Side, Crumbs, TopBar, ModalHost, closeReactModal, openReactModal, MODALS } = await import(pathToFileURL(out).href + "?" + Date.now());
 

@@ -1,6 +1,7 @@
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
 import { closeModal } from "../lib/modal.js";
+import { exportOffline } from "../lib/offlineExport.js";
 import { Modal } from "../components/Modal.jsx";
 import { useForm, FormBody, isWide, formButtons } from "./kit/form.jsx";
 
@@ -52,6 +53,7 @@ export default function SettingsModal() {
     { l: "사용 안내", cls: "left", fn: () => { closeModal(); E.openHelp(); } },
     { l: "불러오기", cls: "left", fn: () => { closeModal(); E.$("importFile").click(); } },
     { l: "JSON 내보내기", cls: "left", fn: () => E.download(E.fileName("json", E.projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") },
+    { l: "오프라인 HTML 내보내기", cls: "left", fn: () => exportOffline() },
   ];
   return (
     <Modal title="설정" wide={isWide(fields)} buttons={formButtons(extraBtns, form.save)}>

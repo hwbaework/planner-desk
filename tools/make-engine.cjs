@@ -68,6 +68,9 @@ const DROP = [/^setTopH\(\)/, /^addEventListener\("resize", setTopH\)/, /^new Re
 
 // 문구·버튼 중 웹판에 안 맞는 것
 const POST = [
+  // 설정: 오프라인 HTML 내보내기 (src/lib/offlineExport.js)
+  ['   { l: "JSON 내보내기", cls: "left", fn: () => download(fileName("json", projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") }]',
+   '   { l: "JSON 내보내기", cls: "left", fn: () => download(fileName("json", projShortNames(), "업무관리 데이터"), JSON.stringify(S, null, 1), "application/json") },\n   { l: "오프라인 HTML 내보내기", cls: "left", fn: () => window.__exportOffline?.() }]'],
   // React 창이 열려 있어도 '창 열림'으로 봄 (단축키 C, 30분 갱신)
   ['    const open = $("modalBg").classList.contains("open");', '    const open = $("modalBg").classList.contains("open") || !!window.__reactModalOpen;'],
   ['  if (document.hidden || typing || $("modalBg").classList.contains("open")) return;', '  if (document.hidden || typing || $("modalBg").classList.contains("open") || window.__reactModalOpen) return;'],
