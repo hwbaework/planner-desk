@@ -1,7 +1,15 @@
 import { useEffect } from "react";
-import { onToast } from "./lib/store.js";
+import { onToast, useStore } from "./lib/store.js";
+import { VIEWS } from "./views/index.js";
 import * as E from "./legacy/engine.js";
 import TopBar from "./components/TopBar.jsx";
+
+// React로 옮긴 화면: 오프라인판 render()가 #view를 비워 두면 여기서 그림
+function ReactView() {
+  const { ui } = useStore();
+  const V = VIEWS[ui.tab];
+  return V ? <V key={ui.tab} /> : null;
+}
 
 // 화면 틀. 왼쪽 메뉴·경로·본문·창(모달)은 오프라인판 코드(src/legacy/engine.js)가 id로 찾아 그린다.
 // React는 이 틀을 한 번만 그리고 그 안(#side, #view …)은 건드리지 않는다.
@@ -20,6 +28,7 @@ export default function App() {
           <div id="bannerArea"></div>
           <nav className="tabs" id="tabs"></nav>
           <section id="view"></section>
+          <ReactView />
         </main>
       </div>
       <div className="modal-bg" id="modalBg" onMouseDown={(e) => { if (e.target === e.currentTarget) E.tryCloseModal(); }}>

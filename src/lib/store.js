@@ -53,8 +53,10 @@ function getSnap() {
   return snap;
 }
 const subscribe = (f) => { subs.add(f); return () => subs.delete(f); };
-export const useStore = () => useSyncExternalStore(subscribe, getSnap);
+export const useStore = () => useSyncExternalStore(subscribe, getSnap, getSnap);
 export const getState = () => S;
+// S를 직접 고치고 저장 없이 화면만 다시 그릴 때 (필터·접기 등)
+export const touch = () => emit();
 
 // 서버·다른 창에서 데이터가 바뀌었을 때 (화면을 다시 그려야 함)
 const remoteSubs = new Set();

@@ -64,6 +64,17 @@ const DROP = [/^setTopH\(\)/, /^addEventListener\("resize", setTopH\)/, /^new Re
 
 // 문구·버튼 중 웹판에 안 맞는 것
 const POST = [
+  // React로 옮긴 화면(window.__reactTabs)은 비워 두고 React가 그림. 다시 그릴 때 React에도 알림
+  [`  $("view").innerHTML = v();
+  if (S.ui.tab === "wbs") wbsFreeze();
+  if (S.ui.tab === "notes") bindNoteEditor();
+  updateSaveInd();
+`, `  const _react = window.__reactTabs?.has(S.ui.tab);
+  $("view").innerHTML = _react ? "" : v();
+  if (!_react && S.ui.tab === "wbs") wbsFreeze();
+  if (!_react && S.ui.tab === "notes") bindNoteEditor();
+  desk.touch();
+`],
   ['   { l: "다른 이름으로 저장", cls: "left", fn: () => { closeModal(); saveFile(true); } },\n', ""],
   ['    ${row("Ctrl+S", "HTML로 저장")}\n', ""],
   ['${row("자동 저장", "브라우저에 바로 저장")}', '${row("자동 저장", "고치면 바로 서버에 저장 (다른 창에도 반영)")}'],

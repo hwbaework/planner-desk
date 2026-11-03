@@ -745,10 +745,11 @@ function render() {
   renderBanner(); renderSide(); renderTabs();
   if (S.ui.tab === "board") S.ui.tab = "tasks";   // 보드 메뉴 없앰 (업무 단계 보드로)
   const v = { funcs: renderFuncs, dash: renderDash, board: renderBoard, timeline: renderTimeline, cal: renderCal, tasks: renderTasks, data: renderData, ho: renderTasks, docs: renderDocs, reqs: renderReqs, risks: renderRisks, screens: renderScreens, wbs: renderWBS, tc: renderTC, notes: renderNotes }[S.ui.tab] || renderDash;
-  $("view").innerHTML = v();
-  if (S.ui.tab === "wbs") wbsFreeze();
-  if (S.ui.tab === "notes") bindNoteEditor();
-  updateSaveInd();
+  const _react = window.__reactTabs?.has(S.ui.tab);
+  $("view").innerHTML = _react ? "" : v();
+  if (!_react && S.ui.tab === "wbs") wbsFreeze();
+  if (!_react && S.ui.tab === "notes") bindNoteEditor();
+  desk.touch();
 }
 function renderBanner() { const el = $("bannerArea"); if (el) el.innerHTML = ""; }
 function useEmbedded() {}
