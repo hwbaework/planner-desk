@@ -565,7 +565,8 @@
   .tl-h.mon { height: 26px; background: var(--panel); }
   .tl-cell.mon { font-weight: 700; color: var(--text); font-size: 12.5px; border-left: 1px solid var(--line2); }
   .tl-add, .tl-del { border: none; background: none; cursor: pointer; color: var(--faint); font-size: 16px; line-height: 1; padding: 0 4px; border-radius: 4px; flex: none; font-family: inherit; }
-  .tl-add { margin-left: auto; color: var(--accent); font-weight: 700; }
+  .tl-add { margin-left: auto; color: var(--dim); }
+  .tl-add.ico-btn, .tl-del.ico-btn { padding: 2px; line-height: 0; }
   .tl-r.epic .tl-add { margin-left: 4px; }
   .tl-del { visibility: hidden; }
   .tl-r:hover .tl-del { visibility: visible; }
@@ -619,7 +620,7 @@
   .tl .log-act { margin-left: 4px; white-space: nowrap; }
   .ico-btn { border: 0; background: none; padding: 2px; margin-left: 2px; cursor: pointer; color: var(--faint); border-radius: 4px; vertical-align: middle; line-height: 0; }
   .ico-btn .ico { width: 14px; height: 14px; margin: 0; }
-  .ico-btn:hover { background: var(--hover); color: var(--accent); }
+  .ico-btn:hover { background: var(--hover); color: var(--text); }
   .ico-btn.del:hover { color: var(--danger); }
   .log-edit { display: grid; gap: 6px; }
   .log-edit input[type=date] { width: 150px; }

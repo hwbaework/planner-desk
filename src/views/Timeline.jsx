@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, TypeIcon, ChangeInput, Raw } from "../components/ui.jsx";
+import { PageHead, TypeIcon, ChangeInput, Raw, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["timeline"];
 
@@ -101,7 +101,7 @@ export default function Timeline() {
           {r.p.start && r.p.end
             ? <>{" "}<span className="small muted font-normal cursor-pointer" onClick={() => E.editProject(r.p.id)} title="사업 기간 바꾸기">{E.shortD(r.p.start)} ~ {E.shortD(r.p.end)}</span></>
             : <>{" "}<span className="small font-semibold text-[var(--warn)] cursor-pointer" onClick={() => E.editProject(r.p.id)} title="프로젝트 정보에서 시작·종료일 입력">사업 기간 입력</span></>}
-          <button className="tl-add" title="이 프로젝트에 추가" onClick={() => E.tlAdd(r.p.id)}>+</button></div>);
+          <IconBtn icon="plus" className="tl-add" title="이 프로젝트에 추가" onClick={() => E.tlAdd(r.p.id)} /></div>);
       R.push(<div key={k} className="tl-r grp" style={{ width: W }}>{r.p.start && r.p.end ? <Span s0={r.p.start} e0={r.p.end} x={x} z={z} r0={r0} r1={r1} color="#8590a2" cls="epic" title="" /> : null}{todayLine}</div>);
       return;
     }
@@ -112,7 +112,7 @@ export default function Timeline() {
           <span className="w-[10px] h-[10px] rounded-[2px] flex-none" style={{ background: r.color }}></span>
           <span className={`nm${r.wid ? " cursor-pointer" : ""}`} onClick={r.wid ? () => E.editWBS(r.wid) : undefined}>{r.title}</span>
           <span className="who">{r.st}</span>
-          {r.wid ? null : <button className="tl-add" title="이 단계에 WBS 작업 추가" onClick={() => E.editWBS(null, r.phase, r.pid)}>+</button>}</div>);
+          {r.wid ? null : <IconBtn icon="plus" className="tl-add" title="이 단계에 WBS 작업 추가" onClick={() => E.editWBS(null, r.phase, r.pid)} />}</div>);
       R.push(<div key={k} className="tl-r" style={{ width: W }}>{gridBody}{r.s ? <Span s0={r.s} e0={r.e} x={x} z={z} r0={r0} r1={r1} color={r.color} cls="epic" title="" /> : null}{todayLine}</div>);
       return;
     }
@@ -124,7 +124,7 @@ export default function Timeline() {
       <div key={k} className="tl-r" style={{ paddingLeft: typeof r.indent === "number" ? 14 + r.indent * 16 : r.indent ? 30 : 10 }}><TypeIcon kind={ik} />
         <span className="nm" onClick={open} title={title}>{title}</span>
         <span className="who">{K.st(it)}{who ? " · " + who : ""}</span>
-        <button className="tl-del" title="삭제" onClick={() => E.tlDel(kind, it.id)}>×</button></div>);
+        <IconBtn icon="del" className="tl-del" title="삭제" onClick={() => E.tlDel(kind, it.id)} /></div>);
     let bar = null;
     if (!e0) bar = (
       <div className="tl-fill"><span>{s0 ? "마감 없음" : "날짜 없음"}</span>

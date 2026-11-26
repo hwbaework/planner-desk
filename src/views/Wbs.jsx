@@ -181,9 +181,9 @@ export default function Wbs() {
           {w.note ? <> <span className="chip-ref">{w.note}</span></> : null}
           {nTk ? <> <button className="wbs-tk-btn" onClick={() => E.editWBS(w.id)}>업무 {nTk}</button></> : null}
           <span className="wbs-act">
-            <button className="ico-btn" onClick={() => E.wbsAddChild(w.id)} title="하위 추가">+</button>
-            <button className="ico-btn" onClick={() => E.wbsOutdent(w.id)} title="한 단계 올리기">←</button>
-            <button className="ico-btn" onClick={() => E.wbsIndent(w.id)} title="한 단계 내리기">→</button>
+            <IconBtn icon="plus" title="하위 추가" onClick={() => E.wbsAddChild(w.id)} />
+            <IconBtn icon="outdent" title="한 단계 올리기" onClick={() => E.wbsOutdent(w.id)} />
+            <IconBtn icon="indent" title="한 단계 내리기" onClick={() => E.wbsIndent(w.id)} />
           </span>
           {" "}
         </td>
