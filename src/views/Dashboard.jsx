@@ -85,7 +85,7 @@ export default function Dashboard() {
       <div className="grid2 mt-[14px]">
         {" "}<div className="card"><div className="card-h"><h3>확인 필요</h3><span className="sub">{alerts.length}건 · 노티가 안 온 건 / 내가 처리할 건</span></div>
           {" "}{alerts.length ? alerts.slice(0, 30).map((a, i) => <AlertRow key={i} a={a} />) : <div className="empty">지금은 확인할 게 없어</div>}</div>
-        {" "}<div><div className="card"><div className="card-h"><h3>다가오는 일정</h3><span className="sub">오늘부터 14일</span><div className="actions"><button className="btn sm" onClick={() => selTab("cal")}>캘린더</button></div></div><UpcomingList pid={pid} n={14} /></div>
+        {" "}<div><div className="card"><div className="card-h"><h3>다가오는 일정</h3><span className="sub">오늘부터 14일</span><div className="actions"><IconBtn icon="calendar" title="캘린더 보기" onClick={() => selTab("cal")} /></div></div><UpcomingList pid={pid} n={14} /></div>
           {" "}<div className="card"><div className="card-h"><h3>상태 개요</h3><span className="sub">업무 상태 · 항목 유형</span><div className="actions"><button className="btn sm" onClick={() => selTab("tasks")}>모든 업무 보기</button></div></div><div className="card-b"><StatusOverview pid={pid} /></div></div>
           {" "}<div className="card"><div className="card-h"><h3>최근 활동</h3></div><div className="card-b"><RecentActivity pid={pid} /></div></div></div>
         {" "}
@@ -327,7 +327,7 @@ function AlertRow({ a }) {
   const { S } = useStore();
   const [type, id] = a.ref;
   let acts = null;
-  if (type === "ho" && a.level !== "mine") acts = <><button className="btn sm" onClick={() => E.copyNudge(id)} title="독촉 문구 복사">문구</button><button className="btn sm" onClick={() => E.mailNudge(id)} title="메일 작성창 열기">메일</button><button className="btn sm" onClick={() => E.openHO(id, "ack")}>회신 기록</button></>;
+  if (type === "ho" && a.level !== "mine") acts = <><IconBtn icon="copy" title="독촉 문구 복사" onClick={() => E.copyNudge(id)} /><IconBtn icon="mail" title="메일 작성창 열기" onClick={() => E.mailNudge(id)} /><button className="btn sm" onClick={() => E.openHO(id, "ack")}>회신 기록</button></>;
   if (type === "ho" && a.level === "mine") acts = <><button className="btn sm" onClick={() => E.quickEvent(id, "verified")}>검수 완료</button><button className="btn sm" onClick={() => E.openHO(id, "reject")}>반려</button></>;
   if (type === "task") acts = <button className="btn sm" onClick={() => E.setTask(id, "status", "완료")}>완료</button>;
   if (type === "doc" && a.kind === "승인 회신 없음") acts = <button className="btn sm" onClick={() => E.setDocStatus(id, "승인")}>승인 받음</button>;

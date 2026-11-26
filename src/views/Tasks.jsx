@@ -1,6 +1,6 @@
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, TypeIcon, PriIcon, Raw } from "../components/ui.jsx";
+import { PageHead, TypeIcon, PriIcon, Raw, IconBtn } from "../components/ui.jsx";
 
 // 오프라인판 renderTasks (업무 · 정기 업무). 업무 창·정기 업무 창·CSV 가져오기는 오프라인판 창 그대로
 export const tabs = ["tasks", "ho"];
@@ -262,7 +262,7 @@ export default function Tasks() {
                 <tr key={r.id}>
                   {pid ? null : <td className="nowrap"><ProjTag id={r.projectId} /></td>}
                   <td className="tc-title">{" "}<span className="link" onClick={() => E.editRecur(r.id)}>{r.title}</span>
-                    {r.path ? <>{" "}<button className="btn sm ghost" title={r.path} onClick={() => E.copyText(r.path, "경로 복사됨")}>경로</button></> : null}</td>
+                    {r.path ? <>{" "}<IconBtn icon="copy" title={"경로 복사: " + r.path} onClick={() => E.copyText(r.path, "경로 복사됨")} /></> : null}</td>
                   <td className="nowrap">{" "}{E.recurLabel(r)}</td>
                   <td className="nowrap">{" "}{nx ? <>{E.shortD(nx)} <span className="small muted">{E.dday(nx)}</span></> : "-"}</td>
                   <td className="small">{" "}{r.recipient || ""}</td>

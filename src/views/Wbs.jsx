@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, ChangeInput } from "../components/ui.jsx";
+import { PageHead, ChangeInput, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["wbs"];
 
@@ -222,7 +222,7 @@ export default function Wbs() {
                     onDragStart={(e) => { e.stopPropagation(); e.dataTransfer.setData("text/plain", "col:" + c.id); }}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => colDrop(e, c.id)}>
-                    {c.name}<button className="ico-btn del" onClick={() => E.wbsDelCol(c.id)} title="컬럼 삭제">×</button>
+                    {c.name}<IconBtn icon="del" title="컬럼 삭제" onClick={() => E.wbsDelCol(c.id)} />
                   </th>
                 ))}
                 {cols.length < E.WBS_MAX_COLS ? <th className="cf-add" onClick={addCol} title="컬럼 추가">＋</th> : <th></th>}
