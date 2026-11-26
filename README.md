@@ -41,15 +41,16 @@ node tools/server-test.mjs               # npm run dev 상태에서 서버 저�
 1. 오프라인판에서 **설정 → JSON 내보내기** (또는 저장한 HTML 파일 그대로)
 2. 웹판에서 **설정 → 가져오기** 로 그 파일을 고른다. 서버 데이터가 통째로 바뀐다.
 
-## 접속 제한 (배포 전에 꼭)
+## 비밀번호 (배포 전에 꼭)
 
-Cloudflare 대시보드 → **Zero Trust → Access → Applications → Add an application → Self-hosted**
+첫 화면에서 비밀번호를 묻는다. 맞으면 30일 동안 다시 안 묻고, 5번 틀리면 1시간 잠긴다.
 
-- Application domain: `planner-desk.pairworks.net`
-- Policy: Action **Allow**, Include → **Emails** → 내 메일 주소 하나
-- 로그인 방식: One-time PIN
+```bash
+npx wrangler secret put PASSWORD        # 비밀번호
+npx wrangler secret put PASSWORD_HINT   # 첫 화면 "비밀번호 찾기"에 보일 힌트
+```
 
-추가로 서버에서도 확인하려면 `npx wrangler secret put OWNER_EMAIL` 로 같은 메일을 넣는다 (그 메일이 아니면 403).
+잊었을 때는 이 폴더에서 `npx wrangler secret put PASSWORD` 로 새로 넣으면 된다 (잠금도 같이 풀림).
 
 ---
 

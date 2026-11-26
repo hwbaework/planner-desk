@@ -8,8 +8,13 @@
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    // 비밀번호 잠금 때문에 화면 파일도 전부 Worker를 먼저 거친다
+    "run_worker_first": true
   },
+
+  // workers.dev 주소·미리보기 주소로 우회해서 들어오지 못하게
+  "workers_dev": false,
+  "preview_urls": false,
 
   // 데이터 저장소 + 실시간 연결 (무료 플랜에서는 SQLite 방식만 가능)
   "durable_objects": {

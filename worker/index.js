@@ -12,8 +12,102 @@ import { DurableObject } from "cloudflare:workers";
 export const COLS = ["projects", "tasks", "events", "recurring", "datas", "tcs", "reqs", "risks", "docs", "handoffs", "screens", "wbs", "funcs", "notes"];
 const META = ["v", "updatedAt", "settings", "seq"];
 
+// ── 비밀번호 잠금 ───────────────────────────────────────────────
+//  `npx wrangler secret put PASSWORD` 로 넣은 비밀번호를 첫 화면에서 묻는다.
+//  맞으면 30일짜리 쿠키(서명값)를 주고, 화면·API·WebSocket 모두 이 쿠키가 있어야 열린다.
+//  비밀번호를 바꾸면 기존 쿠키는 전부 무효가 된다. 힌트는 `npx wrangler secret put PASSWORD_HINT`.
+//  비밀번호를 잊으면: 이 폴더에서 `npx wrangler secret put PASSWORD` 로 새로 넣으면 끝 (잠금도 같이 풀림).
+const COOKIE = "pd_auth";
+const SESSION_DAYS = 30;
+const enc = new TextEncoder();
+
+async function hmac(secret, text) {
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(text));
+  return btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/[+/=]/g, (c) => ({ "+": "-", "/": "_", "=": "" })[c]);
+}
+
+function sameText(a, b) {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+function readCookie(request, name) {
+  const all = request.headers.get("Cookie") || "";
+  for (const part of all.split(";")) {
+    const [k, ...v] = part.trim().split("=");
+    if (k === name) return v.join("=");
+  }
+  return "";
+}
+
+async function signedIn(request, pw) {
+  const [exp, sig] = readCookie(request, COOKIE).split(".");
+  if (!exp || !sig || Number(exp) < Date.now()) return false;
+  return sameText(sig, await hmac(pw, "session:" + exp));
+}
+
+function loginPage(wrong, hint) {
+  const html = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>기획 데스크</title><style>
+body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#f5f6f8;font-family:'Pretendard','Malgun Gothic',sans-serif;color:#1f2937}
+form{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:32px 28px;width:min(320px,calc(100vw - 32px));box-sizing:border-box;box-shadow:0 4px 16px rgba(0,0,0,.05)}
+h1{font-size:18px;margin:0 0 20px}
+input{width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
+input:focus{outline:none;border-color:#2563eb}
+button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:#2563eb;color:#fff;font-size:15px;cursor:pointer}
+p{color:#dc2626;font-size:13px;margin:10px 0 0}
+details{margin-top:14px;font-size:13px;color:#6b7280}summary{cursor:pointer}
+</style></head><body><form method="post" action="/__login">
+<h1>기획 데스크</h1>
+<input type="password" name="pw" autofocus autocomplete="current-password" aria-label="비밀번호">
+<button>들어가기</button>${wrong === "locked" ? "<p>여러 번 틀려서 잠겼습니다. 1시간 뒤에 다시 해 주세요</p>" : wrong ? "<p>비밀번호가 맞지 않습니다</p>" : ""}${hint ? `<details><summary>비밀번호 찾기</summary>힌트: ${hint.replace(/[<>&"]/g, "")}</details>` : ""}
+</form></body></html>`;
+  return new Response(html, { status: wrong ? 401 : 200, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+}
+
+async function gate(request, env) {
+  const url = new URL(request.url);
+  const pw = env.PASSWORD || "";
+  if (!pw) {
+    // 내 PC에서 npm run dev 할 때만 비밀번호 없이 열림. 배포본은 비밀번호가 없으면 닫아 둔다.
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return null;
+    return new Response("비밀번호가 설정되지 않았습니다 (wrangler secret put PASSWORD)", { status: 503 });
+  }
+  if (url.pathname === "/__login" && request.method === "POST") {
+    // 5번 틀리면 1시간 잠금 (비밀번호를 바꾸면 잠금도 풀린다)
+    const desk = env.DESK.get(env.DESK.idFromName("main"));
+    const tag = await hmac(pw, "lock");
+    if (await desk.authLocked(tag)) return loginPage("locked", env.PASSWORD_HINT);
+    const form = await request.formData();
+    const given = String(form.get("pw") || "");
+    if (!sameText(await hmac("pw", given), await hmac("pw", pw))) {
+      await desk.authFail(tag);
+      await new Promise((r) => setTimeout(r, 1000));   // 마구 넣어 보기 늦추기
+      return loginPage(true, env.PASSWORD_HINT);
+    }
+    await desk.authOk(tag);
+    const exp = Date.now() + SESSION_DAYS * 86400000;
+    const value = `${exp}.${await hmac(pw, "session:" + exp)}`;
+    return new Response(null, {
+      status: 303,
+      headers: {
+        Location: "/",
+        "Set-Cookie": `${COOKIE}=${value}; Path=/; Max-Age=${SESSION_DAYS * 86400}; HttpOnly; Secure; SameSite=Lax`,
+      },
+    });
+  }
+  if (await signedIn(request, pw)) return null;
+  if (url.pathname.startsWith("/api/")) return new Response("Unauthorized", { status: 401 });
+  return loginPage(false, env.PASSWORD_HINT);
+}
+
 export default {
   async fetch(request, env) {
+    const blocked = await gate(request, env);
+    if (blocked) return blocked;
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/")) {
       const owner = (env.OWNER_EMAIL || "").toLowerCase();
@@ -43,6 +137,29 @@ export class Desk extends DurableObject {
     ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair("ping", "pong"));
   }
 
+  // ── 비밀번호 잠금 기록 (틀린 횟수) ──
+  authRead(tag) {
+    const row = [...this.sql.exec("SELECT data FROM meta WHERE key = 'auth'")][0];
+    const a = row ? JSON.parse(row.data) : {};
+    return a.tag === tag ? a : { tag, fails: 0, until: 0 };
+  }
+  authWrite(a) {
+    this.sql.exec("INSERT OR REPLACE INTO meta (key, data) VALUES ('auth', ?)", JSON.stringify(a));
+  }
+  authLocked(tag) {
+    return this.authRead(tag).until > Date.now();
+  }
+  authFail(tag) {
+    const a = this.authRead(tag);
+    if (a.until && a.until <= Date.now()) { a.fails = 0; a.until = 0; }
+    a.fails += 1;
+    if (a.fails >= 5) a.until = Date.now() + 3600000;
+    this.authWrite(a);
+  }
+  authOk(tag) {
+    this.authWrite({ tag, fails: 0, until: 0 });
+  }
+
   async fetch(request) {
     const url = new URL(request.url);
 
@@ -66,7 +183,7 @@ export class Desk extends DurableObject {
   // 전체 상태: 화면에서 쓰는 모양 그대로 (배열 + 설정)
   state() {
     const s = {}, ords = {};
-    for (const r of this.sql.exec("SELECT key, data FROM meta").toArray()) s[r.key] = JSON.parse(r.data);
+    for (const r of this.sql.exec("SELECT key, data FROM meta WHERE key != 'auth'").toArray()) s[r.key] = JSON.parse(r.data);
     for (const c of COLS) { s[c] = []; ords[c] = []; }
     for (const r of this.sql.exec("SELECT col, ord, data FROM items ORDER BY col, ord").toArray()) if (s[r.col]) { s[r.col].push(JSON.parse(r.data)); ords[r.col].push(r.ord); }
     return { ...s, _ords: ords };   // 순서 값: 화면이 다음 변경의 순서를 정할 때 씀
