@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, Badge, TypeIcon } from "../components/ui.jsx";
+import { PageHead, Badge, TypeIcon, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["dash"];
 
@@ -100,12 +100,12 @@ function AccessCard({ p, pid }) {
   const [shown, setShown] = useState({});
   return (
     <div className="card access">
-      <div className="card-h"><h3>시스템 접속</h3><span className="sub">{p.links.length}개</span><div className="actions"><button className="btn sm" onClick={() => E.editProject(pid)}>편집</button></div></div>
+      <div className="card-h"><h3>시스템 접속</h3><span className="sub">{p.links.length}개</span><div className="actions"><IconBtn icon="edit" title="편집" onClick={() => E.editProject(pid)} /></div></div>
       {p.links.map((l, i) => (
         <div key={i} className="acc-row"><b className="acc-n">{l.name || "시스템"}</b>
           {" "}{l.url ? <a className="acc-url" href={l.url} target="_blank" rel="noopener">{l.url}</a> : null}
-          {" "}{l.user ? <><span className="acc-k">아이디</span><span className="mono">{l.user}</span><button className="btn sm ghost" onClick={() => E.copyText(l.user, "아이디 복사됨")}>복사</button></> : null}
-          {" "}{l.pass ? <><span className="acc-k">비밀번호</span><span className="mono" id={`accp${i}`}>{shown[i] ? l.pass : "••••••"}</span><button className="btn sm ghost" onClick={() => setShown({ ...shown, [i]: !shown[i] })}>보기</button><button className="btn sm ghost" onClick={() => E.copyText(l.pass, "비밀번호 복사됨")}>복사</button></> : null}
+          {" "}{l.user ? <><span className="acc-k">아이디</span><span className="mono">{l.user}</span><IconBtn icon="copy" title="아이디 복사" onClick={() => E.copyText(l.user, "아이디 복사됨")} /></> : null}
+          {" "}{l.pass ? <><span className="acc-k">비밀번호</span><span className="mono" id={`accp${i}`}>{shown[i] ? l.pass : "••••••"}</span><IconBtn icon={shown[i] ? "eyeOff" : "eye"} title={shown[i] ? "가리기" : "보기"} onClick={() => setShown({ ...shown, [i]: !shown[i] })} /><IconBtn icon="copy" title="비밀번호 복사" onClick={() => E.copyText(l.pass, "비밀번호 복사됨")} /></> : null}
           {" "}{l.memo ? <span className="small muted">{l.memo}</span> : null}</div>
       ))}
     </div>
@@ -121,7 +121,7 @@ function ConceptCard({ p, pid }) {
     <div className="card concept">
       <div className="card-h">
         <button className="tl-fold" onClick={fold} title={open ? "접기" : "펼치기"}><svg className="ico w-[14px] h-[14px] m-0" viewBox="0 0 24 24"><path d={open ? "m6 9 6 6 6-6" : "m9 18 6-6-6-6"} /></svg></button>
-        <h3>메모</h3><div className="actions"><button className="btn sm" onClick={() => E.editProject(pid)}>편집</button></div>
+        <h3>메모</h3><div className="actions"><IconBtn icon="edit" title="편집" onClick={() => E.editProject(pid)} /></div>
       </div>
       {open ? (p.memo ? <div className="concept-b"><Concept t={p.memo} /></div> : <div className="empty">메모 없음 · [편집]</div>) : null}
     </div>

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useStore } from "../lib/store.js";
 import * as E from "../legacy/engine.js";
-import { PageHead, Badge, TypeIcon } from "../components/ui.jsx";
+import { PageHead, Badge, TypeIcon, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["notes"];
 
@@ -55,8 +55,8 @@ function NoteEditor({ cur }) {
       <textarea id="noteContent" placeholder="회의 내용, 결정사항, 액션아이템…" defaultValue={cur.content || ""}></textarea>{" "}
       <div className="flex gap-1.5 mt-2 items-center"><span className="muted small" id="noteSaved">자동 저장됨</span>{" "}
         <button className="btn sm ml-auto" onClick={() => E.noteToTasks(cur.id)}>업무·결정·리스크 등록</button>{" "}
-        <button className="btn sm" onClick={() => E.copyText(document.getElementById("noteContent").value)}>복사</button>{" "}
-        <button className="btn sm danger" onClick={() => E.delNote(cur.id)}>삭제</button>
+        <IconBtn icon="copy" title="복사" onClick={() => E.copyText(document.getElementById("noteContent").value)} />
+        <IconBtn icon="del" title="삭제" onClick={() => E.delNote(cur.id)} />
       </div>{" "}
       <NoteTasks n={cur} />
     </>

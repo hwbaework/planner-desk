@@ -3,7 +3,7 @@ import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
 import { closeModal } from "../lib/modal.js";
 import { Modal } from "../components/Modal.jsx";
-import { Badge, ChangeInput, Raw } from "../components/ui.jsx";
+import { Badge, ChangeInput, Raw, IconBtn } from "../components/ui.jsx";
 import { FormModal } from "./_formFields.jsx";
 
 // 개발 전달 상세(openHO) · 등록/편집(editHO)
@@ -143,7 +143,7 @@ function OpenHO({ args: [id, presetType] }) {
             </> : null}
             {x.link ? <>
               <div className="l">문서</div>
-              <div className="mono small" style={{ wordBreak: "break-all" }}>{x.link} <button className="btn sm ghost" onClick={() => E.copyText(x.link)}>복사</button></div>
+              <div className="mono small" style={{ wordBreak: "break-all" }}>{x.link} <IconBtn icon="copy" title="복사" onClick={() => E.copyText(x.link)} /></div>
             </> : null}
           </div>
           <div className="quick">

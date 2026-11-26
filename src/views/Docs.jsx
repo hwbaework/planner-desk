@@ -1,7 +1,7 @@
 import { useState } from "react";
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, Badge, TypeIcon, ChangeInput } from "../components/ui.jsx";
+import { PageHead, Badge, TypeIcon, ChangeInput, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["docs"];
 
@@ -34,7 +34,7 @@ function DocPath({ d }) {
   return (
     <>
       {isUrl ? <a href={d.path} target="_blank" rel="noopener" title={d.path}>{name}</a> : <span title={d.path}>{name}</span>}
-      <button className="btn sm ghost" onClick={() => E.copyText(d.path, "경로 복사됨")} title={d.path}>복사</button>
+      <IconBtn icon="copy" title="경로 복사" onClick={() => E.copyText(d.path, "경로 복사됨")} />
     </>
   );
 }

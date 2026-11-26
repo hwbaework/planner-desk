@@ -1,6 +1,6 @@
 import { useStore } from "../lib/store.js";
 import * as E from "../legacy/engine.js";
-import { PageHead, Badge, Raw } from "../components/ui.jsx";
+import { PageHead, Badge, Raw, IconBtn } from "../components/ui.jsx";
 
 export const tabs = ["screens"];
 
@@ -29,8 +29,8 @@ export function PathCard({ label, pid, fileKey, path, ver }) {
       </span>{" "}
       {path ? (
         <>
-          <button className="btn sm ghost" onClick={() => E.openPath(path)}><Raw html={E.ICO_FOLDER} style={{ display: "contents" }} /> 열기</button>
-          <button className="btn sm ghost" onClick={() => E.copyText(path, "경로 복사됨 — 탐색기 주소창에 붙여넣기")}>복사</button>
+          <IconBtn icon="folder" title="폴더 열기" onClick={() => E.openPath(path)} />
+          <IconBtn icon="copy" title="경로 복사" onClick={() => E.copyText(path, "경로 복사됨 — 탐색기 주소창에 붙여넣기")} />
         </>
       ) : null}
     </div>

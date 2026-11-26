@@ -1,6 +1,6 @@
 import * as E from "../legacy/engine.js";
 import { useStore } from "../lib/store.js";
-import { PageHead, TypeIcon, PriIcon } from "../components/ui.jsx";
+import { PageHead, TypeIcon, PriIcon, Raw } from "../components/ui.jsx";
 
 // 오프라인판 renderTasks (업무 · 정기 업무). 업무 창·정기 업무 창·CSV 가져오기는 오프라인판 창 그대로
 export const tabs = ["tasks", "ho"];
@@ -18,8 +18,8 @@ function TaskVia({ x }) {
   const isUrl = /^https?:\/\//i.test(x.link || "");
   const ln = x.link
     ? isUrl
-      ? <a href={x.link} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} title={x.link}>링크</a>
-      : <span className="link" onClick={(e) => { e.stopPropagation(); E.copyText(x.link, "복사됨"); }} title={x.link}>링크 복사</span>
+      ? <a href={x.link} target="_blank" rel="noopener" onClick={(e) => e.stopPropagation()} title={x.link} aria-label="링크 열기"><Raw html={E.ICO_LINK} style={{ display: "contents" }} /></a>
+      : <span className="link" onClick={(e) => { e.stopPropagation(); E.copyText(x.link, "복사됨"); }} title={"복사: " + x.link} aria-label="링크 복사"><Raw html={E.ICO_LINK} style={{ display: "contents" }} /></span>
     : null;
   return <>{" "}<span className="chip-ref">{x.via || "출처"}{ln ? <>{" · "}{ln}</> : null}</span></>;
 }
